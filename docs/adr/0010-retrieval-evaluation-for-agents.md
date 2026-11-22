@@ -254,3 +254,8 @@ accuracy on either cohort.
   leaves the gate for good and takes a History line naming it; the tolerance
   already used is carried across a revision as a difference measured over the
   previous membership.
+- 2026-11-22: reviewed warning cases become a release gate in report version 4
+  ([reviewed warning cases](../design/evaluation-warning-cases.md)): every case
+  of the warning fixture must show its reviewed `provision_effect` warning on
+  the target provision through search and read, with no previous comparison;
+  `quality_pass` holds the result and the signing validators recompute it.

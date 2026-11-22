@@ -88,6 +88,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [MRR@8 tolerance](evaluation-mrr-tolerance.md)                                   | The bounded exception to MRR@8 non-regression on a corpus-only release, against a high-water mark                |
 | [period cases](evaluation-period-cases.md)                                       | Development cases about a past period: a reported cohort under the agent's period request, not gated             |
 | [evaluation fixtures](evaluation-fixtures.md)                                    | Authored case fixtures, the identity map and identity validation                                                 |
+| [reviewed warning cases](evaluation-warning-cases.md)                            | Warning assertions in search and read, fixture binding and release gate                                          |
 | [serialized recipe](retrieval-recipe-serialized.md)                              | Serialized retrieval recipe, hash and checks                                                                     |
 | [retrieval performance](retrieval-performance.md)                                | Measured statement costs per search and topic page; one change per cost                                          |
 | [sparse postings](sparse-postings.md)                                            | Exact in-memory sparse arm for the active release, with its load-time gate                                       |
