@@ -233,39 +233,7 @@ func (s *openAICountStore) write(dir int, name string, value any) error {
 	if err != nil {
 		return err
 	}
-	staging, err := countOpenDir(s.journal, ".staging", true)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = unix.Close(staging) }()
-	id, err := newID()
-	if err != nil {
-		return err
-	}
-	fd, err := unix.Openat(staging, id, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = unix.Unlinkat(staging, id, 0) }()
-	f := os.NewFile(uintptr(fd), id)
-	_, err = f.Write(raw)
-	if err == nil {
-		err = f.Sync()
-	}
-	closeErr := f.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
-	}
-	if err = unix.Linkat(staging, id, dir, name, 0); err != nil {
-		return err
-	}
-	if err = s.syncDir(dir); err != nil {
-		return err
-	}
-	return s.syncDir(staging)
+	return publishEvidenceOnce(s.journal, dir, name, raw, s.syncDir)
 }
 func (s *openAICountStore) barrier() error {
 	for _, fd := range []int{s.journal, s.counts, s.root, s.parent} {

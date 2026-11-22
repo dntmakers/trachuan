@@ -127,6 +127,11 @@ during recovery
 If the original project and key cannot read evidence, keep the reserve and
 locks.
 
+Bind the OpenAI creator guard to the admitted intent. Open its lockfile without
+following symlinks and keep the descriptor that acquired the lock until the
+guard closes. Before publishing evidence, confirm that descriptor still refers
+to the intent's current lockfile. Never replace a lockfile to clear the guard.
+
 After admission and durable intent, write JSONL only for submitted items, using
 their original intent item indices in `custom_id`. Do not renumber after replay
 or skips. If there is nothing to submit, do not upload or create a batch. Retain
