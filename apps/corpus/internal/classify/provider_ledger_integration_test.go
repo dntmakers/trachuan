@@ -36,7 +36,7 @@ func TestProviderLedger_RollbackProvider(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			migration, err := os.ReadFile("../../migrations/00017_submission_provider.sql")
+			migration, err := os.ReadFile("../../migrations/00018_submission_provider.sql")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -85,7 +85,7 @@ func TestProviderLedger_DatabaseMigrationAndTuples(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(db.Close)
-	migration, err := os.ReadFile("../../migrations/00017_submission_provider.sql")
+	migration, err := os.ReadFile("../../migrations/00018_submission_provider.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
