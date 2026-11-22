@@ -71,10 +71,9 @@ jobs:
                 deploy/oci/*|.github/workflows/ci.yml) tofu=true ;;
               esac
               case "$path" in
+                *.md) ;;
                 deploy/host/*|deploy/images/*|deploy/github/*|.github/workflows/*) go=true ;;
-                docs/*.md) ;;
                 apps/web/*) ;;
-                *.md) [[ "$path" != */* ]] || go=true ;;
                 *) go=true ;;
               esac
             done < "$paths"
