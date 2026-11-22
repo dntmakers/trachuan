@@ -32,11 +32,19 @@ fixture to 20 cases and 64 KiB. Keep it to representative serving cases, not one
 case per entry.
 
 `fixture_hashes.Warnings` is the lowercase SHA-256 of the exact fixture bytes,
-even for an empty array. Put the digest in the eval input hash and eval cache
-key. Version the eval recipe for the new check; do not change build, serving or
-calibration inputs. A field or a tag on development cases would change
-`development.json`, `fixtures.json` and the fixture revision path. The loader
-checks that metadata and hashes the suite inputs
+even for an empty array. Keep it in the eval-only projection of fixture hashes,
+not in the shared hashes that calibration serializes
+([calibrate.go](../../apps/corpus/internal/evaluation/calibrate.go#L23-L33),
+[assignment](../../apps/corpus/internal/evaluation/calibrate.go#L59-L68)). Add
+the digest to the `eval` stage input hash and the eval cache key
+([eval.go](../../apps/corpus/internal/stage/eval/eval.go#L55-L72),
+[cache.go](../../apps/corpus/internal/evaluation/cache.go#L150-L172)). Version
+the eval recipe for the new check. Changing only the warning fixture leaves
+`calibration.json` bytes, the build input hash and the serving recipe unchanged.
+
+A field or a tag on development cases would change `development.json`,
+`fixtures.json` and the fixture revision path. The loader checks that metadata
+and hashes the suite inputs
 ([fixtures.go](../../apps/corpus/internal/evaluation/fixtures.go#L52-L109),
 [hash assignment](../../apps/corpus/internal/evaluation/fixtures.go#L125-L136));
 the signing code closes development fields and tags
@@ -67,6 +75,11 @@ whose entry is absent has outcome `missing`, not `not_run`.
   not to pass a failing run. Review the fixture and entry together when revising
   their binding; a dependency-only rebind needs no fixture change.
 
+When a reviewed change intentionally stops serving a target (on hold or no
+longer eligible), it may replace that case in the same change with another
+passing case, even if the original entry stays. Never replace a case to waive a
+missing warning on an eligible target.
+
 ## Responses to assert
 
 Use the evaluator's product prepare, collect, shape and present path. It already
@@ -81,15 +94,17 @@ as the period cohort does
 ([cohort_inputs.go](../../apps/corpus/internal/evaluation/cohort_inputs.go#L9-L16),
 [request](../../apps/corpus/internal/evaluation/case_pool.go#L70-L75)). Inspect
 presented `hits` then `non_current`: shaping can place an expired target in the
-second list ([shape.go](../../internal/retrieval/shape.go#L64-L109)). Respect
+second list
+([sibling_plan.go](../../internal/retrieval/sibling_plan.go#L19-L53)). Respect
 normal caps; a raw relation, database row or citation match cannot substitute
 for response evidence. No separate dense or lexical assertions, statistical
 metrics, calibration cases or external model calls.
 
-In both compact and full, require a hit in the target document whose own anchor
-is T, an ancestor of T, or a descendant of T (compare complete slash-separated
-anchor components). In that hit's `warnings`, require one item with `dir:"in"`,
-the fixture `kind`, `key` equal to the acting document key, `in_release:true`,
+In both compact and full, require a hit in the target document whose provision
+is T, an ancestor of T, or a descendant of T. Resolve both handles in the
+candidate release and follow stored provision parent links, not anchor string
+prefixes. In that hit's `warnings`, require one item with `dir:"in"`, the
+fixture `kind`, `key` equal to the acting document key, `in_release:true`,
 `source` equal to the acting handle, `target` equal to T's handle, and
 `exact:true`. An ancestor hit can legitimately carry the exact warning on T; a
 sibling or an inexact warning does not count. Search projects warnings in both
@@ -106,8 +121,7 @@ copy the warning metadata. A per-item error, wrong handle, or absent assertion
 is a failure. Do not turn a missing capped warning into a pass using a
 `relations:true` read. The read path builds the target unit and attaches
 warnings by anchor
-([read_scope.go](../../internal/retrieval/read_scope.go#L53-L71),
-[target unit](../../internal/retrieval/read_scope.go#L94-L109),
+([read_scope.go](../../internal/retrieval/read_scope.go#L94-L109),
 [read_warnings.go](../../internal/retrieval/read_warnings.go#L9-L33)), splits
 only the unit's content field
 ([read_units.go](../../internal/retrieval/read_units.go#L63-L76)).
@@ -128,9 +142,16 @@ Report version 4 keeps `agent-eval/6` and the version 3 scoring contracts. Today
 ([previous_recipe.go](../../apps/corpus/internal/evaluation/previous_recipe.go#L51-L72)),
 and signing pairs versions and scorers
 ([corpus_comparison.py](../../deploy/github/corpus_comparison.py#L7-L19)). Add
-version 4 to those readers and the signed previous report checks. Version 4
-compares with version 2, 3 or 4 under existing scorer compatibility. No schema,
-signed manifest version or scorer bump.
+version 4 to those readers, to
+[`comparablePrevious`](../../apps/corpus/internal/evaluation/previous_compare.go#L13-L26),
+and to the
+[signed previous report checks](../../deploy/github/corpus_previous.py#L32-L42).
+Version 4 compares with version 2, 3 or 4 under existing scorer compatibility.
+Test a version 4 candidate against a version 4 previous report from frozen
+selection in `corpus start` through normal comparison in `eval`. Verify that
+`previous_diff.previous.report_sha256` equals the frozen SHA-256 and that the
+existing non-regression checks run. No schema, signed manifest version or scorer
+bump.
 
 `warning_cases` is a top-level array in fixture order, separate from `cases` and
 `cohorts`. Each record is `{entry_id, outcome, reason?, search, read}`. `reason`
@@ -162,23 +183,33 @@ its build/dump bindings and the verified previous report
 [corpus_upload.py](../../deploy/github/corpus_upload.py#L98-L105),
 [corpus_previous.py](../../deploy/github/corpus_previous.py#L15-L42)).
 
-1. For version 4, resolve `fixture_hashes.Warnings` to exact fixture bytes in
-   first-parent `main` history, using the path-specific fixture history reader
-   ([corpus_fixture_history.py](../../deploy/github/corpus_fixture_history.py#L42-L74)).
-   Decode the closed warning schema separately. Require closed record shapes,
-   exact membership and order, the prescribed surface matrix and the `not_run`
-   rule. Validate each match's fields against the pinned fixture, including
-   carrier scope. Recompute the candidate gate; refuse a missing or failing gate
-   even if `quality_pass` is true. Keep the existing partition, revisions and
-   gates for versions 3 and 4.
-2. Once the evaluator and the validators ship, upload and first signing of a new
-   release require version 4; a run evaluated at version 3 needs a new run.
-   Re-signing an already verified release keeps its original report hash and
-   validation rules
+1. After rollout, upload and first signing of a new release require version 4
+   and `fixture_hashes.Warnings` equal to the SHA-256 of the fixture at the
+   trusted release-authorizing `main` commit. Upload uses local `main`, updated
+   before upload; signing uses the workflow's `main` commit. Do not accept an
+   older fixture from history. A run evaluated at version 3 needs a new run.
+2. Re-signing keeps the report hash from the verified signed release manifest
+   and applies the report version's validation rules
    ([corpus_production.py](../../deploy/github/corpus_production.py#L76-L93),
-   [corpus_publish.py](../../deploy/github/corpus_publish.py#L23-L39)). The
-   fixture is pinned in first-parent `main` history like the other fixtures, so
-   removing a case needs a reviewed change on `main`.
+   [corpus_publish.py](../../deploy/github/corpus_publish.py#L23-L39)). Only on
+   this path, resolve version 4's fixture by its digest in first-parent `main`
+   history, using the path-specific reader
+   ([corpus_fixture_history.py](../../deploy/github/corpus_fixture_history.py#L42-L74)).
+3. For version 4, decode the closed warning schema separately. Require closed
+   record shapes, exact case membership and order, the prescribed surface matrix
+   and the `not_run` rule. Compare each match with the pinned fixture. A search
+   `carrier` must be a provision handle in the target document; the validator
+   does not check its place in the tree. A read `carrier` must be T's handle.
+   Recompute the candidate gate and refuse a missing or failing gate even if
+   `quality_pass` is true. Keep the existing partition, revisions and gates for
+   versions 3 and 4.
+
+Signing trusts the evaluator's observations, as it already trusts the reported
+case ranks and observations behind other metrics
+([corpus_comparison.py](../../deploy/github/corpus_comparison.py#L68-L78),
+[gate recomputation](../../deploy/github/corpus_comparison.py#L180-L197)). The
+validator catches inconsistent records and gate results, not fabricated
+observations.
 
 ## First release
 

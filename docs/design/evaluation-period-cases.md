@@ -108,6 +108,7 @@ The report version becomes 3: it adds the period cohort and the revision fields.
 The scorer version moves to `agent-eval/6`, listed as comparable with
 `agent-eval/5` only (earlier scorers stay incompatible) because product matching
 and the metric definitions are unchanged; only the cases in the `development`
-records change, which the revision rule handles. `corpus start` accepts a
-previous report of version 2 or 3, and the validators list version 3. A previous
-report that used the removed `historical_policy` override is refused.
+records change, which the revision rule handles. Version 4 retains these rules.
+[Selected report](release-evidence.md#selected-report) lists the versions
+`corpus start` accepts. A previous report that used the removed
+`historical_policy` override is refused.
