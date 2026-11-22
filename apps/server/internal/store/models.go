@@ -288,6 +288,7 @@ type ReleaseJournal struct {
 	DumpSha256       *string
 	ExpectedActiveDb *string
 	Manifest         []byte
+	CorpusKind       string
 }
 
 type RetiredRelease struct {
@@ -297,6 +298,7 @@ type RetiredRelease struct {
 	RetainUntil time.Time
 	DroppedAt   *time.Time
 	DumpSha256  *string
+	CorpusKind  string
 }
 
 type TotpCredential struct {
