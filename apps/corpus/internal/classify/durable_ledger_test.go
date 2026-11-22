@@ -14,6 +14,8 @@ func TestDurableLedger_ChangedWorkshopFieldsBlockCreate(t *testing.T) {
 		settled bool
 		change  func(*Submission)
 	}{
+		{"project", false, func(s *Submission) { s.ProjectID = "proj-other" }},
+		{"provider", false, func(s *Submission) { s.Provider = "openai" }},
 		{"reserve", false, func(s *Submission) { s.ReserveMicroUSD = 0 }},
 		{"cost", true, func(s *Submission) { s.CostMicroUSD = 0 }},
 		{"cost", false, func(s *Submission) { s.CostMicroUSD = 1 }},
@@ -114,6 +116,7 @@ func seedHistoricalPilot(t *testing.T, r *Runner, ledger *memoryLedger, o Option
 	if recipe.Article != nil {
 		recipe = recipe.documentRecipe()
 	}
+	recipe.Provider = ""
 	reserve, err := recipe.reserve("", 100)
 	if err != nil {
 		t.Fatal(err)

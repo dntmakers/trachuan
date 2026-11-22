@@ -32,6 +32,9 @@ type Outcome struct {
 }
 
 func BuildRequest(r Recipe, d Document, families []Family) (anthropic.MessageNewParams, error) {
+	if r.Provider != "" && r.Provider != "anthropic" {
+		return anthropic.MessageNewParams{}, fmt.Errorf("anthropic recipe required")
+	}
 	if err := r.validate(true); err != nil {
 		return anthropic.MessageNewParams{}, err
 	}

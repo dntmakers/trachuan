@@ -86,6 +86,8 @@ func (r *Runner) verifyLedgerRows(rows []Submission, store *retainedStore) error
 			name  string
 			match bool
 		}{
+			{"provider", row.Provider == intent.Provider},
+			{"project", row.ProjectID == intent.ProjectID},
 			{"reserve", row.ReserveMicroUSD == intent.ReserveMicroUSD},
 			{"budget name", row.Budget == intent.Budget},
 			{"budget amount", row.BudgetMicroUSD == intent.BudgetMicroUSD},
@@ -162,12 +164,28 @@ func sameReceiptTime(got *time.Time, want time.Time) bool {
 	return got != nil && got.Equal(want)
 }
 
-func (store retainedStore) ledgerCost() (int64, error) {
-	if store.pendingPilot != "" {
+func (store retainedStore) ledgerCostFor(provider string) (int64, error) {
+	if provider != "anthropic" && provider != "openai" {
+		return 0, fmt.Errorf("invalid ledger provider")
+	}
+	if provider != "openai" && store.pendingPilot != "" {
 		return 0, fmt.Errorf("pilot settlement %s must be imported with corpus submissions --rebuild before admission", store.pendingPilot)
 	}
 	var total int64
 	for _, intent := range store.intents {
+		p := intent.Provider
+		if p == "" {
+			if _, ok := priceForModel(intent.Recipe.Model); !ok || (intent.PriceVersion != "" && intent.PriceVersion != pilotPriceVersion && intent.PriceVersion != batchPriceVersion) {
+				return 0, fmt.Errorf("unknown historical provider for %s", intent.ID)
+			}
+			p = "anthropic"
+		}
+		if p != "anthropic" && p != "openai" {
+			return 0, fmt.Errorf("unknown provider for %s", intent.ID)
+		}
+		if p != provider {
+			continue
+		}
 		charge := intent.ReserveMicroUSD
 		if store.abandoned[intent.ID] && store.retryAbandoned[intent.ID] {
 			charge = 0

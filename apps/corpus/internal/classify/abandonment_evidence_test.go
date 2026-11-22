@@ -31,7 +31,7 @@ func TestAbandonment_CompleteListingReleasesDispatchedReserve(t *testing.T) {
 	if !store.retryAbandoned[s.ID] {
 		t.Fatal("complete clean listing did not release key")
 	}
-	cost, err := store.ledgerCost()
+	cost, err := store.ledgerCostFor("anthropic")
 	if err != nil || cost != 0 {
 		t.Fatalf("reserve remains: %d, %v", cost, err)
 	}
@@ -89,7 +89,7 @@ func TestAbandonment_IncompleteEvidenceKeepsReserve(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cost, err := store.ledgerCost()
+			cost, err := store.ledgerCostFor("anthropic")
 			if err != nil || cost != s.ReserveMicroUSD {
 				t.Fatalf("reserve released: %d, %v", cost, err)
 			}

@@ -183,6 +183,7 @@ func TestResultStore_RebuildImportsHistoricalPilotCost(t *testing.T) {
 	ctx := context.Background()
 	r, ledger, _, o := screenFixture(t)
 	o.Recipe.PromptVersion = 1
+	o.Recipe.Provider = ""
 	s := Submission{ID: strings.Repeat("a", 32), RunID: o.RunID, Country: o.Country, Release: o.Release, Recipe: o.Recipe, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, ReserveMicroUSD: 1029, Items: []Item{{Key: documents()[0].Key, RequestHash: strings.Repeat("b", 64), InputTokens: 100}}}
 	s.ItemsHash = itemsHash(s.Items)
 	if err := r.writeIntent(s); err != nil {
@@ -303,7 +304,7 @@ func TestResultStore_RebuildKeepsAbandonedKeyLockedWhenReceiptAppears(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := retained.ledgerCost()
+	total, err := retained.ledgerCostFor("anthropic")
 	if err != nil || total != s.ReserveMicroUSD || retained.retryAbandoned[s.ID] {
 		t.Fatalf("late receipt failed to hold reserve and key: total=%d error=%v", total, err)
 	}

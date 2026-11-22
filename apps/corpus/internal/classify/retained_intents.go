@@ -56,6 +56,9 @@ func readRetainedFile(path string, value any) error {
 		return fmt.Errorf("decode classification record %s: %w", path, err)
 	}
 	if s, ok := value.(*Submission); ok {
+		if s.Provider != "" && s.Provider != "anthropic" {
+			return fmt.Errorf("unsupported provider in retained intent %s", path)
+		}
 		var fields map[string]json.RawMessage
 		if err = json.Unmarshal(b, &fields); err != nil {
 			return fmt.Errorf("decode classification record %s: %w", path, err)

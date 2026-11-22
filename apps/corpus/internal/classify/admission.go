@@ -22,7 +22,7 @@ func (r *Runner) admitBatch(ctx context.Context, prepared *screenBatch, o Option
 			if retained.missingRows != 0 {
 				return fmt.Errorf("submission ledger omits retained intents; run corpus submissions --rebuild before admission")
 			}
-			total, ledgerErr := retained.ledgerCost()
+			total, ledgerErr := retained.ledgerCostFor("anthropic")
 			if ledgerErr != nil {
 				return ledgerErr
 			}

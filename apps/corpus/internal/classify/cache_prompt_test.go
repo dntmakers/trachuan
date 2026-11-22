@@ -64,6 +64,7 @@ func TestDocumentPromptVersionChangesRequestKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.Provider = ""
 	r.PromptVersion = 2
 	old, err := BuildRequest(r, d, families())
 	if err != nil {
@@ -89,6 +90,8 @@ func TestArticlePromptVersionChangesRequestKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.Provider = ""
+	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	r.Article.PromptVersion = 1
 	old, err := BuildArticleRequest(r, req)
 	if err != nil {

@@ -43,6 +43,7 @@ func TestRebuild_RestoresUncertainOrKnownBatch(t *testing.T) {
 	for _, known := range []bool{false, true} {
 		t.Run(map[bool]string{false: "uncertain", true: "submitted"}[known], func(t *testing.T) {
 			r, m, _, o := screenFixture(t)
+			o.Recipe.Provider = ""
 			s := Submission{ID: strings.Repeat("a", 32), RunID: o.RunID, Country: o.Country, Release: o.Release, Recipe: o.Recipe, Items: []Item{{Key: "vn:vbpl:1", InputTokens: 100}}, State: "preparing", CreatedAt: r.Now(), ReserveMicroUSD: 1029, Budget: "pilot", BudgetMicroUSD: 15000000}
 			s.ItemsHash = itemsHash(s.Items)
 			if err := r.writeIntent(s); err != nil {

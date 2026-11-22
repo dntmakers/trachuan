@@ -11,6 +11,7 @@ import (
 
 func TestOpenAIDocumentRequest_StableCount(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Article = nil
 	r.Model = "gpt-6.2-sol"
 	d := Document{Key: "key", Title: "title"}
@@ -59,6 +60,7 @@ func TestOpenAIDocumentRequest_StableCount(t *testing.T) {
 
 func TestOpenAIArticleRequest_SchemaAndCount(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Model = "gpt-6.2-astra"
 	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	req := ArticleRequest{DocumentKey: "key", Articles: articleInputs(2, ""), Nodes: articleNodes()}
@@ -96,6 +98,7 @@ func TestOpenAIArticleRequest_SchemaAndCount(t *testing.T) {
 
 func TestOpenAIRequest_RejectsUnsupported(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Article = nil
 	r.Model = "gpt-6.2-sol"
 	d := Document{Key: "key", Title: "title"}
@@ -115,6 +118,7 @@ func TestOpenAIRequest_RejectsUnsupported(t *testing.T) {
 
 func TestOpenAIArticleRequest_RejectsSchemaLimit(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Model = "gpt-6.2-astra"
 	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	req := ArticleRequest{DocumentKey: "key", Articles: articleInputs(1251, ""), Nodes: articleNodes()}
@@ -125,6 +129,8 @@ func TestOpenAIArticleRequest_RejectsSchemaLimit(t *testing.T) {
 
 func TestOpenAIRequest_AnthropicBytes(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = ""
+	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	for _, version := range []int{1, 2, 3} {
 		base := r.documentRecipe()
 		base.PromptVersion = version
@@ -169,6 +175,7 @@ func TestOpenAIRequest_AnthropicBytes(t *testing.T) {
 
 func TestOpenAIArticleRequest_RejectsInvalidAnchorUTF8(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Model = "gpt-6.2-astra"
 	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	req := ArticleRequest{DocumentKey: "key", Articles: []Article{{Anchor: string([]byte{0xff})}}, Nodes: articleNodes()}
@@ -182,6 +189,7 @@ func TestOpenAIRequest_EffortMatrix(t *testing.T) {
 		for _, effort := range []string{"low", "medium", "high", "xhigh", "max", "none", "minimal", "other"} {
 			t.Run(model+"/"+effort, func(t *testing.T) {
 				r := articleRecipe(t)
+				r.Provider = "openai"
 				r.Model = model
 				r.Effort = effort
 				r.Article.SourceRecipeHash = r.documentRecipe().Hash()
@@ -200,6 +208,7 @@ func TestOpenAIRequest_OutputBounds(t *testing.T) {
 	for _, n := range []int64{15, 16, 32000, 32001} {
 		t.Run(fmt.Sprint(n), func(t *testing.T) {
 			r := articleRecipe(t)
+			r.Provider = "openai"
 			r.Model = "gpt-6.2-sol"
 			r.MaxTokens = n
 			r.Article.SourceRecipeHash = r.documentRecipe().Hash()
@@ -219,6 +228,7 @@ func TestOpenAIRequest_OutputBounds(t *testing.T) {
 
 func TestOpenAIDocumentRequest_RejectsArticleRecipe(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Model = "gpt-6.2-sol"
 	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	b, c, err := BuildOpenAIDocumentRequest(r, Document{Key: "key", Title: "title"}, []Family{{Code: "1"}})
@@ -229,6 +239,7 @@ func TestOpenAIDocumentRequest_RejectsArticleRecipe(t *testing.T) {
 
 func TestOpenAIRequest_CacheTTL(t *testing.T) {
 	r := articleRecipe(t)
+	r.Provider = "openai"
 	r.Article = nil
 	r.Model = "gpt-6.2-sol"
 	body, count, err := BuildOpenAIDocumentRequest(r, Document{Key: "key", Title: "title"}, []Family{{Code: "1"}})

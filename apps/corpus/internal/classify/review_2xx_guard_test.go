@@ -78,7 +78,7 @@ func TestReview_Any2xxCreateKeepsAbandonedReserve(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			total, err := store.ledgerCost()
+			total, err := store.ledgerCostFor("anthropic")
 			if err != nil || store.retryAbandoned[s.ID] || total != s.ReserveMicroUSD {
 				t.Fatalf("2xx evidence released key or reserve: total=%d error=%v", total, err)
 			}

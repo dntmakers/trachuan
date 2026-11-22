@@ -19,7 +19,7 @@ func (r *Runner) prepareScreenBatch(ctx context.Context, o Options, docs []Docum
 	if err != nil {
 		return nil, err
 	}
-	s := Submission{KeyVersion: keyVersion, PriceVersion: batchPriceVersion, RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, Families: families, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
+	s := Submission{Provider: o.Recipe.Provider, KeyVersion: keyVersion, PriceVersion: batchPriceVersion, RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, Families: families, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
 	requests := make([]batchapi.Request, len(selected))
 	counter := r.countWith(history, nil)
 	for i, d := range selected {

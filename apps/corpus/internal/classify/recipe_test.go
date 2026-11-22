@@ -93,6 +93,7 @@ func TestRecipe_HistoricalHashesAndNewDefaults(t *testing.T) {
 		t.Fatalf("article default %+v: %v", current.Article, err)
 	}
 
+	base.Provider = ""
 	base.PromptVersion = 2
 	cases := []struct {
 		name    string

@@ -113,6 +113,7 @@ func TestScore_HistoricalArtifacts(t *testing.T) {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			labels, families, a, release, nodes := scoreFixture(t, 1)
 			if version == 1 {
+				a.Recipe.Provider = ""
 				a.Recipe.PromptVersion = 1
 				a.Recipe.Article.SourceRecipeHash = a.Recipe.documentRecipe().Hash()
 			}

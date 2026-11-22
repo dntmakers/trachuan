@@ -24,6 +24,8 @@ type Item struct {
 }
 
 type Submission struct {
+	Provider           string `json:"provider,omitempty"`
+	ProjectID          string `json:"project_id,omitempty"`
 	KeyVersion         int    `json:"key_version,omitempty"`
 	PriceVersion       string `json:"price_version,omitempty"`
 	AccountFingerprint string `json:"account_fingerprint,omitempty"`
@@ -106,6 +108,9 @@ func BudgetMicroUSD(name string) int64 {
 }
 
 func (o Options) validate() error {
+	if o.Recipe.Provider != "anthropic" {
+		return fmt.Errorf("anthropic runtime requires an explicit Anthropic recipe")
+	}
 	if o.RunID < 1 || o.Country != "vn" || o.Release == "" || o.Out == "" {
 		return fmt.Errorf("invalid screening options: require release, output and 1 to 400 documents")
 	}

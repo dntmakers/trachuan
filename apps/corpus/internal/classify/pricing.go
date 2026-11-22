@@ -58,12 +58,24 @@ func (r Recipe) Reserve(input int64) (int64, error) {
 	if err := r.Validate(); err != nil {
 		return 0, err
 	}
+	if r.Provider == "openai" {
+		return r.reserve(openAIBatchPriceVersion, input)
+	}
 	return r.reserve(batchPriceVersion, input)
 }
 
 func (r Recipe) reserve(version string, input int64) (int64, error) {
+	if r.Provider == "openai" {
+		return openAIReserve(r.Model, version, input, r.InputBound, r.outputTokens())
+	}
+	if r.Provider != "" && r.Provider != "anthropic" {
+		return 0, fmt.Errorf("unknown classification provider")
+	}
 	if input < 1 || input > r.InputBound {
 		return 0, fmt.Errorf("counted input exceeds classification recipe bound or is empty")
+	}
+	if r.Provider == "anthropic" && version != batchPriceVersion {
+		return 0, fmt.Errorf("explicit provider requires the current price version")
 	}
 	if version == "" || version == pilotPriceVersion {
 		return r.cost(pilotPriceVersion, tokenUsage{Input: input, Output: r.outputTokens()})
@@ -86,7 +98,7 @@ func (r Recipe) reserve(version string, input int64) (int64, error) {
 
 func (r Recipe) cost(version string, u tokenUsage) (int64, error) {
 	price, ok := priceForModel(r.Model)
-	if !ok || (version != batchPriceVersion && version != pilotPriceVersion) {
+	if (r.Provider != "" && r.Provider != "anthropic") || !ok || (version != batchPriceVersion && version != pilotPriceVersion) {
 		return 0, fmt.Errorf("unknown classification model or price table")
 	}
 	if version == pilotPriceVersion && (u.CacheRead != 0 || u.CacheWrite != 0) {

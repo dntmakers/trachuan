@@ -95,7 +95,7 @@ func TestReview_B1FinalUnpricedAttemptReadsAndReplays(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			total, err := store.ledgerCost()
+			total, err := store.ledgerCostFor("anthropic")
 			if err != nil || total != s.ReserveMicroUSD {
 				t.Fatalf("unpriced reserve %d error %v", total, err)
 			}
@@ -309,7 +309,7 @@ func TestReview_B1FinalUnpricedUsageSnapshotRemainsReadable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || total != s.ReserveMicroUSD {
 		t.Fatalf("historical reserve changed: %d %v", total, err)
 	}

@@ -43,6 +43,23 @@ func screenHash(o Options) string {
 	return digest(b)
 }
 
+func legacyScreenHash(o Options) string {
+	if o.Recipe.Provider != "anthropic" {
+		return ""
+	}
+	o.Recipe.Provider = ""
+	if o.Recipe.Article != nil {
+		article := *o.Recipe.Article
+		o.Recipe.Article = &article
+		article.SourceRecipeHash = o.Recipe.documentRecipe().Hash()
+	}
+	return screenHash(o)
+}
+
+func matchesScreen(s Submission, current, legacy string) bool {
+	return s.ScreenHash == current || (legacy != "" && s.Provider == "" && s.Recipe.Provider == "" && s.ScreenHash == legacy)
+}
+
 func (r *Runner) Screen(ctx context.Context, o Options, docs []Document, families []Family) (Summary, error) {
 	return r.screen(ctx, o, docs, families, nil)
 }
@@ -85,9 +102,9 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	if err != nil {
 		return summary, err
 	}
-	hash := screenHash(o)
+	hash, legacyHash := screenHash(o), legacyScreenHash(o)
 	for _, s := range rows {
-		if s.ScreenHash == hash && (s.State == "completed" || s.State == "cancelled") {
+		if matchesScreen(s, hash, legacyHash) && (s.State == "completed" || s.State == "cancelled") {
 			summary = s.summary()
 			if o.DryRun {
 				return summary, nil
@@ -124,7 +141,7 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	}
 	for i := len(rows) - 1; i >= 0; i-- {
 		s := rows[i]
-		if s.ScreenHash == hash && s.State != "abandoned" {
+		if matchesScreen(s, hash, legacyHash) && s.State != "abandoned" {
 			summary = s.summary()
 			if o.DryRun {
 				return summary, nil
@@ -139,6 +156,9 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 			release()
 			return summary, r.poll(ctx, &s, o.Out)
 		}
+	}
+	for i := len(rows) - 1; i >= 0; i-- {
+		s := rows[i]
 		if s.RunID == o.RunID && nonterminal(s.State) {
 			return summary, fmt.Errorf("earlier classification submission %s blocks this release", s.ID)
 		}

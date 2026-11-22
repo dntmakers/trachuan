@@ -14,6 +14,8 @@ import (
 func stepRecipe(t *testing.T, step int) Recipe {
 	t.Helper()
 	r := articleRecipe(t)
+	r.Provider = ""
+	r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	b, err := json.Marshal(r.Article)
 	if err != nil {
 		t.Fatal(err)

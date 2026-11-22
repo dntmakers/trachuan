@@ -28,6 +28,12 @@ type openAIRequest struct {
 }
 
 func openAIRecipe(r Recipe) (Recipe, error) {
+	if r.Provider != "openai" {
+		return Recipe{}, fmt.Errorf("explicit OpenAI provider required")
+	}
+	if err := r.Validate(); err != nil {
+		return Recipe{}, fmt.Errorf("invalid OpenAI recipe: %w", err)
+	}
 	if r.Model != "gpt-6.2-sol" && r.Model != "gpt-6.2-astra" {
 		return Recipe{}, fmt.Errorf("unsupported OpenAI model")
 	}
@@ -45,6 +51,7 @@ func openAIRecipe(r Recipe) (Recipe, error) {
 		r.Article = &article
 	}
 	r.Model = "claude-haiku-5-5"
+	r.Provider = "anthropic"
 	if r.Article != nil {
 		r.Article.SourceRecipeHash = r.documentRecipe().Hash()
 	}
