@@ -10,9 +10,13 @@ import (
 
 func ReadFrozenSource(path, slice, country, release string) (FrozenLabels, error) {
 	var source FrozenLabels
-	pins := map[string]string{"multi-family": "e46dc8ad6ec74fd341b0feeac5d7fbd4e5c7d2881fb758ce2f64c8b575ab3b04", "post-2023": "8d8d7ce12dc4a96338dc8553d56e4d8e9c5ccb0dfe25e8a1dc0c040918f4ce3c"}
-	pin, ok := pins[slice]
-	if !ok {
+	pin := ""
+	for _, entry := range adjudicatedPins() {
+		if entry.slice == slice && entry.provider == "openai" {
+			pin = entry.hash
+		}
+	}
+	if pin == "" {
 		return source, fmt.Errorf("no frozen source for slice %q", slice)
 	}
 	data, err := os.ReadFile(path)

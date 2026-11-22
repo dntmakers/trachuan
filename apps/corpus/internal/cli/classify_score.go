@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"danny.vn/trachuan/apps/corpus/internal/classify"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
@@ -46,6 +48,13 @@ func runClassifyScoreWith(ctx context.Context, args []string, stdout, stderr io.
 	if err != nil {
 		return fail(1, err)
 	}
+	data, err := os.ReadFile(o.Labels)
+	if err != nil {
+		return fail(1, fmt.Errorf("read score labels: %w", err))
+	}
+	if fmt.Sprintf("%x", sha256.Sum256(data)) != labelsHash {
+		return fail(1, fmt.Errorf("score labels changed while reading"))
+	}
 	evidence, err := load(ctx, args[0], args[1], labels)
 	if err != nil {
 		return fail(1, err)
@@ -61,7 +70,12 @@ func runClassifyScoreWith(ctx context.Context, args []string, stdout, stderr io.
 	if articles.Country != args[0] || articles.Release != args[1] || articles.LabelsHash != labelsHash || articles.Recipe.Article.SourceRecipeHash != families.RecipeHash {
 		return fail(1, fmt.Errorf("article artifact differs from target release, labels or document recipe"))
 	}
+	slice, err := classify.VerifyScoreLabels(articles.Recipe, data)
+	if err != nil {
+		return fail(1, err)
+	}
 	report, scoreErr := classify.Score(labels, families, articles, evidence.articles, evidence.nodes)
+	report.Slice = slice
 	report.LabelsHash = labelsHash
 	if scoreErr != nil && report.Status != "unavailable" {
 		return fail(1, scoreErr)

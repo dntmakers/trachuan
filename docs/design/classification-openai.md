@@ -242,15 +242,16 @@ classification session.
 
 Use one Claude model per slice, including any follow-up blind session. Extend
 `freeze` to accept the provider and actual Claude model ID, validate identities
-and codes, and bind the output to the source list's hash over those triples.
-Scoring recomputes the identity triples from the approved original and compares
-them with those in the derived set; it also checks the labeler provider. After
-the blind sessions finish and the frozen file is checked, its whole-file SHA-256
-is pinned in a reviewed catalog keyed by `(slice, provider)`, beside the two
-original pins; a gate uses only a file whose bytes match its pin, so an earlier
-draft, a relabeled copy or a file that claims another provider cannot gate.
-Existing Astra files keep their bytes and hashes; infer OpenAI only for their
-known historical `gpt-6-astra` labeler format. Reject unknown or inconsistent
+and codes, and bind the output to the source list's hash over those triples. A
+test over the pinned files checks that each derived set's identity triples equal
+those of its approved original; scoring identifies a file only by its whole-file
+pin, which fixes those triples, and checks the labeler provider. After the blind
+sessions finish and the frozen file is checked, its whole-file SHA-256 is pinned
+in a reviewed catalog keyed by `(slice, provider)`, beside the two original
+pins; a gate uses only a file whose bytes match its pin, so an earlier draft, a
+relabeled copy or a file that claims another provider cannot gate. Existing
+Astra files keep their bytes and hashes; infer OpenAI only for their known
+historical `gpt-6-astra` labeler format. Reject unknown or inconsistent
 provenance. A paid Batch adjudication would add a new request and result type,
 spend classification credit and differ from the first labeling method, so do not
 build one.
