@@ -131,15 +131,13 @@ host, so the coordinator runs it. Check that at least 3 GB is free first
 (`free -m`): the probe runs beside the serving server.
 
 The probe is a one-off server from the serving image with the flag on and the
-server Quadlet's limits (no swap, no core dumps, four CPUs, 2,500 MB). It
-receives no request and holds no token: at start the server loads the active law
-release's sparse postings and opens the active frameworks release on its own,
-and logs each (`sparse postings` with `status`, `frameworks release` with
-`status`). Its listener is on a loopback port that Caddy does not route, and
-nothing is sent to it. It shares the auth database and background workers with
-the serving server for its short life; stop it with `podman stop`, which lets
-the mail worker finish a send in progress, and keep `--timeout` only as the
-backstop.
+server Quadlet's limits (no swap, no core dumps, four CPUs, 2,500 MB). It holds
+no token and serves no one: it listens on a loopback port that Caddy does not
+route, with a loopback public URL and no SMTP host, so it starts with mail
+disabled and never claims a mail row. The frameworks release opens on its own at
+start; the law release loads on the first resolve, which the token-free
+`/readyz` call triggers. The server logs each load (`sparse postings` with
+`status`, `frameworks release` with `status`).
 
 On the host, as `trachuan`:
 
@@ -147,47 +145,49 @@ On the host, as `trachuan`:
 sudo -iu trachuan
 export XDG_RUNTIME_DIR=/run/user/$(id -u)
 PORT=18080
-NAME=trachuan-server-memcheck
 SERVER_IMAGE=$(grep '^SERVER_IMAGE=' /srv/trachuan/host/images.env | cut -d= -f2-)
-trap 'podman stop --time 30 "$NAME" >/dev/null 2>&1; podman rm "$NAME" >/dev/null 2>&1' EXIT
-podman run -d --name "$NAME" --timeout 900 --network host \
+CID=$(podman run -d --timeout 900 --network host \
   --user 65532:65532 --cap-drop=ALL --security-opt=no-new-privileges --read-only \
   --cpus=4 --memory=2500m --memory-swap=2500m --memory-reservation=2000m \
   --ulimit core=0 --env-file /srv/trachuan/host/server.env \
-  -e SERVER_LISTEN="127.0.0.1:$PORT" -e SERVER_FRAMEWORKS=true \
+  -e SERVER_LISTEN="127.0.0.1:$PORT" -e SERVER_PUBLIC_URL="http://127.0.0.1:$PORT" \
+  -e SERVER_SMTP_HOST= -e SERVER_FRAMEWORKS=true \
   --secret google_client_secret,type=env,target=GOOGLE_CLIENT_SECRET \
   --secret server_auth_database_url,type=env,target=SERVER_AUTH_DATABASE_URL \
   --secret server_corpus_database_url,type=env,target=SERVER_CORPUS_DATABASE_URL \
   --secret account_keys,type=mount,target=/run/secrets/account_keys,uid=65532,gid=65532,mode=0400 \
   --secret server_frameworks_key,type=mount,target=/run/secrets/server_frameworks_key,uid=65532,gid=65532,mode=0400 \
-  --secret smtp_username,type=env,target=SERVER_SMTP_USERNAME \
-  --secret smtp_password,type=env,target=SERVER_SMTP_PASSWORD \
-  "$SERVER_IMAGE" serve
+  "$SERVER_IMAGE" serve) || exit 1
+trap 'podman rm -f "$CID" >/dev/null 2>&1' EXIT
 ```
 
 `--memory-swap` equal to `--memory` gives the probe no swap, as
-`MemorySwapMax=0` does for the service. Wait up to five minutes for both load
-lines; anything other than `ready` postings and an `opened` frameworks release
-ends the probe as failed:
+`MemorySwapMax=0` does for the service, and `--timeout` ends it after 15 minutes
+even if the shell dies. Every later command uses the returned container ID,
+never a name. Wait up to five minutes: call `/readyz` until it answers 200, then
+require `mail_disabled`, `ready` postings and an `opened` frameworks release in
+the probe's own log; anything else ends the probe as failed:
 
 ```sh
 ready=
 for i in $(seq 1 60); do
-  logs=$(podman logs "$NAME" 2>&1)
+  code=$(curl -q -s --noproxy '*' -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/readyz")
+  logs=$(podman logs "$CID" 2>&1)
+  mail=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "mail_disabled") | .msg' | tail -n 1)
   law=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "sparse postings") | .status' | tail -n 1)
   fw=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "frameworks release") | .status' | tail -n 1)
-  if [ "$law" = ready ] && [ "$fw" = opened ]; then ready=1; break; fi
+  if [ "$code" = 200 ] && [ -n "$mail" ] && [ "$law" = ready ] && [ "$fw" = opened ]; then ready=1; break; fi
   if [ -n "$fw" ] && [ "$fw" != opened ]; then break; fi
   sleep 5
 done
-echo "law=${law:-none} frameworks=${fw:-none}"
+echo "readyz=${code:-none} mail=${mail:-enabled} law=${law:-none} frameworks=${fw:-none}"
 [ -n "$ready" ] || exit 1
 ```
 
-Then record the probe's resident memory; the EXIT trap stops and removes it:
+Then record the probe's resident memory; the EXIT trap removes it:
 
 ```sh
-PID=$(podman inspect --format '{{.State.Pid}}' "$NAME")
+PID=$(podman inspect --format '{{.State.Pid}}' "$CID")
 grep -E '^(VmRSS|VmHWM)' "/proc/$PID/status"
 exit
 ```
