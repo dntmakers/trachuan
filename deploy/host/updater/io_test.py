@@ -107,6 +107,49 @@ class IOTest(unittest.TestCase):
         self.assertEqual(failure_reason(['/usr/local/libexec/trachuan/bin/oras', 'repo', 'tags'], stderr), 'denied')
         self.assertEqual(failure_reason(['/usr/local/libexec/trachuan/bin/oras', 'resolve'], stderr), 'denied')
         self.assertEqual(failure_reason(['/usr/local/libexec/trachuan/bin/oras', 'manifest', 'fetch'], stderr), 'failed')
+class ProcessControlTest(unittest.TestCase):
+    def setUp(self):
+        from updater.deploy_io import stop
+        stop.clear()
+        self.addCleanup(stop.clear)
+
+    def test_signal_interrupts_child_wait(self):
+        import os
+        import signal
+        import threading
+        from updater import main
+        from updater.deploy_io import StopRequested, interrupted
+        old = signal.signal(signal.SIGTERM, main.interrupted)
+        timer = threading.Timer(0.2, os.kill, args=(os.getpid(), signal.SIGTERM))
+        timer.start()
+        try:
+            with self.assertRaises(StopRequested) as raised:
+                command(['/bin/sleep', '5'], timeout=3, stdout_limit=10)
+            self.assertTrue(interrupted(raised.exception))
+        finally:
+            timer.cancel()
+            timer.join()
+            signal.signal(signal.SIGTERM, old)
+
+    def test_early_empty_select_is_not_timeout(self):
+        import selectors
+        original = selectors.DefaultSelector.select
+        calls = []
+        def select(selector, timeout=None):
+            if not calls:
+                calls.append(True)
+                return []
+            return original(selector, timeout)
+        with mock.patch.object(selectors.DefaultSelector, 'select', select):
+            self.assertEqual(command(['/bin/echo', 'ok'], timeout=2, stdout_limit=10), b'ok\n')
+
+    def test_timeout_reports_program_without_arguments(self):
+        for limit in (None, 10):
+            with self.subTest(limit=limit), self.assertRaises(CommandError) as raised:
+                command(['/bin/sleep', '5'], timeout=0.05, stdout_limit=limit)
+            self.assertEqual(raised.exception.reason, 'timeout')
+            self.assertEqual(raised.exception.detail, 'sleep: timeout')
+
 
 if __name__ == '__main__':
     unittest.main()

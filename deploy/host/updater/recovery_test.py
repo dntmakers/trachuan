@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from updater.activation_test import ActivationFixture, Crash
-from updater.deploy_io import CommandError, canonical
+from updater.deploy_io import CommandError, StopRequested, canonical, stop
 from updater.deploy_state import State
 from updater.deploy_verify import pull_image
 from updater.deploy_run import Updater
@@ -253,6 +253,97 @@ class HousekeepingTest(ActivationFixture, unittest.TestCase):
         secrets = mock.patch('updater.deploy_run.Secrets.run', return_value=True)
         secrets.start()
         self.addCleanup(secrets.stop)
+
+    def test_stop_during_activation_does_not_start_recovery(self):
+        with mock.patch.object(self.app.host, 'migrate', side_effect=StopRequested('stop')):
+            with mock.patch('updater.deploy_run.Activator.recover', wraps=self.engine.recover) as recover:
+                self.assertEqual(self.app.run(), 1)
+        self.assertEqual(recover.call_count, 1)
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'started')
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_stop_during_recovery_keeps_journal_recoverable(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        with mock.patch.object(self.host, 'schema', side_effect=StopRequested('stop')):
+            with self.assertRaises(StopRequested):
+                self.engine.recover()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
+
+    def edge_stop(self):
+        self.addCleanup(stop.clear)
+        runner = self.app.host.runner
+        def run(args, **kwargs):
+            if args[-1] == 'https://trachuan.vn/':
+                stop.request()
+                raise StopRequested('stop')
+            return runner(args, **kwargs)
+        self.app.host.runner = run
+
+    def assert_edge_cancelled(self):
+        stops = [args for args, _ in self.calls if args == ['systemctl', '--user', 'stop', 'trachuan-caddy.service']]
+        self.assertTrue(stops)
+        self.assertEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertTrue(self.paths.hold.exists())
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('caddy stopped', result['message'])
+
+    def test_stop_on_activation_edge_probe_stops_caddy(self):
+        self.edge_stop()
+        self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'started')
+
+    def test_failed_edge_cancel_is_reported(self):
+        self.edge_stop()
+        runner = self.app.host.runner
+        def run(args, **kwargs):
+            if kwargs.get('cancel'):
+                raise CommandError('stop failed')
+            return runner(args, **kwargs)
+        self.app.host.runner = run
+        self.assertEqual(self.app.run(), 1)
+        self.assertTrue(self.paths.hold.exists())
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('caddy stop failed', result['message'])
+
+    def test_stop_on_recovery_edge_probe_stops_caddy(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        self.edge_stop()
+        self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
+
+    def test_stop_after_verified_activation_keeps_caddy_running(self):
+        self.addCleanup(stop.clear)
+        self.app.phases = ('images', 'corpus')
+        def later(*args):
+            stop.request()
+            raise StopRequested('stop')
+        with mock.patch.object(self.app, 'corpus', side_effect=later):
+            self.assertEqual(self.app.run(), 1)
+        self.assertFalse(self.paths.hold.exists())
+        self.assertNotEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_stop_during_failure_recovery_edge_stops_caddy(self):
+        self.edge_stop()
+        original = self.app.host.migrate
+        calls = []
+        def migrate():
+            if not calls:
+                calls.append(True)
+                raise CommandError('activation failure')
+            return original()
+        with mock.patch.object(self.app.host, 'migrate', side_effect=migrate):
+            self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
 
     def test_prune_failure_is_success_and_next_run_can_restart_caddy(self):
         self.paths.mode.write_text('activate\n')

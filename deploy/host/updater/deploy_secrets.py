@@ -7,7 +7,7 @@ import re
 import time
 from urllib.parse import quote
 
-from .deploy_io import CommandError, Result
+from .deploy_io import CommandError, Result, interrupted
 from .deploy_secrets_state import raw_pending, SecretsState
 
 
@@ -181,6 +181,10 @@ class Secrets:
             result.write('ok' if changed else 'current', 'secrets', 'Vault secrets reconciled')
             return True
         except (OSError, ValueError, TypeError, CommandError, InterruptedError) as error:
+            if interrupted(error):
+                if self.data and self.data['pending']:
+                    self.host.hold()
+                raise
             self.failed = True
             code = error.code if isinstance(error, CommandError) and error.code else 'ReconcileError'
             if self.storage is None:
@@ -193,8 +197,9 @@ class Secrets:
                 self.host.hold()
                 try:
                     self.host.systemctl('stop', 'caddy')
-                except (OSError, CommandError, InterruptedError):
-                    pass
+                except (OSError, CommandError) as error:
+                    if interrupted(error):
+                        raise
                 return False
             return True
         except BaseException:

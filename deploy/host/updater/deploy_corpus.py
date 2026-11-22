@@ -13,7 +13,7 @@ from .deploy_corpus_database import Database
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_result import ReleaseResult
 from .deploy_corpus_sql import JournalRefused, REFUSED, SUPERUSER_REFUSED
-from .deploy_io import atomic, canonical, CommandError, interrupted
+from .deploy_io import atomic, canonical, CommandError, StopRequested, interrupted
 from .deploy_release_tables import PointerRefused
 from .deploy_release_target import Held, LockUnavailable, Waiting
 from .deploy_verify import match
@@ -373,7 +373,7 @@ class Corpus:
                 self.record.raise_alert('lock_unavailable')
             self.result.write('waiting', self.step, str(error), self.hash, self.manifest, self.mode)
             return True
-        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, RecursionError) as error:
+        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested, RecursionError) as error:
             self.interrupted = interrupted(error)
             reason = str(error) if isinstance(error, ValueError) else self.label + ' command failed or run interrupted'
             if isinstance(error, RecursionError):

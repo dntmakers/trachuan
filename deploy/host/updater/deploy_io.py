@@ -6,6 +6,7 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import sys
 import signal
 import selectors
 import time
@@ -81,6 +82,32 @@ class Lock:
         self.file.close()
 
 
+class StopRequested(Exception):
+    pass
+
+
+class StopState:
+    def __init__(self):
+        self.flag = False
+
+    def request(self):
+        self.flag = True
+
+    def requested(self):
+        return self.flag
+
+    def clear(self):
+        self.flag = False
+
+
+stop = StopState()
+
+
+def check_stop():
+    if stop.requested():
+        raise StopRequested('updater interrupted')
+
+
 class CommandError(Exception):
     def __init__(self, message, reason='failed', returncode=None, detail=None, code=None, safe=None):
         super().__init__(message)
@@ -142,7 +169,7 @@ def failure_reason(args, stderr):
     return 'failed'
 
 
-def bounded_output(process, limit, timeout, input=None):
+def bounded_output(process, limit, timeout, input=None, check=check_stop):
     deadline = time.monotonic() + timeout
     output, errors = bytearray(), bytearray()
     pending = memoryview(input) if input else None
@@ -161,12 +188,14 @@ def bounded_output(process, limit, timeout, input=None):
             else:
                 finish_input()
         while selector.get_map():
+            check()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise subprocess.TimeoutExpired('host command', timeout)
-            ready = selector.select(remaining)
+            ready = selector.select(min(remaining, 0.2))
+            check()
             if not ready:
-                raise subprocess.TimeoutExpired('host command', timeout)
+                continue
             for key, _ in ready:
                 if key.data == 'input':
                     try:
@@ -188,42 +217,105 @@ def bounded_output(process, limit, timeout, input=None):
                         raise CommandError('command output exceeds byte limit')
                 else:
                     errors.extend(chunk[:max(0, 65536 - len(errors))])
-        process.wait(timeout=max(0, deadline - time.monotonic()))
+        while True:
+            check()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired('host command', timeout)
+            try:
+                process.wait(timeout=min(remaining, 0.2))
+                check()
+                if time.monotonic() > deadline:
+                    raise subprocess.TimeoutExpired('host command', timeout)
+                break
+            except subprocess.TimeoutExpired:
+                continue
     return bytes(output), bytes(errors)
 
 
-def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None, input_file=None, safe=None):
+def terminate(process):
+    if process.returncode is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + 0.2
+    exited = False
+    while time.monotonic() < deadline:
+        if os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None:
+            exited = True
+            break
+        time.sleep(min(0.02, max(0, deadline - time.monotonic())))
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        if not (exited and sys.platform == 'darwin'):
+            raise
+    process.wait()
+
+
+def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None, input_file=None, safe=None, cancel=False):
     if input is not None and input_file is not None:
         raise ValueError('conflicting command input')
+    if cancel and (args[-4:] != ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
+                   or timeout != 10 or input is not None or input_file is not None):
+        raise ValueError('invalid cancellation command')
+    check = (lambda: None) if cancel else check_stop
+    check()
+    process = None
+    finished = False
     try:
         with ExitStack() as stack:
             source = stack.enter_context(open(input_file, 'rb')) if input_file is not None else None
-            process = stack.enter_context(subprocess.Popen(
-                args, stdin=source if source is not None else subprocess.PIPE if input is not None else subprocess.DEVNULL,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True))
             try:
+                process = subprocess.Popen(
+                    args, stdin=source if source is not None else subprocess.PIPE if input is not None else subprocess.DEVNULL,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                check()
                 if stdout_limit is None:
-                    output, errors = process.communicate(input=input, timeout=timeout)
+                    deadline = time.monotonic() + timeout
+                    pending = input
+                    while True:
+                        check()
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise subprocess.TimeoutExpired(args[0], timeout)
+                        try:
+                            output, errors = process.communicate(input=pending, timeout=min(remaining, 0.2))
+                            check()
+                            if time.monotonic() > deadline:
+                                raise subprocess.TimeoutExpired(args[0], timeout)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pending = None
                 else:
                     if type(stdout_limit) is not int or stdout_limit < 0:
                         raise ValueError('invalid streaming command limits')
-                    output, errors = bounded_output(process, stdout_limit, timeout, input)
+                    output, errors = bounded_output(process, stdout_limit, timeout, input, check)
                 if process.returncode:
                     code = None
                     if error_prefix:
                         found = re.fullmatch(re.escape(error_prefix.encode()) + rb'([A-Za-z][A-Za-z0-9_]{0,79})\n', errors)
                         code = found[1].decode() if found else 'SDKError'
+                    finished = True
                     raise CommandError('command failed', reason=failure_reason(args, errors),
                                        returncode=process.returncode, code=code,
                                        detail=describe(args, errors, process.returncode),
                                        safe=safe_line(safe, errors))
-            except BaseException:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                process.communicate()
-                raise
+                finished = True
+            finally:
+                if process is not None:
+                    if not finished:
+                        terminate(process)
+                    for stream in (process.stdin, process.stdout, process.stderr):
+                        if stream is not None:
+                            stream.close()
+    except subprocess.TimeoutExpired as error:
+        raise CommandError('command timed out', reason='timeout',
+                           detail=Path(args[0]).name + ': timeout') from error
     except (OSError, subprocess.SubprocessError) as error:
         raise CommandError('command failed') from error
     if len(output) > 16 * 1024 * 1024:
@@ -234,7 +326,7 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
 def interrupted(error):
     seen = set()
     while error is not None and id(error) not in seen:
-        if isinstance(error, InterruptedError):
+        if isinstance(error, (InterruptedError, StopRequested)):
             return True
         seen.add(id(error))
         error = error.__cause__ or error.__context__
