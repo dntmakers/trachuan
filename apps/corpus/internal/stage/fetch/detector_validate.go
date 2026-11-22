@@ -56,7 +56,7 @@ func validateOCRDetails(d OCRCheckDetails) error {
 		}
 		switch item.Position {
 		case "tail":
-			if err := validateOCRLocation(item.Location, d); err != nil {
+			if err := ValidateOCRLocation(item.Location, d); err != nil {
 				return err
 			}
 		case "not_tail", "ambiguous", "unlocated":
@@ -73,8 +73,8 @@ func validateOCRDetails(d OCRCheckDetails) error {
 	return nil
 }
 
-func validateOCRLocation(loc *OCRLocation, d OCRCheckDetails) error {
-	if loc == nil || loc.TailScopeIndex < 1 || loc.TailScopeIndex >= d.ScopeCount || loc.StartParagraph < 1 || loc.EndParagraph < loc.StartParagraph || loc.EndParagraph > d.ParagraphCount || loc.StartLine < 1 || loc.EndLine < loc.StartLine || loc.EndLine > d.LineCount || loc.StartLine < loc.StartParagraph || loc.EndLine-loc.StartLine < loc.EndParagraph-loc.StartParagraph {
+func ValidateOCRLocation(loc *OCRLocation, d OCRCheckDetails) error {
+	if loc == nil || loc.TailScopeIndex < 1 || loc.TailScopeIndex >= d.ScopeCount || loc.StartParagraph < 1 || loc.EndParagraph < loc.StartParagraph || loc.EndParagraph > d.ParagraphCount || loc.StartLine < 1 || loc.EndLine < loc.StartLine || loc.EndLine > d.LineCount || loc.StartLine < loc.StartParagraph || loc.EndLine-loc.StartLine < loc.EndParagraph-loc.StartParagraph || d.LineCount-loc.EndLine < d.ParagraphCount-loc.EndParagraph {
 		return fmt.Errorf("invalid OCR tail location")
 	}
 	return nil

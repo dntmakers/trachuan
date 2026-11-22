@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
@@ -37,13 +35,9 @@ func loadDetectorInputs(ctx context.Context, in Inputs, rel releaseData, extract
 	if buildDir == "" || !detectorDigest(buildHash) {
 		return nil, detectorIncomplete("missing committed build identity")
 	}
-	verified, err := artifact.VerifyFiles(buildDir, "inputs.json")
-	if err != nil || verified != buildHash {
-		return nil, detectorIncomplete("build inventory failed verification")
-	}
-	data, err := os.ReadFile(filepath.Join(buildDir, "inputs.json"))
+	data, err := artifact.ReadVerifiedFile(buildDir, "inputs.json", buildHash, 256<<20)
 	if err != nil {
-		return nil, detectorIncomplete("read build inventory: %v", err)
+		return nil, detectorIncomplete("build inventory failed verification: %v", err)
 	}
 	inv, err := decodeDetectorInventory(data, in.Run.Country)
 	if err != nil {
@@ -124,13 +118,12 @@ func loadDetectorInputs(ctx context.Context, in Inputs, rel releaseData, extract
 		if locateErr != nil || !found || dir == "" {
 			return detectorIncomplete("extract artifact unavailable for %s", doc.Key)
 		}
-		sum, verifyErr := artifact.VerifyFiles(dir, "text.json")
-		if verifyErr != nil || sum != doc.ExtractSHA256 {
-			return detectorIncomplete("extract artifact failed verification for %s", doc.Key)
-		}
-		text, readErr := os.ReadFile(filepath.Join(dir, "text.json"))
+		text, readErr := artifact.ReadVerifiedFile(dir, "text.json", doc.ExtractSHA256, 256<<20)
 		if readErr != nil {
-			return detectorIncomplete("read extract record for %s: %v", doc.Key, readErr)
+			return detectorIncomplete("extract artifact failed verification for %s: %v", doc.Key, readErr)
+		}
+		if lineageErr := fetch.CheckExtractLineageV1Bytes(text, *fetchItem.ArtifactSHA256, *extractItem.InputHash); lineageErr != nil {
+			return detectorIncomplete("extract lineage mismatch for %s: %v", doc.Key, lineageErr)
 		}
 		detector, decodeErr := fetch.DecodeDetectorTextV1(text, doc.TextSource)
 		if decodeErr != nil {

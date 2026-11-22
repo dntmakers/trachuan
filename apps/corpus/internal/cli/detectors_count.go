@@ -98,5 +98,21 @@ func loadDetectorCounts(ctx context.Context, cc, rel string) ([]evidence.Count, 
 	}
 	run := stage.Run{ID: row.ID, Country: row.Country, Rel: row.Rel, Generation: int(row.Generation), Snapshot: snapshot}
 	env := stage.Env{DB: workshop, Artifacts: artifact.Store{Root: cfg.Artifacts}}
-	return evidence.CountFindings(ctx, evidence.CountInputs(ctx, q, env, run, release), evidence.CrossSignal()), nil
+	in := evidence.CountInputs(ctx, q, env, run, release)
+	return countDetectorInputs(in, env.Artifacts, func() (artifact.Result, error) {
+		return build.VerifyDetectorDatabase(ctx, workshop, release, env.Artifacts, run)
+	}, func(input evidence.Inputs) []evidence.Count {
+		return evidence.CountFindings(ctx, input, evidence.CrossSignal())
+	})
+}
+
+func countDetectorInputs(in evidence.Inputs, artifacts artifact.Store, verify func() (artifact.Result, error), count func(evidence.Inputs) []evidence.Count) ([]evidence.Count, error) {
+	if in.Run.Snapshot.ExtractRecordContract == stage.ExtractRecordV1 {
+		art, err := verify()
+		if err != nil {
+			return nil, fmt.Errorf("verify detector database: %w", err)
+		}
+		in.BuildDir, in.BuildSHA256 = artifacts.Abs(art.Path), art.SHA256
+	}
+	return count(in), nil
 }

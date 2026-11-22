@@ -34,7 +34,7 @@ func TestBuildExtractAuthorityBothConsumers(t *testing.T) {
 	e := publish("extract", f.SHA256, map[string]string{"provisions.json": `invalid`})
 	key := "vn:vbpl:1"
 	fetchItem := InventoryItem{Stage: "fetch", ItemKey: key, State: "done", Path: &f.Path, ArtifactSHA256: &f.SHA256}
-	extractItem := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &f.SHA256, RecipeHash: &recipe}
+	extractItem := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &f.SHA256, RecipeHash: &recipe, authority: testExtractAuthority(key, &f.SHA256, &recipe)}
 	verified := readIdentityFetch(store, fetchItem)
 	if verified.err != nil {
 		t.Fatal(verified.err)
@@ -92,7 +92,7 @@ func TestBuildExtractAuthorityAcceptsMatchingRecords(t *testing.T) {
 			}
 			key := "vn:vbpl:1"
 			fetchItem := InventoryItem{Stage: "fetch", ItemKey: key, State: "done", Path: &f.Path, ArtifactSHA256: &f.SHA256}
-			extractItem := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &f.SHA256, RecipeHash: &recipe}
+			extractItem := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &f.SHA256, RecipeHash: &recipe, authority: testExtractAuthority(key, &f.SHA256, &recipe)}
 			inv := Inventory{Country: "vn", ExtractSnapshot: stage.Snapshot{ExtractRecordContract: contract, Recipes: map[string]string{"extract": recipe}}, ExpectedKeys: []string{key}, Items: []InventoryItem{fetchItem, extractItem}}
 			if _, err = IdentityInventory(inv, store, nil); err != nil {
 				t.Fatalf("identity: %v", err)

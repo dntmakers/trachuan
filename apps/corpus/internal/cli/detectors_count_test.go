@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/detector"
+	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/evidence"
 )
 
@@ -98,5 +100,35 @@ func TestLoadDetectorCounts_FailsClosedWithoutDatabases(t *testing.T) {
 	}
 	if _, err := loadDetectorCounts(context.Background(), "vn", "20990102_1"); err == nil {
 		t.Fatal("no database configuration accepted")
+	}
+}
+
+func TestCountDetectorInputsChecksV1BeforeCounting(t *testing.T) {
+	for _, scenario := range []string{"legacy", "v1 rejected", "v1 accepted"} {
+		t.Run(scenario, func(t *testing.T) {
+			in := evidence.Inputs{}
+			if scenario != "legacy" {
+				in.Run.Snapshot.ExtractRecordContract = stage.ExtractRecordV1
+			}
+			verified, counted := false, false
+			verify := func() (artifact.Result, error) {
+				verified = true
+				if scenario == "v1 rejected" {
+					return artifact.Result{}, errors.New("bad database")
+				}
+				return artifact.Result{Path: "build", SHA256: "hash"}, nil
+			}
+			count := func(in evidence.Inputs) []evidence.Count {
+				counted = true
+				if scenario == "v1 accepted" && (in.BuildDir != "/root/build" || in.BuildSHA256 != "hash") {
+					t.Fatalf("build not pinned: %+v", in)
+				}
+				return []evidence.Count{{Detector: "test"}}
+			}
+			_, err := countDetectorInputs(in, artifact.Store{Root: "/root"}, verify, count)
+			if verified != (scenario != "legacy") || counted != (scenario != "v1 rejected") || (err != nil) != (scenario == "v1 rejected") {
+				t.Fatalf("verified=%t counted=%t err=%v", verified, counted, err)
+			}
+		})
 	}
 }

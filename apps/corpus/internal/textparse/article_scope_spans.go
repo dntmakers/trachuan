@@ -23,3 +23,19 @@ func ArticleScopeSpans(paragraphs []Paragraph) []ArticleScopeSpan {
 	}
 	return out
 }
+
+func HasMainBeforeExplicitTail(paragraphs []Paragraph) bool {
+	quoted, _ := quotedParagraphs(paragraphs)
+	for i, p := range paragraphs {
+		if quoted[i] {
+			continue
+		}
+		if appendix(p.Text) {
+			return false
+		}
+		if _, ok := article(p.Text); ok {
+			return true
+		}
+	}
+	return false
+}

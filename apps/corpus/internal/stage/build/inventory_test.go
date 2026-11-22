@@ -3,6 +3,7 @@ package build
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -240,4 +241,34 @@ func TestInventory_ExtractAuthorityNotSerializedOrHashed(t *testing.T) {
 			t.Fatalf("version=%d base=%s with=%s", version, original, updated)
 		}
 	}
+}
+
+func TestInventoryRejectsMismatchedExtractArtifactAuthority(t *testing.T) {
+	recipe := strings.Repeat("a", 64)
+	input := strings.Repeat("b", 64)
+	snapshot, hash, err := membership.CanonicalSnapshot(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []int{0, 1} {
+		for _, field := range []string{"artifact_stage", "artifact_item_key", "artifact_input_hash", "artifact_recipe_hash"} {
+			t.Run(fmt.Sprintf("v%d/%s", version, field), func(t *testing.T) {
+				item := map[string]any{"stage": "extract", "item_key": "doc", "state": "done", "input_hash": input, "recipe_hash": recipe, "artifact_sha256": strings.Repeat("c", 64), "path": "artifact", "artifact_stage": "extract", "artifact_item_key": "doc", "artifact_input_hash": input, "artifact_recipe_hash": recipe}
+				item[field] = "wrong"
+				raw, err := json.Marshal(map[string]any{"items": []any{item}, "final_snapshot": snapshot, "final_hash": hash})
+				if err != nil {
+					t.Fatal(err)
+				}
+				run := stage.Run{Snapshot: stage.Snapshot{SourceList: []byte(fmt.Sprintf(`{"vbpl":{"selection_version":%d}}`, version)), Recipes: map[string]string{"extract": recipe}, ExtractRecordContract: stage.ExtractRecordV1}}
+				if _, err := LoadInventory(context.Background(), inventoryQueryStub{raw: raw}, run, "extract"); err == nil {
+					t.Fatal("accepted mismatched extract artifact")
+				}
+			})
+		}
+	}
+}
+
+func testExtractAuthority(key string, input, recipe *string) *extractArtifactAuthority {
+	stageName := "extract"
+	return &extractArtifactAuthority{Stage: &stageName, ItemKey: &key, InputHash: input, RecipeHash: recipe}
 }

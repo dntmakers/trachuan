@@ -15,6 +15,7 @@ import (
 )
 
 type InventoryItem struct {
+	authority      *extractArtifactAuthority
 	Stage          string  `json:"stage"`
 	ItemKey        string  `json:"item_key"`
 	State          string  `json:"state"`
@@ -172,17 +173,10 @@ func LoadInventory(ctx context.Context, q store.Querier, run stage.Run, through 
 	}
 	result := Inventory{ExtractSnapshot: run.Snapshot, Country: run.Country, SourceListHash: run.Snapshot.SourceListHash, ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}}
 	for _, data := range payload.Items {
-		var item InventoryItem
-		if err = json.Unmarshal(data, &item); err != nil {
-			return Inventory{}, fmt.Errorf("decode inventory item: %w", err)
+		item, err := decodeInventoryItem(data, run.Snapshot)
+		if err != nil {
+			return Inventory{}, err
 		}
-		var path struct {
-			Path *string `json:"path"`
-		}
-		if err = json.Unmarshal(data, &path); err != nil {
-			return Inventory{}, fmt.Errorf("decode artifact path: %w", err)
-		}
-		item.Path = path.Path
 		if result.order(item.Stage) <= limit {
 			result.Items = append(result.Items, item)
 			if item.Stage == "fetch" {

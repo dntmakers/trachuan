@@ -48,12 +48,14 @@ func buildOCRCheckObservation(selected selection, data []byte) (ocrCheckObservat
 		PDFSHA256: selected.hash, EngineID: entry.Text.EngineID, TextSHA256: entry.Text.TextSha256,
 		CheckerID: entry.Check.CheckerID, ResultSHA256: entry.Check.ResultSha256,
 		SameDocument: check.SameDocument, Verdict: check.Verdict, PageCount: check.PDFPages,
-		LineCount: len(strings.Split(string(data), "\n")), Items: make([]ocrCheckItem, 0),
+		LineCount: strings.Count(string(data), "\n") + 1, Items: make([]ocrCheckItem, 0),
 	}
 	paragraphs, parseErr := textparse.ParagraphsFromText(string(data))
+	var spans []textparse.ArticleScopeSpan
 	if parseErr == nil {
+		spans = textparse.ArticleScopeSpans(paragraphs)
 		details.ParagraphCount = len(paragraphs)
-		details.ScopeCount = len(textparse.ParseArticles(paragraphs).Scopes)
+		details.ScopeCount = len(spans)
 	}
 	var readings []string
 	for _, item := range check.Items {
@@ -71,7 +73,7 @@ func buildOCRCheckObservation(selected selection, data []byte) (ocrCheckObservat
 		positions[i].Position = "unlocated"
 	}
 	if check.SameDocument && parseErr == nil {
-		positions = locateOCRReadings(string(data), readings, ocrReadingBudget)
+		positions = locateOCRParsed(paragraphs, spans, readings, ocrReadingBudget)
 	}
 	type itemKey struct {
 		kind string

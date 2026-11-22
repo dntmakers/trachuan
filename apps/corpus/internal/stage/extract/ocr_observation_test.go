@@ -145,3 +145,13 @@ func TestOCRObservationFrozenHeadingState(t *testing.T) {
 		}
 	}
 }
+
+func TestOCRObservationBlankLinesAndSharedLocations(t *testing.T) {
+	text := "Điều 1. Mở đầu\n" + strings.Repeat("nội dung ", 50) + strings.Repeat("\n", 1000) + "PHỤ LỤC\nĐiều 5\n"
+	result := ocrstore.CheckResult{SameDocument: true, Pages: 1, PDFPages: 1, Verdict: "flagged", Items: []ocrstore.CheckItem{{Kind: "article_label", Page: 1, OCR: "Điều 5", PDF: "Điều 6"}}}
+	selected := observationSelection(t, result, text)
+	got, err := buildOCRCheckObservation(selected, []byte(text))
+	if err != nil || got.LineCount != 1004 || got.ParagraphCount != 4 || got.ScopeCount != 2 || got.Items[0].Location == nil || got.Items[0].Location.StartLine != 1003 || got.Items[0].Location.StartParagraph != 4 {
+		t.Fatalf("got=%+v err=%v", got.OCRCheckDetails, err)
+	}
+}

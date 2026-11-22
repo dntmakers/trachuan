@@ -154,3 +154,29 @@ func TestOCRLabelObserverInvalidInputNoPartialResults(t *testing.T) {
 		t.Fatalf("out=%+v err=%v", out, err)
 	}
 }
+
+func TestOCRLabelObserverLocationBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name                                             string
+		startParagraph, endParagraph, startLine, endLine int
+		valid                                            bool
+	}{
+		{"earliest", 3, 4, 3, 4, true},
+		{"latest", 3, 4, 8, 9, true},
+		{"before", 3, 4, 2, 3, false},
+		{"inside", 3, 5, 3, 4, false},
+		{"after", 3, 4, 9, 10, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := checkedOCRInput("vn:vbpl:1", true, "flagged", false, 0, ocrItem("article_label", 1, 1, "tail"))
+			c := input.Detector.OCRCheck.OCRCheckDetails
+			c.ParagraphCount, c.LineCount = 5, 10
+			loc := c.Items[0].Location
+			loc.StartParagraph, loc.EndParagraph, loc.StartLine, loc.EndLine = tc.startParagraph, tc.endParagraph, tc.startLine, tc.endLine
+			_, err := observeOCRLabelItems([]detectorInput{input})
+			if (err == nil) != tc.valid {
+				t.Fatalf("err=%v valid=%v", err, tc.valid)
+			}
+		})
+	}
+}

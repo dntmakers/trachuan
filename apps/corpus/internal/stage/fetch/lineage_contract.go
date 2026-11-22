@@ -44,6 +44,10 @@ func checkExtractLineageV1(dir, fetchHash, inputHash string) error {
 	if err != nil {
 		return fmt.Errorf("read extract text record: %w", err)
 	}
+	return CheckExtractLineageV1Bytes(data, fetchHash, inputHash)
+}
+
+func CheckExtractLineageV1Bytes(data []byte, fetchHash, inputHash string) error {
 	fields, err := detectorObjectMode(data, true)
 	if err != nil {
 		return fmt.Errorf("decode extract text record: %w", err)

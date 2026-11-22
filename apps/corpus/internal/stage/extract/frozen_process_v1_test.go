@@ -17,7 +17,9 @@ import (
 
 func processV1Fixture(t *testing.T) (string, *ocrstore.Store, store.GetRunOCRSelectionRow, string, string) {
 	t.Helper()
-	pdf, digest, state, source := strings.Repeat("a", 64), strings.Repeat("f", 64), "checked", "none"
+	pdfBytes := []byte("%PDF-1.4 synthetic fixture\n")
+	pdf := fmt.Sprintf("%x", sha256.Sum256(pdfBytes))
+	digest, state, source := strings.Repeat("f", 64), "checked", "none"
 	text := []byte("OCR text\n")
 	textHash := fmt.Sprintf("%x", sha256.Sum256(text))
 	result, err := json.Marshal(ocrstore.CheckResult{SameDocument: false, Pages: 1, PDFPages: 1, Items: []ocrstore.CheckItem{}, Verdict: "rejected"})
@@ -29,10 +31,16 @@ func processV1Fixture(t *testing.T) (string, *ocrstore.Store, store.GetRunOCRSel
 	engine, checker := "engine", "checker"
 	row := store.GetRunOCRSelectionRow{SelectionVersion: 1, SelectionState: &state, TextSource: &source, FetchSha256: &digest, Gap: "ocr_rejected", PdfSha256: &pdf, OcrTextID: &textID, OcrCheckID: &checkID, TextPdfSha256: &pdf, CheckOcrTextID: &textID, EngineID: &engine, TextSha256: &textHash, CheckerID: &checker, ResultSha256: &resultHash, Flagged: pgtype.Int4{Valid: true}, CheckResult: result}
 	dir, root := t.TempDir(), t.TempDir()
-	for name, data := range map[string]string{"detail.json": `{"data":{"id":"1"}}`, "files.json": fmt.Sprintf(`[{"name":"scan.pdf","sha256":"%s","size":1}]`, pdf)} {
+	for name, data := range map[string]string{"detail.json": `{"data":{"id":"1"}}`, "files.json": fmt.Sprintf(`[{"name":"scan.pdf","sha256":"%s","size":%d}]`, pdf, len(pdfBytes))} {
 		if writeErr := os.WriteFile(filepath.Join(dir, name), []byte(data), 0600); writeErr != nil {
 			t.Fatal(writeErr)
 		}
+	}
+	if mkdirErr := os.Mkdir(filepath.Join(dir, "files"), 0700); mkdirErr != nil {
+		t.Fatal(mkdirErr)
+	}
+	if writeErr := os.WriteFile(filepath.Join(dir, "files", pdf), pdfBytes, 0600); writeErr != nil {
+		t.Fatal(writeErr)
 	}
 	if mkdirErr := os.Mkdir(filepath.Join(root, "text"), 0700); mkdirErr != nil {
 		t.Fatal(mkdirErr)

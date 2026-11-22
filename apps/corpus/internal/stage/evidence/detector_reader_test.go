@@ -10,6 +10,7 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 )
 
 const testDetectorText = `{"text_source":"source_tree","detector_inputs":{"version":1,"ocr_check":{"state":"not_selected"},"tree_transcription":{"state":"no_pair"}}}`
@@ -39,7 +40,7 @@ func detectorReaderSetup(t *testing.T, text string) *detectorReaderFixture {
 	f.doc = releaseDocument{ID: 1, Key: "vn:vbpl:1", Source: "vbpl", TextSource: "source_tree", ExtractSHA256: f.extract.SHA256}
 	f.inventory = map[string]any{"version": 2, "country": "vn", "expected_keys": []string{f.doc.Key}, "items": []map[string]any{
 		{"stage": "fetch", "item_key": f.doc.Key, "state": "done", "input_hash": strings.Repeat("c", 64), "recipe_hash": strings.Repeat("d", 64), "artifact_sha256": strings.Repeat("e", 64)},
-		{"stage": "extract", "item_key": f.doc.Key, "state": "done", "input_hash": strings.Repeat("b", 64), "recipe_hash": f.recipe, "artifact_sha256": f.extract.SHA256},
+		{"stage": "extract", "item_key": f.doc.Key, "state": "done", "input_hash": fetch.ExtractInputHash(strings.Repeat("e", 64), "source_tree"), "recipe_hash": f.recipe, "artifact_sha256": f.extract.SHA256},
 	}, "gaps": []any{}}
 	return f
 }
@@ -201,5 +202,18 @@ func TestDetectorReaderRejectsTreeSourceForNonVBPL(t *testing.T) {
 	f.publishBuild(t)
 	if got, err := f.read(t); err == nil || len(got) != 0 {
 		t.Fatalf("got=%+v err=%v", got, err)
+	}
+}
+
+func TestDetectorReaderRejectsExtractLineageMismatch(t *testing.T) {
+	f := detectorReaderSetup(t, testDetectorText)
+	f.inventory["items"].([]map[string]any)[1]["input_hash"] = strings.Repeat("b", 64)
+	f.publishBuild(t)
+	got, err := f.read(t)
+	if err == nil || len(got) != 0 {
+		t.Fatalf("accepted incorrect source-tree lineage: got=%+v err=%v", got, err)
+	}
+	if _, ok := err.(*IncompleteError); !ok {
+		t.Fatalf("error type %T: %v", err, err)
 	}
 }

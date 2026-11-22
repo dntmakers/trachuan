@@ -39,8 +39,15 @@ func locateOCRReadings(text string, readings []string, budget int64) []ocrReadin
 	if err != nil {
 		return out
 	}
-	spans := textparse.ArticleScopeSpans(paragraphs)
-	if len(spans) == 0 || spans[0].Kind != "main" {
+	return locateOCRParsed(paragraphs, textparse.ArticleScopeSpans(paragraphs), readings, budget)
+}
+
+func locateOCRParsed(paragraphs []textparse.Paragraph, spans []textparse.ArticleScopeSpan, readings []string, budget int64) []ocrReadingPosition {
+	out := make([]ocrReadingPosition, len(readings))
+	for i := range out {
+		out[i].Position = "unlocated"
+	}
+	if len(spans) == 0 || spans[0].Kind != "main" || !textparse.HasMainBeforeExplicitTail(paragraphs) {
 		return out
 	}
 	locator := ocrLocator{paragraphs: paragraphs, starts: make([]int, len(paragraphs)), tails: make([]int, len(paragraphs)), prefix: make([]int, len(paragraphs)+1)}

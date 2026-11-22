@@ -130,17 +130,10 @@ func loadInventoryV2(ctx context.Context, q store.Querier, run stage.Run, limit 
 		i.ExpectedKeys = append(i.ExpectedKeys, e.DocumentKey)
 	}
 	for _, data := range p.Items {
-		var item InventoryItem
-		var path struct {
-			Path *string `json:"path"`
+		item, err := decodeInventoryItem(data, run.Snapshot)
+		if err != nil {
+			return Inventory{}, err
 		}
-		if err = json.Unmarshal(data, &item); err != nil {
-			return Inventory{}, fmt.Errorf("decode item: %w", err)
-		}
-		if err = json.Unmarshal(data, &path); err != nil {
-			return Inventory{}, fmt.Errorf("decode path: %w", err)
-		}
-		item.Path = path.Path
 		if stageOrder(item.Stage) <= limit {
 			i.Items = append(i.Items, item)
 		}

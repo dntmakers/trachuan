@@ -12,6 +12,7 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/ocrstore"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
 	"danny.vn/trachuan/apps/corpus/internal/store"
 	"danny.vn/trachuan/apps/corpus/internal/vbpl"
@@ -163,25 +164,22 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if err != nil {
 		return stage.Output{}, fmt.Errorf("load fetch artifact: %w", err)
 	}
-	if verifyErr := verifyFetch(env.Artifacts.Abs(input.Path), input.Sha256); verifyErr != nil {
-		return stage.Output{}, verifyErr
-	}
-	q := store.New(env.DB)
-	row, lookupErr := q.GetRunOCRSelection(ctx, store.GetRunOCRSelectionParams{RunID: run.ID, ItemKey: item.Key})
 	var selected selection
 	var nodes []vbpl.Node
 	var ocrData []byte
-	if lookupErr == nil {
-		if v1 {
-			selected, nodes, ocrData, err = verifyFrozenSelectionV1(ctx, env.Artifacts.Abs(input.Path), item.Key, input.Sha256, item.InputHash, row, s.ocr)
-			if err == nil && selected.gap != "text_number_mismatch" {
-				var mismatch selection
-				mismatch, err = frozenMismatch(env.Artifacts.Abs(input.Path), item.Key)
-				if err == nil && mismatch.gap != "" {
-					err = fmt.Errorf("frozen OCR selection conflicts with number mismatch")
-				}
-			}
-		} else {
+	if v1 {
+		members, verifyErr := verifiedFetchMembers(env.Artifacts.Abs(input.Path), input.Sha256)
+		if verifyErr != nil {
+			return stage.Output{}, verifyErr
+		}
+		selected, nodes, ocrData, err = s.resolveFrozenV1(ctx, env, run, item, input, members)
+	} else {
+		if verifyErr := verifyFetch(env.Artifacts.Abs(input.Path), input.Sha256); verifyErr != nil {
+			return stage.Output{}, verifyErr
+		}
+		q := store.New(env.DB)
+		row, lookupErr := q.GetRunOCRSelection(ctx, store.GetRunOCRSelectionParams{RunID: run.ID, ItemKey: item.Key})
+		if lookupErr == nil {
 			selected, err = selectionFromRow(row)
 			if err == nil && selected.gap != "text_number_mismatch" {
 				var mismatch selection
@@ -193,14 +191,14 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 			if err == nil {
 				selected, nodes, err = materializeFrozen(ctx, env.Artifacts.Abs(input.Path), item.Key, selected)
 			}
+		} else if errors.Is(lookupErr, pgx.ErrNoRows) {
+			selected, nodes, err = choose(ctx, env.Artifacts.Abs(input.Path), item.Key)
+			if err == nil && selected.consulted {
+				return stage.Output{}, fmt.Errorf("missing frozen OCR selection")
+			}
+		} else {
+			return stage.Output{}, fmt.Errorf("read OCR selection: %w", lookupErr)
 		}
-	} else if errors.Is(lookupErr, pgx.ErrNoRows) {
-		selected, nodes, err = choose(ctx, env.Artifacts.Abs(input.Path), item.Key)
-		if err == nil && selected.consulted {
-			return stage.Output{}, fmt.Errorf("missing frozen OCR selection")
-		}
-	} else {
-		return stage.Output{}, fmt.Errorf("read OCR selection: %w", lookupErr)
 	}
 	if errors.Is(err, vbpl.ErrTreeTooLarge) {
 		return stage.Output{State: "gap", Gaps: []stage.Gap{{Kind: "tree_too_large"}}}, nil
@@ -295,6 +293,11 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	})
 	if err != nil {
 		return stage.Output{}, fmt.Errorf("publish extract artifact: %w", err)
+	}
+	if v1 && art.Adopted {
+		if err = fetch.CheckExtractLineageContract(env.Artifacts.Abs(art.Path), input.Sha256, item.InputHash, stage.ExtractRecordV1); err != nil {
+			return stage.Output{}, fmt.Errorf("adopted extract lineage: %w", err)
+		}
 	}
 	return stage.Output{Artifact: &art, State: "done"}, nil
 }

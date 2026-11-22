@@ -34,13 +34,18 @@ func normalize(s string) string { return norm.NFC.String(strings.Join(strings.Fi
 // ParagraphsFromText returns one paragraph per nonempty OCR line.
 func ParagraphsFromText(text string) ([]Paragraph, error) {
 	var out []Paragraph
-	for i, line := range strings.Split(text, "\n") {
+	for i := 0; ; i++ {
+		line, rest, found := strings.Cut(text, "\n")
 		if s := normalize(line); s != "" {
 			if len(out) == maxParagraphs {
 				return nil, &LimitError{"paragraphs", maxParagraphs}
 			}
 			out = append(out, Paragraph{Text: s, Ordinal: len(out) + 1, Locator: i + 1})
 		}
+		if !found {
+			break
+		}
+		text = rest
 	}
 	return out, nil
 }

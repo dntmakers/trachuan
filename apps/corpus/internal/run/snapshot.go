@@ -109,6 +109,9 @@ func freezeStartSnapshot(snapshot stage.Snapshot, stages []string, existing bool
 			snapshot.ExtractRecordContract = stage.ExtractRecordV1
 		}
 	}
+	if existing && snapshot.ExtractRecordContract == stage.ExtractRecordLegacy && snapshot.PreviousReport != nil && !containsStage(snapshot.Stages, stage.EvidenceStage) && containsStage(stages, stage.EvidenceStage) {
+		return stage.Snapshot{}, fmt.Errorf("cannot add evidence to a legacy extract run")
+	}
 	recipes := recipesFor(snapshot)
 	if containsStage(stages, "extract") && recipes["extract"] == "" {
 		return stage.Snapshot{}, fmt.Errorf("missing recipe for stage %q", "extract")

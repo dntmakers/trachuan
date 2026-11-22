@@ -91,7 +91,7 @@ func TestV1PipelineCheckedWithheld(t *testing.T) {
 	db := processFixtureDBWithRow(t, fetched, &row)
 	env := stage.Env{DB: db, Artifacts: artifacts}
 	run := stage.Run{ID: 1, Snapshot: stage.Snapshot{SourceList: []byte(`{}`), ExtractRecordContract: stage.ExtractRecordV1}}
-	s := New().WithOCR(ocr, nil, "")
+	s := New().WithOCR(ocr, []string{"engine"}, "checker")
 	items, err := s.Plan(ctx, env, run)
 	if err != nil || len(items) != 1 {
 		t.Fatalf("items=%+v err=%v", items, err)

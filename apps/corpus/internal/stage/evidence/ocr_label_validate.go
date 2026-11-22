@@ -45,9 +45,8 @@ func validateObservedOCR(check *fetch.OCRCheckDetails) error {
 		}
 		switch item.Position {
 		case "tail":
-			loc := item.Location
-			if loc == nil || loc.TailScopeIndex < 1 || loc.TailScopeIndex >= check.ScopeCount || loc.StartParagraph < 1 || loc.EndParagraph < loc.StartParagraph || loc.EndParagraph > check.ParagraphCount || loc.StartLine < loc.StartParagraph || loc.EndLine < loc.StartLine || loc.EndLine > check.LineCount || loc.EndLine-loc.StartLine < loc.EndParagraph-loc.StartParagraph {
-				return fmt.Errorf("invalid tail location")
+			if err := fetch.ValidateOCRLocation(item.Location, *check); err != nil {
+				return fmt.Errorf("invalid tail location: %w", err)
 			}
 		case "not_tail", "ambiguous", "unlocated":
 			if item.Location != nil || (check.ScopeCount == 0 && item.Position != "unlocated") {

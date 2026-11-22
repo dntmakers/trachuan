@@ -33,7 +33,7 @@ func TestIdentityInventory_ExtractSelectionLineage(t *testing.T) {
 	f := publish("fetch", strings.Repeat("b", 64), map[string]string{"detail.json": `{"data":{"id":"1"}}`, "files.json": `[]`})
 	input := stage.RecipeHash("extract-input", "1", f.SHA256, "none", "absent", "no_text_source")
 	e := publish("extract", input, map[string]string{"text.json": `{"text_source":"none","gap":"no_text_source"}`, "provisions.json": `[]`})
-	inv := Inventory{ExtractSnapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}, ExpectedKeys: []string{"vn:vbpl:1"}, Items: []InventoryItem{{Stage: "fetch", ItemKey: "vn:vbpl:1", State: "done", Path: &f.Path, ArtifactSHA256: &f.SHA256}, {Stage: "extract", ItemKey: "vn:vbpl:1", State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &input, RecipeHash: &recipe}}}
+	inv := Inventory{ExtractSnapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}, ExpectedKeys: []string{"vn:vbpl:1"}, Items: []InventoryItem{{Stage: "fetch", ItemKey: "vn:vbpl:1", State: "done", Path: &f.Path, ArtifactSHA256: &f.SHA256}, {Stage: "extract", ItemKey: "vn:vbpl:1", State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &input, RecipeHash: &recipe, authority: testExtractAuthority("vn:vbpl:1", &input, &recipe)}}}
 	if _, err := IdentityInventory(inv, store, nil); err != nil {
 		t.Fatal(err)
 	}

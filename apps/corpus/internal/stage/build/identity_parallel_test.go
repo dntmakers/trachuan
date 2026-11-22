@@ -40,7 +40,7 @@ func TestIdentityInventory_ParallelMatchesSerialAndFirstError(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		inv.Items = append(inv.Items, InventoryItem{Stage: "extract", State: "done", ItemKey: key, Path: &ext.Path, ArtifactSHA256: &ext.SHA256, InputHash: &extractInput, RecipeHash: &recipe})
+		inv.Items = append(inv.Items, InventoryItem{Stage: "extract", State: "done", ItemKey: key, Path: &ext.Path, ArtifactSHA256: &ext.SHA256, InputHash: &extractInput, RecipeHash: &recipe, authority: testExtractAuthority(key, &extractInput, &recipe)})
 		relationInput := relate.PairInputHash(art.SHA256, ext.SHA256)
 		rel, err := store.Publish(context.Background(), "relate", relationInput, strings.Repeat("a", 64), func(dir string) error {
 			return os.WriteFile(filepath.Join(dir, "relations.json"), []byte(`[]`), 0600)

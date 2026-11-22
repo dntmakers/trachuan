@@ -62,3 +62,11 @@ func TestLocateOCRReadingBudgetSortedAndShared(t *testing.T) {
 		}
 	}
 }
+
+func TestLocateOCRReadingTailBeforeFirstArticle(t *testing.T) {
+	text := "PHỤ LỤC\n" + strings.Repeat("văn bản ", 80) + "\nĐiều 1. Ví dụ\nPHỤ LỤC\nnhãn"
+	got := locateOCRReadings(text, []string{"nhãn"}, ocrReadingBudget)
+	if got[0].Position != "unlocated" {
+		t.Fatalf("got=%+v", got[0])
+	}
+}
