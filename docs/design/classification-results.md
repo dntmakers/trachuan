@@ -36,10 +36,12 @@ from the store.
 
 An attempt is `final` only when the provider returns a result for the item that
 reports success, the response is complete (Anthropic `stop_reason` `end_turn`;
-OpenAI response `status` `completed`), and the body parses under the request's
-schema. A returned result that is anything else (an error item, an expired or
-cancelled item, a refusal, an incomplete or truncated response, a schema
-failure) is `failed`, at the cost its usage shows.
+OpenAI response `status` `completed`), and the body decodes into the response
+structure (per-anchor codes and confidences of the right types). Anchor and code
+checks are validation, applied on every replay, not part of this rule. A
+returned result that is anything else (an error item, an expired or cancelled
+item, a refusal, an incomplete or truncated response, a schema failure) is
+`failed`, at the cost its usage shows.
 
 A key with a `final` attempt is never submitted again. Its first `final` attempt
 is replayed through the same validation as a fresh response, so replay is
@@ -84,6 +86,33 @@ the intent log store, and `--rebuild` restores the ledger from those files. The
 pilot submissions, settled before this note, get their `.settled` files from the
 current workshop database once; they have no result records and are never
 replayed.
+
+Two invariants hold for the whole intent store. First, it is consistent: every
+file belongs to an intent, every dispatch trace and every receipt needs its
+intent, and every attempt record and settlement needs its intent and a receipt
+with the same batch id. Rebuild and every admission check this first, and any
+violation stops both for the whole store until an operator repairs it; an
+`abandoned` submission may be replaced only when it has no dispatch trace and no
+attempt. Second, evidence is never discarded: results downloaded for a batch id
+that matches an unsettled submission are recorded whatever the submission's
+state, and a deadline only stops polling. Provider data is written to the intent
+log store as soon as it arrives, before any other step that can fail: a batch id
+the moment `create` returns it, each result line as it is decoded, a partial
+download up to its last complete line. A later error changes state only, never
+what was written.
+
+Token counts are free and carry no money, so they are kept apart from intents:
+`counts/<key>.json` is written once when the count arrives, including in dry
+runs, needs no intent, and never touches the ledger, locks or reserves. Reserves
+and replay read it; a new count that disagrees with the stored one for the same
+key is an error.
+
+One verification of the whole store gates both rebuild and every admission, and
+one path settles: a submission settles only from a stored download of its
+receipted batch that ended complete, in which every line carries a known
+`custom_id` of that submission and priced usage; the `.settled` file names that
+download and its hash. Attempts recovered from a partial download can be
+replayed but never settle a submission, and a lost download never promotes them.
 
 ## Key locks and admission
 

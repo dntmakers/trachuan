@@ -111,7 +111,7 @@ func TestArticleSteps_RunnerDryRunSubmissionReplayAndRecovery(t *testing.T) {
 	families.Documents["vn:vbpl:1"] = Outcome{Outcome: "ok", Codes: []string{"1.1", "2.1"}}
 	o.DryRun = true
 	summary, err := runner.Articles(context.Background(), o, "labels", articles, families, articleNodes())
-	if err != nil || summary.Requests != 2 || summary.InputTokens != 200 || summary.ReserveMicroUSD != 4106 || len(ledger.rows) != 0 || client.creates != 0 {
+	if err != nil || summary.Requests != 2 || summary.InputTokens != 200 || summary.ReserveMicroUSD != 4110 || len(ledger.rows) != 0 || client.creates != 0 {
 		t.Fatalf("summary %+v error %v", summary, err)
 	}
 	client.beforeCreate = func(requests []batchapi.Request) {
@@ -125,7 +125,7 @@ func TestArticleSteps_RunnerDryRunSubmissionReplayAndRecovery(t *testing.T) {
 			}
 			typ := "succeeded"
 			if i == 1 {
-				typ = "errored"
+				typ = "expired"
 			}
 			client.results = append(client.results, batchapi.Result{CustomID: request.CustomID, Type: typ, Message: message})
 		}
@@ -167,11 +167,11 @@ func TestArticleSteps_Step1SettlesBeforeArtifact(t *testing.T) {
 	prepare := client.beforeCreate
 	client.beforeCreate = func(requests []batchapi.Request) {
 		prepare(requests)
-		client.results[0].Message.Content[0].Text = `{"dieu-1":{"codes":[{"code":"1.1","confidence":0.8}]}}`
+		client.results[0] = storeResult(t, requests[0].CustomID, `{"stop_reason":"end_turn","content":[{"type":"text","text":"{\"dieu-1\":{\"codes\":[{\"code\":\"1.1\",\"confidence\":0.8}]}}"}],"usage":{"input_tokens":100,"output_tokens":100}}`)
 	}
 	o.DryRun = true
 	summary, err := runner.Articles(context.Background(), o, "labels", articleInputs(1, ""), families, articleNodes())
-	if err != nil || summary.Step != 1 || summary.Requests != 1 || summary.InputTokens != 100 || summary.ReserveMicroUSD != 2053 || client.creates != 0 {
+	if err != nil || summary.Step != 1 || summary.Requests != 1 || summary.InputTokens != 100 || summary.ReserveMicroUSD != 2055 || client.creates != 0 {
 		t.Fatalf("summary %+v error %v", summary, err)
 	}
 	o.DryRun = false

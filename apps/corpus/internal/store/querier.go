@@ -25,6 +25,7 @@ type Querier interface {
 	CountRunAcquisitions(ctx context.Context, runID int64) (int64, error)
 	CountUnacceptedGaps(ctx context.Context, runID int64) (int64, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) error
+	DeleteClassificationAttemptIndex(ctx context.Context) error
 	DeleteItemGaps(ctx context.Context, arg DeleteItemGapsParams) (int64, error)
 	DeleteRunListingsByItem(ctx context.Context, arg DeleteRunListingsByItemParams) (int64, error)
 	DeleteRunListingsByQuery(ctx context.Context, arg DeleteRunListingsByQueryParams) (int64, error)
@@ -62,6 +63,7 @@ type Querier interface {
 	GetRunScope(ctx context.Context, runID int64) (RunScope, error)
 	GetRunSourceForShare(ctx context.Context, arg GetRunSourceForShareParams) (RunSource, error)
 	GetRunSourceForUpdate(ctx context.Context, arg GetRunSourceForUpdateParams) (RunSource, error)
+	IndexClassificationAttempt(ctx context.Context, arg IndexClassificationAttemptParams) error
 	InsertArtifact(ctx context.Context, arg InsertArtifactParams) (int64, error)
 	InsertChunk(ctx context.Context, arg InsertChunkParams) error
 	InsertDocument(ctx context.Context, arg InsertDocumentParams) error

@@ -43,25 +43,25 @@ func (c *stalledReconcileClient) stall(ctx context.Context) error {
 	}
 }
 
-func (c *stalledReconcileClient) List(ctx context.Context, _, _ time.Time) ([]anthropic.MessageBatch, error) {
+func (c *stalledReconcileClient) StreamPages(ctx context.Context, visit func([]anthropic.MessageBatch, string) error) error {
 	if c.phase == "list" {
 		if err := c.stall(ctx); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return []anthropic.MessageBatch{{ID: "unrelated_synthetic", ProcessingStatus: "ended"}}, nil
+	return visit([]anthropic.MessageBatch{{ID: "unrelated_synthetic", ProcessingStatus: "ended", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}}, "")
 }
 
-func (c *stalledReconcileClient) Results(ctx context.Context, id string) ([]batchapi.Result, error) {
+func (c *stalledReconcileClient) StreamResults(ctx context.Context, id string, visit func(batchapi.Result) error) error {
 	if id == "unrelated_synthetic" {
 		if c.phase == "results" {
 			if err := c.stall(ctx); err != nil {
-				return nil, err
+				return err
 			}
 		}
-		return nil, nil
+		return nil
 	}
-	return c.pollingClient.Results(ctx, id)
+	return c.pollingClient.StreamResults(ctx, id, visit)
 }
 
 func TestReconcile_DatabaseCancellationDuringProviderCalls(t *testing.T) {
@@ -100,13 +100,19 @@ func TestReconcile_DatabaseCancellationDuringProviderCalls(t *testing.T) {
 				t.Fatal(err)
 			}
 			blocking := &stalledReconcileClient{pollingClient: client, phase: phase, entered: make(chan struct{}), resume: make(chan struct{})}
-			reconciler := &Runner{Repository: &PGRepository{Pool: db}, Client: blocking, IntentDir: r.IntentDir, Now: r.Now}
+			reconcileRepo := &PGRepository{Pool: db}
+			reconciler := &Runner{Repository: reconcileRepo, Client: blocking, IntentDir: r.IntentDir, Now: r.Now}
 			reconciled := make(chan error, 1)
 			go func() { reconciled <- reconciler.Reconcile(ctx, stalled.ID, false) }()
 			select {
 			case <-blocking.entered:
 			case <-ctx.Done():
 				t.Fatal("reconciliation never reached provider call")
+			}
+			pool := db.Stat()
+			t.Logf("provider stalled: acquired=%d idle=%d new_connections=%d", pool.AcquiredConns(), pool.IdleConns(), pool.NewConnsCount())
+			if reconcileRepo.conn != nil || pool.AcquiredConns() != 0 {
+				t.Fatal("stalled provider call retained a PostgreSQL connection")
 			}
 			observer := &PGRepository{Pool: db}
 			listCtx, stopListing := context.WithTimeout(ctx, 100*time.Millisecond)

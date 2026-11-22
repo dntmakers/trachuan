@@ -39,36 +39,13 @@ func (r *Runner) restoreAbandonment(s *Submission) (bool, error) {
 	if err = json.Unmarshal(b, &record); err != nil {
 		return false, fmt.Errorf("decode submission abandonment: %w", err)
 	}
-	if record.ID != s.ID || record.ItemsHash != s.ItemsHash || record.AbandonedAt.Before(s.CreatedAt.Add(24*time.Hour)) {
+	if !validAbandonment(*s, record) {
 		return false, fmt.Errorf("invalid submission abandonment")
 	}
 	s.State = "abandoned"
 	return true, nil
 }
 
-func (r *Runner) requireReconstruction(rows []Submission) error {
-	known := make(map[string]bool, len(rows))
-	for _, s := range rows {
-		known[s.ID] = true
-	}
-	files, err := os.ReadDir(filepath.Join(r.IntentDir, "submissions"))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("inspect submission intents before admission: %w", err)
-	}
-	for _, file := range files {
-		if filepath.Ext(file.Name()) != ".json" {
-			continue
-		}
-		id := file.Name()[:len(file.Name())-len(".json")]
-		if !validID(id) || !file.Type().IsRegular() {
-			return fmt.Errorf("invalid submission intent path")
-		}
-		if !known[id] {
-			return fmt.Errorf("submission ledger omits retained intents; run corpus submissions --rebuild before admission")
-		}
-	}
-	return nil
+func validAbandonment(s Submission, record abandonmentRecord) bool {
+	return record.ID == s.ID && record.ItemsHash == s.ItemsHash && !record.AbandonedAt.Before(s.CreatedAt.Add(24*time.Hour))
 }

@@ -4,7 +4,6 @@ package classify
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -49,22 +48,14 @@ func TestRebuild_DatabaseAbandonedReplacement(t *testing.T) {
 	for i := range docs {
 		docs[i] = Document{Key: fmt.Sprintf("vn:vbpl:%d", i+1), Title: "Synthetic legal title"}
 	}
-	client.input = 40000
+	client.input = replacementFixtureInput
 	client.beforeCreate = nil
-	client.createErr = errors.New("synthetic lost create response")
-	if _, err := r.Screen(ctx, o, docs, families()); err == nil {
-		t.Fatal("expected uncertain submission")
-	}
-	var abandonedID string
-	if err := db.QueryRow(ctx, `SELECT id FROM submission WHERE run_id=$1`, id).Scan(&abandonedID); err != nil {
-		t.Fatal(err)
-	}
+	abandonedID := seedUndispatchedScreen(t, r, o, docs).ID
 	created := r.Now()
 	r.Now = func() time.Time { return created.Add(25 * time.Hour) }
 	if err := r.Reconcile(ctx, abandonedID, true); err != nil {
 		t.Fatal(err)
 	}
-	client.createErr = nil
 	client.ended = false
 	if _, err := r.Screen(ctx, o, docs, families()); err == nil {
 		t.Fatal("expected interrupted replacement polling")

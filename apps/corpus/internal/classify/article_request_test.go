@@ -110,7 +110,7 @@ func TestArticleRecipe_BindsEveryVersionAndOutputBound(t *testing.T) {
 		}
 	}
 	reserve, err := r.Reserve(100)
-	if err != nil || reserve != 2053 {
+	if err != nil || reserve != 2055 {
 		t.Fatalf("reserve %d error %v", reserve, err)
 	}
 }

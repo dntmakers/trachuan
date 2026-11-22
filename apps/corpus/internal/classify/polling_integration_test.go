@@ -41,12 +41,14 @@ func (p *pollingClient) Get(context.Context, string) (anthropic.MessageBatch, er
 	}
 	return b, nil
 }
-func (p *pollingClient) Results(context.Context, string) ([]batchapi.Result, error) {
+func (p *pollingClient) StreamResults(_ context.Context, _ string, visit func(batchapi.Result) error) error {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.downloads++
-	return []batchapi.Result{{CustomID: p.requests[0].CustomID, Type: "succeeded", Message: p.message}}, nil
+	result := batchapi.Result{CustomID: p.requests[0].CustomID, Type: "succeeded", Message: p.message}
+	p.mu.Unlock()
+	return visit(result)
 }
+
 func (p *pollingClient) Cancel(context.Context, string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()

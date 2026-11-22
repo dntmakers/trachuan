@@ -13,8 +13,12 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/v2"
 )
 
-func (f *fakeClient) List(context.Context, time.Time, time.Time) ([]anthropic.MessageBatch, error) {
-	return []anthropic.MessageBatch{{ID: "batch_synthetic", ProcessingStatus: "ended", CreatedAt: f.batchCreated}}, nil
+func (f *fakeClient) StreamPages(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
+	created := f.batchCreated
+	if created.IsZero() {
+		created = time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	return visit([]anthropic.MessageBatch{{ID: "batch_synthetic", ProcessingStatus: "ended", CreatedAt: created}}, "")
 }
 func (f *fakeClient) Cancel(context.Context, string) error { return nil }
 
@@ -60,12 +64,17 @@ func TestReconcile_AttachesOnlyMatchingPrefixAndWaitsBeforeAbandon(t *testing.T)
 		t.Fatal("expected lost response")
 	}
 	id := m.rows[0].ID
+	candidate := "batch_unrelated"
+	r.Client = &providerFault{fakeClient: f, stream: f.StreamResults, pages: func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
+		return visit([]anthropic.MessageBatch{{ID: candidate, CreatedAt: m.rows[0].CreatedAt, ProcessingStatus: "ended"}}, "")
+	}}
 	f.results = []batchapi.Result{{CustomID: strings.Repeat("b", 32) + "-000000", Type: "expired"}}
 	if err := r.Reconcile(context.Background(), id, true); err == nil || m.rows[0].State != "uncertain" {
 		t.Fatal("abandoned before 24 hours")
 	}
+	candidate = "batch_synthetic"
 	f.results = []batchapi.Result{{CustomID: id + "-000000", Type: "expired"}}
-	if err := r.Reconcile(context.Background(), id, false); err != nil || m.rows[0].State != "submitted" {
+	if err := r.Reconcile(context.Background(), id, false); err != nil || m.rows[0].State != "completed" {
 		t.Fatal("failed to reconcile", err)
 	}
 }

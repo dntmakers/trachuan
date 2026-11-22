@@ -60,34 +60,3 @@ func digest(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
-
-func (r Recipe) Reserve(input int64) (int64, error) {
-	if err := r.Validate(); err != nil {
-		return 0, err
-	}
-	if input < 1 || input > r.InputBound {
-		return 0, fmt.Errorf("counted input exceeds classification recipe bound or is empty")
-	}
-	return r.cost(input, r.outputTokens())
-}
-
-type batchPrice struct{ inputTwentieths, outputTwentieths int64 }
-
-func priceForModel(model string) (batchPrice, bool) {
-	// Anthropic Batch prices: https://platform.claude.com/docs/en/about-claude/pricing
-	price, ok := map[string]batchPrice{
-		"claude-haiku-5-5":  {1, 5},
-		"claude-sonnet-5-5": {20, 100},
-		"claude-opus-5-5":   {40, 200},
-		"claude-fable-5-2":  {80, 400},
-	}[model]
-	return price, ok
-}
-
-func (r Recipe) cost(input, output int64) (int64, error) {
-	price, ok := priceForModel(r.Model)
-	if !ok {
-		return 0, fmt.Errorf("unsupported classification model")
-	}
-	return (price.inputTwentieths*input + price.outputTwentieths*output + 19) / 20, nil
-}

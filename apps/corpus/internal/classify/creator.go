@@ -20,7 +20,7 @@ func (r *Runner) lockCreator(id string) (*creatorGuard, error) {
 		return nil, fmt.Errorf("creator requires a submission identity and intent directory")
 	}
 	dir := filepath.Join(r.IntentDir, "submissions")
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := durableDirectory(dir); err != nil {
 		return nil, fmt.Errorf("create creator lease directory: %w", err)
 	}
 	f, err := os.OpenFile(filepath.Join(dir, id+".creator.lock"), os.O_CREATE|os.O_RDWR, 0600)
@@ -57,16 +57,19 @@ type creatorRecord struct {
 }
 
 func (r *Runner) finishCreator(s Submission, g *creatorGuard, dispatched bool) error {
+	return errors.Join(r.writeCreatorTrace(s, "creator.finished", dispatched), g.close())
+}
+
+func (r *Runner) writeCreatorTrace(s Submission, suffix string, dispatched bool) error {
 	at := r.Now().UTC().Truncate(time.Microsecond)
 	if at.Before(s.CreatedAt) {
 		at = s.CreatedAt.UTC()
 	}
 	b, err := json.Marshal(creatorRecord{ID: s.ID, ItemsHash: s.ItemsHash, At: at, Dispatched: dispatched})
 	if err != nil {
-		return errors.Join(fmt.Errorf("encode creator completion: %w", err), g.close())
+		return fmt.Errorf("encode creator record: %w", err)
 	}
-	err = writeOnce(filepath.Join(r.IntentDir, "submissions", s.ID+".creator.finished"), b)
-	return errors.Join(err, g.close())
+	return writeOnce(filepath.Join(r.IntentDir, "submissions", s.ID+"."+suffix), b)
 }
 
 func (r *Runner) readCreatorRecord(s Submission, suffix string) (creatorRecord, bool, error) {

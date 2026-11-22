@@ -87,7 +87,7 @@ func runCountPath(t *testing.T, path string, ctx context.Context, count TokenCou
 	if path == "screen" {
 		r, _, client, o := screenFixture(t)
 		r.Client = retryCounterClient{client, count}
-		_, err := r.prepareScreenBatch(ctx, o, documents()[:1], families())
+		_, err := r.prepareScreenBatch(ctx, o, documents()[:1], families(), keyHistory{})
 		return err
 	}
 	r := articleRecipe(t)

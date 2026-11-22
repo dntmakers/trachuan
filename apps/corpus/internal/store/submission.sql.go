@@ -12,7 +12,7 @@ import (
 )
 
 const listClassificationSubmissions = `-- name: ListClassificationSubmissions :many
-SELECT s.id, s.run_id, s.stage, s.provider, s.screen_hash, s.recipe, s.families, s.item_list, s.item_list_hash, s.provider_job_id, s.state, s.created_at, s.submitted_at, s.deadline_at, s.budget, s.budget_micro_usd, s.reserved_micro_usd, s.cost_micro_usd, s.cost_settled, s.results, r.country, r.rel FROM submission s JOIN run r ON r.id=s.run_id
+SELECT s.id, s.run_id, s.stage, s.provider, s.screen_hash, s.recipe, s.families, s.item_list, s.item_list_hash, s.provider_job_id, s.state, s.created_at, s.submitted_at, s.deadline_at, s.budget, s.budget_micro_usd, s.reserved_micro_usd, s.cost_micro_usd, s.cost_settled, s.results, s.key_version, s.price_version, r.country, r.rel FROM submission s JOIN run r ON r.id=s.run_id
 WHERE s.stage='classify' ORDER BY s.created_at,s.id
 `
 
@@ -37,6 +37,8 @@ type ListClassificationSubmissionsRow struct {
 	CostMicroUsd     int64
 	CostSettled      bool
 	Results          json.RawMessage
+	KeyVersion       int32
+	PriceVersion     *string
 	Country          string
 	Rel              string
 }
@@ -71,6 +73,8 @@ func (q *Queries) ListClassificationSubmissions(ctx context.Context) ([]ListClas
 			&i.CostMicroUsd,
 			&i.CostSettled,
 			&i.Results,
+			&i.KeyVersion,
+			&i.PriceVersion,
 			&i.Country,
 			&i.Rel,
 		); err != nil {
@@ -85,8 +89,8 @@ func (q *Queries) ListClassificationSubmissions(ctx context.Context) ([]ListClas
 }
 
 const saveClassificationSubmission = `-- name: SaveClassificationSubmission :exec
-INSERT INTO submission (id,run_id,stage,provider,screen_hash,recipe,families,item_list,item_list_hash,provider_job_id,state,created_at,submitted_at,deadline_at,budget,budget_micro_usd,reserved_micro_usd,cost_micro_usd,cost_settled,results)
-VALUES ($1,$2,'classify','anthropic',$3,$4,$5,$6,$7,$16,$8,$9,$17,$18,$10,$11,$12,$13,$14,$15)
+INSERT INTO submission (id,run_id,stage,provider,screen_hash,recipe,families,item_list,item_list_hash,provider_job_id,state,created_at,submitted_at,deadline_at,budget,budget_micro_usd,reserved_micro_usd,cost_micro_usd,cost_settled,results,key_version,price_version)
+VALUES ($1,$2,'classify','anthropic',$3,$4,$5,$6,$7,$17,$8,$9,$18,$19,$10,$11,$12,$13,$14,$15,$16,$20)
 ON CONFLICT (id) DO UPDATE SET provider_job_id=excluded.provider_job_id,state=excluded.state,submitted_at=excluded.submitted_at,deadline_at=excluded.deadline_at,cost_micro_usd=excluded.cost_micro_usd,cost_settled=excluded.cost_settled,results=excluded.results
 `
 
@@ -106,9 +110,11 @@ type SaveClassificationSubmissionParams struct {
 	CostMicroUsd     int64
 	CostSettled      bool
 	Results          json.RawMessage
+	KeyVersion       int32
 	ProviderJobID    *string
 	SubmittedAt      *time.Time
 	DeadlineAt       *time.Time
+	PriceVersion     *string
 }
 
 func (q *Queries) SaveClassificationSubmission(ctx context.Context, arg SaveClassificationSubmissionParams) error {
@@ -128,9 +134,11 @@ func (q *Queries) SaveClassificationSubmission(ctx context.Context, arg SaveClas
 		arg.CostMicroUsd,
 		arg.CostSettled,
 		arg.Results,
+		arg.KeyVersion,
 		arg.ProviderJobID,
 		arg.SubmittedAt,
 		arg.DeadlineAt,
+		arg.PriceVersion,
 	)
 	return err
 }

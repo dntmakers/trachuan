@@ -11,16 +11,11 @@ func TestRebuild_PreservesAbandonedAttempt(t *testing.T) {
 	ctx := context.Background()
 	r, ledger, client, o := screenFixture(t)
 	client.beforeCreate = nil
-	client.createErr = errors.New("synthetic lost response")
-	if _, err := r.Screen(ctx, o, documents(), families()); err == nil {
-		t.Fatal("expected uncertain submission")
-	}
-	abandoned := ledger.rows[0]
+	abandoned := seedUndispatchedScreen(t, r, o, documents())
 	r.Now = func() time.Time { return abandoned.CreatedAt.Add(25 * time.Hour) }
 	if err := r.Reconcile(ctx, abandoned.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	client.createErr = nil
 	client.ended = false
 	if _, err := r.Screen(ctx, o, documents(), families()); err == nil {
 		t.Fatal("expected interrupted polling")
@@ -33,10 +28,36 @@ func TestRebuild_PreservesAbandonedAttempt(t *testing.T) {
 		t.Fatalf("restored %d attempts", len(ledger.rows))
 	}
 	for _, s := range ledger.rows {
-		if s.ID == abandoned.ID && (s.State != "abandoned" || s.Settled || s.ReserveMicroUSD != 1029) {
+		if s.ID == abandoned.ID && (s.State != "abandoned" || s.Settled || s.ReserveMicroUSD != 1031) {
 			t.Fatalf("abandoned attempt %+v", s)
 		}
 	}
+}
+
+func seedUndispatchedScreen(t *testing.T, r *Runner, o Options, docs []Document) Submission {
+	t.Helper()
+	ctx := context.Background()
+	prepared, err := r.prepareScreenBatch(ctx, o, docs, families(), keyHistory{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := r.Repository.Lock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	s, _, _, creator, err := r.admitBatch(ctx, prepared, o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = r.finishCreator(s, creator, false); err != nil {
+		t.Fatal(err)
+	}
+	s.State = "uncertain"
+	if err = r.Repository.Save(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	return s
 }
 
 type trackingLedger struct {
@@ -120,7 +141,15 @@ func TestScreen_AttachmentPreservesConcurrentState(t *testing.T) {
 					return
 				}
 				if state == "completed" {
-					if err = apply(&s, client.results); err != nil {
+					ctx := context.Background()
+					if err = r.captureResults(ctx, s.ID, s.BatchID, time.Time{}); err != nil {
+						t.Fatal(err)
+					}
+					retained, err := r.verifyStore(ledger.rows, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if err = r.applyMatchedDownload(&s, retained.verified[s.ID]); err != nil {
 						t.Fatal(err)
 					}
 				} else {
@@ -138,7 +167,7 @@ func TestScreen_AttachmentPreservesConcurrentState(t *testing.T) {
 			if ledger.rows[0].State != want || !ledger.rows[0].Settled || ledger.rows[0].CostMicroUSD != 8 {
 				t.Fatalf("state after attach %+v", ledger.rows[0])
 			}
-			if state == "completed" && client.downloads != 0 {
+			if state == "completed" && client.downloads != 1 {
 				t.Fatal("attachment reopened an already settled submission")
 			}
 		})

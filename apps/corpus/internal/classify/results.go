@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"time"
 
-	"danny.vn/trachuan/apps/corpus/internal/batchapi"
 	"github.com/anthropics/anthropic-sdk-go/v2"
 )
 
@@ -24,6 +23,10 @@ func providerField(value string, pattern *regexp.Regexp, missing string) string 
 }
 
 func providerError(err error) error {
+	var writeErr *captureWriteError
+	if errors.As(err, &writeErr) {
+		return writeErr
+	}
 	var api *anthropic.Error
 	if errors.As(err, &api) {
 		return fmt.Errorf("classification provider request failed: status=%d type=%s code=%s request_id=%s", api.StatusCode,
@@ -43,13 +46,23 @@ func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
 	if s.DeadlineAt == nil {
 		return fmt.Errorf("submission has no polling deadline")
 	}
-	if err := r.writeBatch(*s); err != nil {
-		return err
-	}
 	for {
 		current, err := r.transition(ctx, s.ID, func(latest *Submission) (bool, error) {
 			if settled(*latest) {
 				return false, nil
+			}
+			rows, listErr := r.Repository.List(ctx)
+			if listErr != nil {
+				return false, listErr
+			}
+			var found bool
+			_, restoreErr := r.verifyStore(rows, func(retained retainedStore) error {
+				var err error
+				found, err = r.recoverRetained(latest, retained)
+				return err
+			})
+			if latest.Settled || restoreErr != nil {
+				return found, restoreErr
 			}
 			if stateErr := pollingState(latest); stateErr != nil {
 				return false, stateErr
@@ -58,7 +71,7 @@ func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
 				latest.State = "failed"
 				return true, nil
 			}
-			return false, nil
+			return found, nil
 		})
 		if err != nil {
 			return err
@@ -69,27 +82,18 @@ func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
 		if err = pollingState(&current); err != nil {
 			return err
 		}
+		if r.Client == nil {
+			return fmt.Errorf("classification polling requires a provider client")
+		}
 		b, err := r.Client.Get(ctx, current.BatchID)
 		if err != nil {
 			return providerError(err)
 		}
 		if b.ProcessingStatus == "ended" {
-			results, resultErr := r.Client.Results(ctx, current.BatchID)
-			if resultErr != nil {
-				return providerError(resultErr)
+			if resultErr := r.captureResults(ctx, current.ID, current.BatchID, b.CreatedAt); resultErr != nil {
+				return resultErr
 			}
-			finished, finishErr := r.transition(ctx, s.ID, func(latest *Submission) (bool, error) {
-				if settled(*latest) {
-					return false, nil
-				}
-				if stateErr := pollingState(latest); stateErr != nil {
-					return false, stateErr
-				}
-				if applyErr := apply(latest, results); applyErr != nil {
-					return false, applyErr
-				}
-				return true, nil
-			})
+			finished, _, finishErr := r.recordDownloaded(ctx, current, current.BatchID)
 			if finishErr != nil {
 				return finishErr
 			}
@@ -103,67 +107,4 @@ func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
 			return fmt.Errorf("wait for classification batch: %w", err)
 		}
 	}
-}
-
-func apply(s *Submission, results []batchapi.Result) error {
-	byID := map[string]batchapi.Result{}
-	for _, result := range results {
-		if _, exists := byID[result.CustomID]; exists {
-			return fmt.Errorf("duplicate classification custom_id")
-		}
-		byID[result.CustomID] = result
-	}
-	if len(byID) != len(s.Items) {
-		return fmt.Errorf("classification batch results have incomplete or foreign identities; reservation retained")
-	}
-	outcomes := map[string]Outcome{}
-	var input, output int64
-	for i, item := range s.Items {
-		v, ok := byID[customID(s.ID, i)]
-		if !ok {
-			return fmt.Errorf("classification batch result omits an item; reservation retained")
-		}
-		out := Outcome{Outcome: "invalid_response", Codes: []string{}, Dropped: []string{}}
-		switch v.Type {
-		case "succeeded":
-			m := v.Message
-			u := m.Usage
-			if !u.JSON.InputTokens.Valid() || !u.JSON.OutputTokens.Valid() || u.InputTokens < 0 || u.OutputTokens < 0 || u.InputTokens > 100000 || u.OutputTokens > s.Recipe.outputTokens() || u.CacheReadInputTokens != 0 || u.CacheCreationInputTokens != 0 {
-				return fmt.Errorf("classification usage is incomplete or outside verified pricing; reservation retained")
-			}
-			input += u.InputTokens
-			output += u.OutputTokens
-			var text string
-			for _, content := range m.Content {
-				if content.Type == "text" {
-					text += content.Text
-				}
-			}
-			if s.Recipe.Article != nil {
-				if item.Article == nil {
-					return fmt.Errorf("article submission is missing request evidence; reservation retained")
-				}
-				out.Articles, out.DroppedAnchors = ValidateArticles(string(m.StopReason), text, *item.Article, item.Article.Nodes)
-			} else {
-				out = Validate(string(m.StopReason), text, s.Recipe.F, s.Families)
-			}
-		case "errored", "expired", "canceled":
-		default:
-			return fmt.Errorf("unknown classification result type; reservation retained")
-		}
-		outcomes[item.Key] = out
-	}
-	cost, err := s.Recipe.cost(input, output)
-	if err != nil {
-		return fmt.Errorf("price classification usage; reservation retained: %w", err)
-	}
-	s.Results = outcomes
-	s.CostMicroUSD = cost
-	s.Settled = true
-	if s.State == "cancelling" {
-		s.State = "cancelled"
-	} else {
-		s.State = "completed"
-	}
-	return nil
 }

@@ -25,7 +25,7 @@ func TestArticles_DatabaseSettlementAndReplay(t *testing.T) {
 		if err := db.QueryRow(ctx, `SELECT id,state,reserved_micro_usd FROM submission WHERE run_id=$1`, runID).Scan(&id, &state, &reserve); err != nil {
 			t.Fatal(err)
 		}
-		if state != "preparing" || reserve != 2053 || requests[0].CustomID != customID(id, 0) {
+		if state != "preparing" || reserve != articleDatabaseReserve || requests[0].CustomID != customID(id, 0) {
 			t.Fatal("article batch not reserved before create")
 		}
 		if _, err := os.Stat(filepath.Join(r.IntentDir, "submissions", id+".json")); err != nil {
