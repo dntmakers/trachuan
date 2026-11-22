@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from updater.activation_test import ActivationFixture, Crash
-from updater.deploy_io import CommandError, StopRequested, canonical
+from updater.deploy_io import CommandError, StopRequested, canonical, stop
 from updater.deploy_state import State
 from updater.deploy_verify import pull_image
 from updater.deploy_run import Updater
@@ -269,6 +269,54 @@ class HousekeepingTest(ActivationFixture, unittest.TestCase):
         with mock.patch.object(self.host, 'schema', side_effect=StopRequested('stop')):
             with self.assertRaises(StopRequested):
                 self.engine.recover()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
+
+    def edge_stop(self):
+        self.addCleanup(stop.clear)
+        runner = self.app.host.runner
+        def run(args, **kwargs):
+            if args[-1] == 'https://trachuan.vn/':
+                stop.request()
+                raise StopRequested('stop')
+            return runner(args, **kwargs)
+        self.app.host.runner = run
+
+    def assert_edge_cancelled(self):
+        stops = [args for args, _ in self.calls if args == ['systemctl', '--user', 'stop', 'trachuan-caddy.service']]
+        self.assertTrue(stops)
+        self.assertEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertTrue(self.paths.hold.exists())
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('caddy stopped', result['message'])
+
+    def test_stop_on_activation_edge_probe_stops_caddy(self):
+        self.edge_stop()
+        self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'started')
+
+    def test_failed_edge_cancel_is_reported(self):
+        self.edge_stop()
+        runner = self.app.host.runner
+        def run(args, **kwargs):
+            if kwargs.get('cancel'):
+                raise CommandError('stop failed')
+            return runner(args, **kwargs)
+        self.app.host.runner = run
+        self.assertEqual(self.app.run(), 1)
+        self.assertTrue(self.paths.hold.exists())
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('caddy stop failed', result['message'])
+
+    def test_stop_on_recovery_edge_probe_stops_caddy(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        self.edge_stop()
+        self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
         self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
 
     def test_prune_failure_is_success_and_next_run_can_restart_caddy(self):

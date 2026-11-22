@@ -74,13 +74,23 @@ def release_arguments(write):
 class Host:
     def __init__(self, paths, runner=command, user_prefix=None):
         self.paths, self.runner = paths, runner
+        self.edge_started = False
         self.user_prefix = as_user() if user_prefix is None else user_prefix
 
     def user(self, *args, **kwargs):
         return self.runner(self.user_prefix + list(args), **kwargs)
 
     def systemctl(self, action, *names):
-        return self.user('systemctl', '--user', action, *['trachuan-' + name + '.service' for name in names])
+        if action == 'start' and 'caddy' in names:
+            self.edge_started = True
+        result = self.user('systemctl', '--user', action, *['trachuan-' + name + '.service' for name in names])
+        if action == 'stop' and 'caddy' in names:
+            self.edge_started = False
+        return result
+
+    def cancel_edge(self):
+        self.edge_started = False
+        return self.user('systemctl', '--user', 'stop', 'trachuan-caddy.service', timeout=10, cancel=True)
 
     def hold(self):
         atomic(self.paths.hold, b'deployment held\n', 0o644)

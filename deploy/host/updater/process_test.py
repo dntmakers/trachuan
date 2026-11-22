@@ -178,5 +178,27 @@ class ProcessTest(unittest.TestCase):
         self.assertEqual(children[0].returncode, -signal.SIGKILL)
 
 
+    def test_termination_does_not_reap_before_final_group_signal(self):
+        events = []
+        process = mock.Mock(pid=123, returncode=None)
+        process.wait.side_effect = lambda: events.append('reap')
+        with mock.patch.object(io.os, 'killpg', side_effect=lambda pid, sig: events.append(sig)), \
+                mock.patch.object(io.os, 'waitid', side_effect=lambda *args: events.append('observe') or object()):
+            io.terminate(process)
+        self.assertEqual(events, [signal.SIGTERM, 'observe', signal.SIGKILL, 'reap'])
+
+
+    def test_cancellation_command_is_the_only_stop_flag_bypass(self):
+        stop_command = ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
+        real = subprocess.Popen
+        io.stop.request()
+        with mock.patch.object(io.subprocess, 'Popen', side_effect=lambda args, **kw: real(['/usr/bin/true'], **kw)):
+            self.assertEqual(io.command(stop_command, timeout=10, cancel=True), b'')
+            with self.assertRaises(ValueError):
+                io.command(['systemctl', '--user', 'start', 'trachuan-caddy.service'], timeout=10, cancel=True)
+            with self.assertRaises(io.StopRequested):
+                io.command(stop_command, timeout=10)
+
+
 if __name__ == '__main__':
     unittest.main()

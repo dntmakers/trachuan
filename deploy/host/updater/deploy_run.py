@@ -195,6 +195,13 @@ class Updater:
             reason = 'command failed or run interrupted'
         if recovery_message:
             reason += '; ' + recovery_message
+        if interrupted(error) and self.host.edge_started:
+            self.host.hold()
+            try:
+                self.host.cancel_edge()
+                reason += '; caddy stopped'
+            except (OSError, CommandError):
+                reason += '; caddy stop failed'
         result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
         return 1
 
