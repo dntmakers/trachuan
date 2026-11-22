@@ -1,1 +1,1436 @@
-[]
+- id: "decision-00bdfd49131f0cca"
+  kind: "review_decision"
+  target: { finding: "sha256:00bdfd49131f0ccabea3809eb72b78afeaaf7ea87d596f52a7f2ab5f422b9e77" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-25/khoan-1." }
+  depends: { fingerprint: "sha256:2739af510ee721f259ab50eb872d1d7d00357b2dbd008b0ce810b69784b26636", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-05b8dc90cce2d5ee"
+  kind: "review_decision"
+  target: { finding: "sha256:05b8dc90cce2d5ee07db2358435f494d1c1d289e02e9c104d1af6bd978ca4309" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:c6851f10f1eaaf475cdd4d654c27f9099b3b2585ab4b6a10d36ad9d27eced693", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-06f3437679da8ae6"
+  kind: "review_decision"
+  target: { finding: "sha256:06f3437679da8ae645c2b66a5bf633285ccf7db09389443af61eeb3cf3b5d902" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-6/khoan-2." }
+  depends: { fingerprint: "sha256:ebe5851a9d92c5c66fb412c16e89c14b780c7e69c1fffe343413ef5680d4b08e", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-1728e287778b10ca"
+  kind: "review_decision"
+  target: { finding: "sha256:1728e287778b10ca8617b8be72aa7f4b9edafa0cb7813ce1f952e227310e117c" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:558de2f1d5344fba929d3e943d18d35e81ef6ab10238466103fe65b019c6853b", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-1d3b3ea78d227af6"
+  kind: "review_decision"
+  target: { finding: "sha256:1d3b3ea78d227af6aa9b1622f39f4673e50a8bd5958c0e940fdf549df3d6ba9b" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:9f3a6f7dd55b6f0d098525fe334ebb1b4a6df0cb33d1ce9c059cf6d1cafb99c0", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-2251badd2adb71e6"
+  kind: "review_decision"
+  target: { finding: "sha256:2251badd2adb71e6714bf926335b21e0d1585ed086d8dbc5c5df454ed2a97469" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-4/khoan-8." }
+  depends: { fingerprint: "sha256:a5c2196ad869711c0e11734ead12c8dda3460472bc55110b9c187d54452dc568", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-3334f1ff5f883e86"
+  kind: "review_decision"
+  target: { finding: "sha256:3334f1ff5f883e86a253c78636de0d06121136a263f094418b835b364e65dce3" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:ab94e3de4f2d09e6a22f81887f30542e1b3a2292a4412225f23f3e7e0a28e55a", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-56522e7bfd8e34b0"
+  kind: "review_decision"
+  target: { finding: "sha256:56522e7bfd8e34b09bb7bcb2d793f5221076762157ee3e270596ecd6df55d363" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:c17da73cf2cb836f0b572c9c227a5796b4b18412b438022c6751e256fe49a0aa", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-7bf0fa9f083a243d"
+  kind: "review_decision"
+  target: { finding: "sha256:7bf0fa9f083a243dd5c9529f47122d872e5798d3113ea55e728daddab7027105" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:75ee7568f7b63723af2edb631c6b2551baba7cb5f9e35162d3c47b28be9c7ad5", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-7d4938a9dd3f2c01"
+  kind: "review_decision"
+  target: { finding: "sha256:7d4938a9dd3f2c018dabd21cf846403fedcbee292ddef6e411d36e5081424097" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:b6be9844b5e4ef5f9170254fc7ea1b8a6478da582d37b3902d5dd3481ce0abf8", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-8f9472875045cfde"
+  kind: "review_decision"
+  target: { finding: "sha256:8f9472875045cfde6f3cfcb7616f6e0e6a833e7bc26c12fee07cc5667a93c338" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:aa3b1baaa7367f2782002dce67a5a4c1a81771c8a3f54fb00528e07624090264", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-966f8129f226f7c7"
+  kind: "review_decision"
+  target: { finding: "sha256:966f8129f226f7c78ebaec3817443d48dcb59b849fee21ec7adefb78f85e849d" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-31/khoan-1." }
+  depends: { fingerprint: "sha256:6aa8806209d0ef56bc39aea1d0e761c239d1057f61df32a884c499c7044e0844", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-9c907c7107ac46d0"
+  kind: "review_decision"
+  target: { finding: "sha256:9c907c7107ac46d0f4ceab9d9edd313e308fde35ab2d29c4228e0f17e5c4bbd4" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:90ccb47a77a0bb1c3294591c963b47117e264b511922749fcefe14b1f288cf05", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-a143c3246f3fe1b7"
+  kind: "review_decision"
+  target: { finding: "sha256:a143c3246f3fe1b7f21cded42a4f656f3a8c5202db3e97c0d9e27ac12c24a4fa" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:25d546cbf06d9e81e8130c41de0f362687b2656d533ebb9c175a311630aad693", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-a2428eae9874fad0"
+  kind: "review_decision"
+  target: { finding: "sha256:a2428eae9874fad0e27eeeb14cd59b3c5f25478e68b363ba5bb4278edfc1c1cf" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-7/khoan-1, dieu-7/khoan-2." }
+  depends: { fingerprint: "sha256:1749f64d19eeb263334bdfd28981ca3143951aecb432d546882c11a7ce812a33", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-a35abd7fd3a9b6de"
+  kind: "review_decision"
+  target: { finding: "sha256:a35abd7fd3a9b6de6aaf572c2d6b4dcd42aef66672ed412fe5a1cc0cbbe01807" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:d840a7aab4fd3a40b1b76f829b894801b7c45957d414230f61bf690435421e88", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-b4aa254edba49013"
+  kind: "review_decision"
+  target: { finding: "sha256:b4aa254edba490131b215934f86cc3c566e013e2ecafe6f0902759b8924cfd5e" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:b82c57e5e4f02556e5513248465257529b90944ab238bce8aa7abda75f48c215", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-bc839e954352b95b"
+  kind: "review_decision"
+  target: { finding: "sha256:bc839e954352b95b22622d9a847107eaa3e66489d58784e0f97e075f8706103b" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:205cb3b2101f6130172a72e127df86f587fb23a4d1786fdb54ae607a2ec5e845", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-d23786bcf2802995"
+  kind: "review_decision"
+  target: { finding: "sha256:d23786bcf28029951e463a656e9f1f6e6ad755cf6862a18bdf3defbbf95b7099" }
+  claim: { reason_code: "source_defect", reason: "The acting article label is ambiguous in the source tree, so no provision can carry the effect." }
+  depends: { fingerprint: "sha256:c79cc38105041d5c91d06da277dec5e58071f8245357229dc5fa4891858c9467", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-d378f546706f9084"
+  kind: "review_decision"
+  target: { finding: "sha256:d378f546706f90843f58f41422b518f4b60bde4b2fdd6e9d083b8b393cbc9190" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-8/khoan-3, dieu-8/khoan-5." }
+  depends: { fingerprint: "sha256:fb41e3f57f90a6657db03284478581494eb96b14f25012318647381cc57eabde", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-dbb35107fa546c1c"
+  kind: "review_decision"
+  target: { finding: "sha256:dbb35107fa546c1c7dca69ffc6c8b6b3a2b4cc26888f1f493b6fb3a2a3b52604" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:77abe78fff044deafa216144c889178e57a9bdf0ae11fb0246035482d27a22bf", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-e0484088c2360a9e"
+  kind: "review_decision"
+  target: { finding: "sha256:e0484088c2360a9e3aa7ae92c906010a7d087a2f69d9d1beba3019f8fa485ed1" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-30/khoan-1." }
+  depends: { fingerprint: "sha256:b6ef406ef9c5c27e0cb3f57b12598b9cef2f4b8390ea0c89f9aa90019270aa47", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-ea76b96fd1ad35cf"
+  kind: "review_decision"
+  target: { finding: "sha256:ea76b96fd1ad35cfcda0ad1f379fabf215970b2a6b424218b18390839cb92426" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:9fe18cc9067e4245526da3267a81289fa29530eb4d1ec90e7e65ec1f46a1dc32", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-ec9c5493e51c55df"
+  kind: "review_decision"
+  target: { finding: "sha256:ec9c5493e51c55df99ee11f4e1d0386ff3a6574715995ed3cfa15ba212749194" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-9/khoan-1." }
+  depends: { fingerprint: "sha256:1b4471e2323fbc8898aa33e28da0a07834c8d61a2730c748d8e9306875f4eec6", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-f71959bb08e5fb5e"
+  kind: "review_decision"
+  target: { finding: "sha256:f71959bb08e5fb5ef040d856814c8c313657f640ad5d437e3fc93ac79bf4fd5a" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:1a359df040c4a8a57db38e65e2cf10ef6b33a5532c3591f82d15a70a2fd1489f", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-f76c0b7fc1a0bfd0"
+  kind: "review_decision"
+  target: { finding: "sha256:f76c0b7fc1a0bfd0c64ec3ef967dc0b4e2181bc5c16fd383ae0fb4627dc513a7" }
+  claim: { reason_code: "deferred", reason: "The target text is incomplete in this release, so the reviewed effect would be stale; record it when the text is complete." }
+  depends: { fingerprint: "sha256:8720657ef131fbd1f6f9d0ed47d455c302d697724544a02d1c96ba9688082a54", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "decision-fa0e51f47a2bb6d1"
+  kind: "review_decision"
+  target: { finding: "sha256:fa0e51f47a2bb6d1b479dc19a70c628ba9ee487d91a7eb6b22b4b095cb9c5cc2" }
+  claim: { reason_code: "source_defect", reason: "The target tree lacks dieu-23/khoan-1/diem-b, dieu-23/khoan-1/diem-c." }
+  depends: { fingerprint: "sha256:19ab6d9edf6e950b96e18755df41261ca2568eaba6e8564b0467028f607526e5", semantics: 1, first_rel: "20261119_1" }
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-0149c139587d6044"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-1" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-1" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 1 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:90da585453a16f71d297dfb632b73e875f68fe81b6d8e34cf89d77a47972d07f
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:080cee1a65e2c109460c48803f21b5ba7310a25babb8cf9292bfd1a4ace10922
+      heading_sha256: sha256:1546822a3c16355554bf80570b4053096016bcdf49926cf1a5246608fa6f845f
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-02a62c8073da959f"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-6" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-1/khoan-4" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 6 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:ccf5dc02c57c4ddaec120da3c8a254a0b115b21260ec92c135dab0c6eb516e37
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:e2368ef19f4f9149243a5ef78a5d9fed590986ce795c48076578027698451140
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:2593fdaa6e1958fc570fb7b12b13099236a11efebe6899cb0b23fb24f1b6164d
+      heading_sha256: sha256:e914aa489b63718606aa6429563d049e448dd83a4f1e61413a627891535e82fa
+      ancestors:
+          - anchor: chuong-ii
+            heading_sha256: sha256:924aca6a5a3a79716d655000be337b1228c93354a5141a5b496d396ff8c0f073
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-03c782cbcaa2d98c"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-2/khoan-2" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-1/khoan-1" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 2 Điều 2 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0412b23f2b865c13b00fa982f47ec38d7b8dba38ede0f1813e3a681866a707e6
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:e2368ef19f4f9149243a5ef78a5d9fed590986ce795c48076578027698451140
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:483319ff26f996177048e8a43e48a5fd75a87d95759e962dd0fed4ec6c623588
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-i
+            heading_sha256: sha256:2407cb01fab8a166848efb18a55a9baccae578cf1c516b35af29dd9ce6c82b63
+          - anchor: dieu-2
+            heading_sha256: sha256:0ffe7d14bac43d3227df03f5ec54493a6bc89d2c2e7d0c8b6608f611fd98b936
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-0dbf9af72073562f"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-21" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-6" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 21 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:a9c8ad0bd89bd6c7c976ef8331c38ea5035266e6788eb556b9da59192e1f7dd3
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:592aa02233aa06920f76822c561a941a2723730bf353dfeeb9835e5294d37c31
+      heading_sha256: sha256:b788f215f77c6216a8bd0cb08ca9436cb2ea15d56d14b4f62463ce1eddda6386
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-0e432f02044e5142"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-31" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-11" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 31 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:5d5a57043962b7b79f9d6b02de388341af57b7042efc122e8e15123eb7179b36
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:5d6a5faf806884216331d36f68e282c15c71f35a8355bfcabbc2af95aa18ff41
+      heading_sha256: sha256:7bf16173399dfee60ba58560d5e1285bc6fd7237779c8b0d16b71f7a49053b64
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-115ac9d2638d474c"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-22" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-12" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung khoản 1a vào Điều 22 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:e27c073e715a4f685a40a3da6dc7cc598ee6e925653ac28b0f046342f666f01a
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:25a251a01342bf644e4a29dd7be7c8363a4f1e487f0cfa89b1d870448e2a3ad8
+      heading_sha256: sha256:03ca118cdf2cb8412540b090b9fda3e0762244bca9a5d451110532938e9b6455
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-16ed658b86a36659"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-24" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-7" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 24 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:07357cfa2d7eb7ad67aa57451332f9ba2dfcb72ef3814f45706dbd36c5527442
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:0e4ae2aaf569b14f5280a5d23de83d339dac24885f6c0e5a6f0c4c7d54f0fbf2
+      heading_sha256: sha256:cb31573aed4f0f9313765ab3deb5d3bce4f00836e784538f9cf71f0c35608e65
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-214aaec0ab164af1"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-36" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-13" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 36 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:0a85fac1409939a08cea9aa04767e411dfa3cedff5149d83fede7742e0f47958
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:0b7ccd3b5b960cc365f84b43d3635c8e147d29a24ede776c98e24d95d853acf5
+      heading_sha256: sha256:af36f1f745a69143d39f2f8ff0851b2d764148482581ffece8424970c534479c
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-366c55355e226fda"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-13/khoan-1/diem-g" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-6" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung điểm g khoản 1 Điều 13 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:411cd330710c22bfdeeaff86df917937c739bd3c97ec061fbe9e358b7ad7a335
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:63042e8f1d7b30a2b2a954123d1fe48eea9394aebec5f4bc9a46e25376e2a420
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-13
+            heading_sha256: sha256:6b6df7a6dd819370fa833b39d31120510c6ce037c07f21078e4aecccec4ea356
+          - anchor: dieu-13/khoan-1
+            heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-37c07e81023a8a79"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-17/khoan-3" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-10" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung điểm e vào khoản 3 Điều 17 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0887b62b15ac55b0646f0ba2543936f1c50bbdc54d707e4b8ab2606468ff940c
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:73c64fa7f5bb6b06e89a326a010f1353c28adb92526922029f8b952cf6f8cf9a
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-17
+            heading_sha256: sha256:6a5d0d4167430d1a03e20080729f72da8808301d0a716b2827027ad5fbf457ad
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-3ea436308504c846"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:134267", anchor: "dieu-23" }
+  claim:
+    acting: { key: "vn:vbpl:166970", anchor: "dieu-1/khoan-1" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 23 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 48/2024/ND-CP
+      text_source: source_tree
+      text_sha256: sha256:8e96ed3311d28d4b4102df7ec58c8ee502246db609af1fe85ee2eac9bd162c41
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:422c9fbc21e2cc653571d5c5d272e23e78ac15723932eabdcb300c40ff35ef30
+    target:
+      number_norm: 130/2018/ND-CP
+      text_source: source_tree
+      text_sha256: sha256:5fd9b17085d34f270cc5eceaa34d0d701216ed790dd542910c476f7226fe39b5
+      heading_sha256: sha256:9c127612b574727e1737c8882b69367f2dba7f5aaf57b8102d49b32fa12eae69
+      ancestors:
+          - anchor: chuong-iii
+            heading_sha256: sha256:7ffd0c3992d094645388254f28c5bc2adb63e420c5853d246b47d32867e93b95
+          - anchor: chuong-iii/muc-2
+            heading_sha256: sha256:c47ec58cd2d14bd8043752219f5f7ce47656ae1a4a7fb8d4226366b1b5557f37
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-504db04e7fd3ebf6"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-45" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-17" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 45 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:8541fc43f44e93fae832e06e919af89b76ab1cc797060bec249e59175626b2f2
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:2954330b578d0b06a2eee5afe87a21585d8e78bc0c64c3197d1967c71f204ed7
+      heading_sha256: sha256:ecc31f531b0b83330d12e43082f12bf07e38dae1c7780b2a3a0ba046a161f99b
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-544dca4c57a730e0"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:134267", anchor: "dieu-46/khoan-1/diem-b" }
+  claim:
+    acting: { key: "vn:vbpl:166970", anchor: "dieu-1/khoan-2" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung điểm b khoản 1 Điều 46 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 48/2024/ND-CP
+      text_source: source_tree
+      text_sha256: sha256:6f8fd13b156fe4858aa7d7d69baa862460cb9946af786a4931e4b24b4ee74fd3
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:422c9fbc21e2cc653571d5c5d272e23e78ac15723932eabdcb300c40ff35ef30
+    target:
+      number_norm: 130/2018/ND-CP
+      text_source: source_tree
+      text_sha256: sha256:2ee6527f7243180769d4d40d72961805b6cc2d698869ab1b8624e5feae7dc0a7
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-v
+            heading_sha256: sha256:64e1eb85f41bdb3f3616520325a6f22e453558a42105da47d17d585dd025c806
+          - anchor: dieu-46
+            heading_sha256: sha256:decf0a163a13ef56778855be57a57ce05e5a57e0a13b62b43e8e8c6eaeea9583
+          - anchor: dieu-46/khoan-1
+            heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-55debfaac7a664f8"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:138989", anchor: "dieu-20/khoan-4/diem-a" }
+  claim:
+    acting: { key: "vn:vbpl:158925", anchor: "dieu-1/khoan-1" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung điểm a khoản 4 Điều 20 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 26/2022/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:649dfd952158cfd7491067654159dca31e54787666953d5ecaccacce9b774567
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:c64ad18d49d97f1f8ce39fd2f996b9d5b03a4db7e4c106f4963a90128461ef18
+    target:
+      number_norm: 22/2019/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:6e43794fee9066cd9cd10484ac1895be18878738c2f9ae6aa9ea49f5b4173d92
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-ii
+            heading_sha256: sha256:924aca6a5a3a79716d655000be337b1228c93354a5141a5b496d396ff8c0f073
+          - anchor: chuong-ii/muc-8
+            heading_sha256: sha256:124445f2e9b73355b9da81d658c4d1bbb6f4d94558c7249ecf12fe1a9f6f6fc5
+          - anchor: dieu-20
+            heading_sha256: sha256:c257a8d9ccd2722cc511257d899d9312742fe0fdbbd5a94b7369b3a643b32339
+          - anchor: dieu-20/khoan-4
+            heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-58eef3ace091516b"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-28/khoan-3" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-14" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 3 Điều 28 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:bcbbd10b48545306135c304ef5c187d89f403671eb375065e3289ad5a70f476d
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:dd1723429f2759d342b397b4607bdd77952cb009db70116785685aa03d214a32
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-28
+            heading_sha256: sha256:91c5efe7e0c7b1ed3f548ed4bbeb603eddfa7612761791d5dba81324bb557686
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-59429d793c465e44"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-41" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-15" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi Điều 41 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:eeca69fc2e81fff2ca5e128ec523a1a23eddfe992dcef5366346364c5527a351
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:e7f8f7a100aec1db77402d4fdddd938da6d0ed6f90ec7126ca5171e22a813e41
+      heading_sha256: sha256:f2259910b7dded267b8c6f248097ae8db8db4e15084d25e9cd1e84e29619cdb1
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-59608f38c9bcf6f8"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-5" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-1/khoan-3" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 5 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0542fca7e7ffe114969960332fd3d682c156992087f955eef4dd21b00302d15b
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:e2368ef19f4f9149243a5ef78a5d9fed590986ce795c48076578027698451140
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:7611ed4ea4f36032ff20c8107a1b5805c5a654d9214fcc6e216db1c4b7c61499
+      heading_sha256: sha256:7ec16be43a3c00decce66637e58b41726a5aa18ad98aee3ed428dd3888ce994a
+      ancestors:
+          - anchor: chuong-ii
+            heading_sha256: sha256:924aca6a5a3a79716d655000be337b1228c93354a5141a5b496d396ff8c0f073
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-59efffd9a10be9c5"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-30" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-10" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 30 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:b1db3db03d1716fef9d02f2edcba629f02997ae009e2cdba412a727ca454037e
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:309cc299e9edc6a014044afe388e27e7e1d6af196159d6549c37738b9be5979d
+      heading_sha256: sha256:276cea48f92e2e03b8e624bc7bd84eae24715198ff9342549a455c4303027953
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-6b37a73348d3e0c2"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-17/khoan-1" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-9" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 1, khoản 2 Điều 17 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0bb809f152124df164cd13560223a038c92fc8af0309453dc4dd3523ed0b26de
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:3dcfe2aa48a7cf76940e81b9fd4656082dcb79aa98f978a98dccd45c3d37b40d
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-17
+            heading_sha256: sha256:6a5d0d4167430d1a03e20080729f72da8808301d0a716b2827027ad5fbf457ad
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-6b490e0cb4bf56a5"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-2" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-3" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 2 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:8ce013e8c6b8c6f53f77ffcbaab9f2979b746bccb26e962b57ae29e7d13b9ece
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:6a28290e5021e2e4c237345d92b98a28ae456b60bb26cf9cd39762214c4b332e
+      heading_sha256: sha256:e82cb63d94e1670cc7c932a6a282f13f2fe27a46f28bfad81fcad3989cc3e140
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-6e8a055b33a9af7c"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-47" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-18" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi Điều 47 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:2b4ade547fcc0107fc3c84e880cce7b64e2e068ea9064ca029480fd93b163538
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:54fc8874e99a0c795b39994b5c9b6e5e657479607f4efeec30cb8c4381a87f98
+      heading_sha256: sha256:7b3f33069f3395afef080c092db9b102b65c5698727f73e559f56634b63538bc
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-7c84cbf845cd35c0"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-4/khoan-3" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-2/khoan-2" }
+    relation_kind: "repeals"
+  evidence: { quote: "Bãi bỏ khoản 3 Điều 4." }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:04ad0c74d2dc0ea01af40842599dc0a939eed7d4e63e90a04eb2f03a3a9d001e
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:3d47c2cb7b7c701ab70715a33e4542040e9f3cf60ddaebf4addb0cb8e21a5039
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:2b80aee4ee3ab531a4cee8e0c26a373efe83e17d1e579736a9439833d98ab6ef
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-i
+            heading_sha256: sha256:2407cb01fab8a166848efb18a55a9baccae578cf1c516b35af29dd9ce6c82b63
+          - anchor: dieu-4
+            heading_sha256: sha256:61fdc8fff1a1d370ff0ffc8ece2b0bd3e65163470deecfb3f3f872154822cdcf
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-7fb0d03c273f4e66"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-15/khoan-1/diem-b" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-7" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung điểm b khoản 1 Điều 15 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:652da9214bfbdbda621eca0a5fbbbf17b6f3086f01c462604d14ec5c9b698f56
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:da333f113a394809d8e915de651ba9bb5a2838cb7175a1f28f8563b413a5271d
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-15
+            heading_sha256: sha256:7a005892b678cba599222646606de555abddc0557d74b06be8162987009ef24f
+          - anchor: dieu-15/khoan-1
+            heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-9f33e94f010936cf"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-3/khoan-12" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-1" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 12 Điều 3 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:aad3ac0e6496998d222eb72c5726d3533e3bf9506b9a2748c1a4d9b3705dcd18
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:b6c66fbebf3a68b507d095a5df57a015f3c6fcc5e59ebbfb2bf92f85dbc435d3
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-3
+            heading_sha256: sha256:7ef5ee38f2719f105b91c1a4588b20af9847a262ca1635d6747967da79e29f5d
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-aa895ea5d5a90ca0"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-40" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-14" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 40 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:567f262cf3b759113c76f34c134ea47a52e36b9178f8048829570440a13a2fa8
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:c6b23f97b80663ce19b0a20ee20814acd558a88069aca7b3b2e17a0d2d2bce6e
+      heading_sha256: sha256:80475748f3d4d8d3b497a392b725d0dfbf5e82dd2e19d07dc8f4e7d9d8fac411
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-c34e7ceb139f492c"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:11766", anchor: "dieu-25" }
+  claim:
+    acting: { key: "vn:vbpl:32510", anchor: "dieu-2/khoan-8" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung Điều 25 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 135/2013/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:745abd0a7a10d3bd18aa183819eccbc68ba2a15a072f45e3f4872916f93066ec
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:7ca0bfc4f6afb84469e23552fe15658906836dde668f601d3a0c5c190f62b442
+    target:
+      number_norm: 61/2009/ND-CP
+      text_source: html_transcription
+      text_sha256: sha256:cd8b171ae76516dba60b331176a7034ba7548396c68689bcff4572c126ec4156
+      heading_sha256: sha256:08301e6956415d27ffaf83ac4978e1b1c235d14f5cb4c43b2f3517331753c8ec
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-c4f92a314583f6ea"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:138989", anchor: "dieu-24/khoan-2" }
+  claim:
+    acting: { key: "vn:vbpl:158925", anchor: "dieu-1/khoan-2" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 2 Điều 24 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 26/2022/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:235843c2ae91639b1ea8ca8731008004d37bedc444c469c167b90e4196ec3796
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:c64ad18d49d97f1f8ce39fd2f996b9d5b03a4db7e4c106f4963a90128461ef18
+    target:
+      number_norm: 22/2019/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:043d5e10e7bf446a4b35e6d2b3e074133851fc4ee118597530104580d80e818c
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-iii
+            heading_sha256: sha256:bbede691da6dbf971b7fa2e18a3af0c7b5d15992e7ab4f4992464896def40161
+          - anchor: dieu-24
+            heading_sha256: sha256:7780a430a0b643ccf61a06a11e4fa35d33c2dd5e2cb2c1e96f92a216008cd486
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-cf62ea3ee83103c6"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-10" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-4" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung khoản 10 vào Điều 10 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0c9bcd090ad185056e5cdca81cbe8c4d0e8c25313aa2e27cd323d9a1bc9935bb
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:d194dbed09080b7ff0dc2b086c9fa1fab3449b440f90edf7890d1857e2dd6bfe
+      heading_sha256: sha256:9cbb64dc01339b11856a6fb9fd2a20508e383a6fc576a7295ac7695f4f8abe74
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-db2aa020c4d78838"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-17/khoan-2" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-9" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 1, khoản 2 Điều 17 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:0bb809f152124df164cd13560223a038c92fc8af0309453dc4dd3523ed0b26de
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:4ee4c6b3cf97b74c51b22b05dc3cdd082ca1513ebefce620883824331488e2da
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-17
+            heading_sha256: sha256:6a5d0d4167430d1a03e20080729f72da8808301d0a716b2827027ad5fbf457ad
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-de0249d6aacb50c9"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-17" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-11" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung khoản 4 vào Điều 17 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:8f640623143faae750d2c86aa3955593c4e65fa4f95d8698bcc66419d49b35cb
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:53ede146a858617b17284c88021afb740b6f098a1fd6ba35c6acd113132cd60c
+      heading_sha256: sha256:6a5d0d4167430d1a03e20080729f72da8808301d0a716b2827027ad5fbf457ad
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-e2aa901a063aab09"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-9" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-2" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung khoản 5 vào Điều 9 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:94266b353ca18f0208ce838839b04dc49a4e62a5499766eabf88ddf0dcc21789
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:83e802449b599394b8f5e962a2dfaaac24c565828b0057d7a815f1ff4f421f1e
+      heading_sha256: sha256:5c64aa3824e960d5eb1b7c9f8c8263176940a9526fdd574d824b988ba08de72e
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-e69b76c65f850e0f"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-3/khoan-2" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-2/khoan-1" }
+    relation_kind: "repeals"
+  evidence: { quote: "Bãi bỏ khoản 2 Điều 3." }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:1eb42ae63535a82d3ce73376f3b5f5fa1ff78cb40b766504f953eb99e31dd466
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-2
+            heading_sha256: sha256:3d47c2cb7b7c701ab70715a33e4542040e9f3cf60ddaebf4addb0cb8e21a5039
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:864673ff8fdd61572e5ced56b06f0e41d018107675f52cb89b6c4d1545c259e5
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-i
+            heading_sha256: sha256:2407cb01fab8a166848efb18a55a9baccae578cf1c516b35af29dd9ce6c82b63
+          - anchor: dieu-3
+            heading_sha256: sha256:da861e967a68ec41721012400cd9ef43d24ce07b007a10115aa8817cde38d4ef
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-ec31ab82e988d869"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-31/khoan-1" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-15" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung điểm d vào khoản 1 Điều 31 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:79f6afe2f179d1ed9b288c97f9ab40bb16f03a0b5b9a6ef91cc789df818c2780
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:aa2a6f7e464afb4ea2baa81a346ba8f293917dcf9d04678888e8699a3f0726ef
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-31
+            heading_sha256: sha256:2164b57677a9b59266382236503fedaeecc13c2ce6671a5bac5539433fbceb06
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-eddcc904a5369d9f"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111953", anchor: "dieu-27" }
+  claim:
+    acting: { key: "vn:vbpl:150904", anchor: "dieu-1/khoan-13" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Bổ sung khoản 1a vào Điều 27 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 17/2021/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:c56f77300e5dc66ea591ae28ebaad9a3126bb644288b7170038e145307f8e11e
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:bd9f4dcf1010491866127b2a327a0b86f0d65d855d2133664a93d80925cd2e9b
+    target:
+      number_norm: 19/2016/TT-NHNN
+      text_source: html_transcription
+      text_sha256: sha256:beeb23e5ca7be702b104814f671cc556c274c62c059000ada85dfd86f6255363
+      heading_sha256: sha256:511f775c8f808426a5204c142dd08b6d959939cd16e51ff5f3a8391ff693cfc0
+      ancestors: []
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
+- id: "effect-fd9aaa66c25198c2"
+  kind: "provision_effect"
+  target: { key: "vn:vbpl:111966", anchor: "dieu-3/khoan-1" }
+  claim:
+    acting: { key: "vn:vbpl:167086", anchor: "dieu-1/khoan-2" }
+    relation_kind: "amends_supplements"
+  evidence: { quote: "Sửa đổi, bổ sung khoản 1 Điều 3 như sau:" }
+  depends:
+    contract: 1
+    acting:
+      number_norm: 02/2024/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:72e72336205b562bd4a024f7108d1f3a00ac2c32d35d556a40d6f76e3aa40caa
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: dieu-1
+            heading_sha256: sha256:e2368ef19f4f9149243a5ef78a5d9fed590986ce795c48076578027698451140
+    target:
+      number_norm: 17/2016/TT-NHNN
+      text_source: source_tree
+      text_sha256: sha256:28adee95a8027775af6a3eabbdd2468155c6895c54d9af8109bf1b1382f7e560
+      heading_sha256: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+      ancestors:
+          - anchor: chuong-i
+            heading_sha256: sha256:2407cb01fab8a166848efb18a55a9baccae578cf1c516b35af29dd9ce6c82b63
+          - anchor: dieu-3
+            heading_sha256: sha256:da861e967a68ec41721012400cd9ef43d24ce07b007a10115aa8817cde38d4ef
+  reviewed:
+    date: "2026-11-22"
+    by: "primary"
+    method: "model-adjudicated"
+    batch: "claims-2026-11-22"
+    sample_read: 7
+    sample_of: 62
