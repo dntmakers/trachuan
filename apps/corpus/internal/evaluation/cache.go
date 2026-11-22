@@ -147,7 +147,7 @@ func summarizeTiming(values []float64) timingSummary {
 	return timingSummary{len(values), Quantile(values, .5), Quantile(values, .95), Quantile(values, .99)}
 }
 
-func cacheKey(c Cache, o Options, hashes FixtureHashes) string {
+func cacheKey(c Cache, o Options, hashes EvalFixtureHashes) string {
 	var policies any
 	if o.NotYetEligible || (o.NonCurrentTail != nil && *o.NonCurrentTail > 0) {
 		policies = o.ValidityOverrides
@@ -155,7 +155,7 @@ func cacheKey(c Cache, o Options, hashes FixtureHashes) string {
 	value := struct {
 		Version  string
 		Dump     string
-		Fixtures FixtureHashes
+		Fixtures EvalFixtureHashes
 		Date     retrieval.Date
 		Modes    []retrieval.Mode
 		Recipes  map[string]string

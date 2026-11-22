@@ -10,6 +10,7 @@ from corpus_dispatch import dispatch_command
 from corpus_manifest import identity, release_files, sha256, validated_inputs
 from corpus_previous import verified_previous
 from corpus_production import require_settled
+from corpus_warning import validate_authorized
 from manifest import positive
 from repositories import require_listed, write_repository
 
@@ -97,6 +98,7 @@ def upload(country, rel, directory, report, repository):
 
     inputs = validated_inputs(country, rel, directory, report)
     row, candidate, sidecars = inputs.row, inputs.report, inputs.sidecars
+    validate_authorized(candidate, country)
     if sidecars is not None:
         print('Open findings allowed: review {review}, info {info}'.format(**sidecars['open']))
         print('Findings against {rel}: new {new}, gone {gone}'.format(rel=sidecars['predecessor']['rel'], **sidecars['changed']))

@@ -54,8 +54,8 @@ func ParseDecisionReport(data []byte) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if report.Version != 2 && report.Version != 3 {
-		return Report{}, fmt.Errorf("previous report is version %d, want version 2 or 3", report.Version)
+	if report.Version != 2 && report.Version != 3 && report.Version != 4 {
+		return Report{}, fmt.Errorf("previous report is version %d, want version 2, 3 or 4", report.Version)
 	}
 	if report.Status != "complete" {
 		return Report{}, fmt.Errorf("previous report status %q is not complete", report.Status)

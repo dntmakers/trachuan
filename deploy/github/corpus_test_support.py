@@ -142,6 +142,42 @@ def write_fixture(path):
     return row, report
 
 
+def release_fixture_history(repository):
+    from corpus_revision_support import CURRENT_CASES, encode, history_for
+    from corpus_warning import WARNING_PATH
+
+    fixture = encode(CURRENT_CASES)
+    history = history_for(repository, fixture)
+    warning_path = history.root / WARNING_PATH
+    warning_path.parent.mkdir(parents=True, exist_ok=True)
+    warning_path.write_bytes(b'[]\n')
+    git(history.root, 'add', WARNING_PATH)
+    git(history.root, 'commit', '--quiet', '--allow-empty', '-m', 'warning fixture')
+    return history
+
+
+def write_release_fixture(path, repository):
+    from corpus_revision_support import (CANDIDATE_REL, CURRENT_CASES, CURRENT_RANKS, PREVIOUS_REL,
+                                         build_report, encode, link_period)
+
+    row, old = write_fixture(path)
+    fixture = encode(CURRENT_CASES)
+    release_fixture_history(repository)
+    previous = build_report(3, PREVIOUS_REL, fixture, CURRENT_RANKS)
+    report = build_report(4, CANDIDATE_REL, fixture, CURRENT_RANKS)
+    link_period(report, previous)
+    previous_data = json.dumps(previous).encode()
+    (path / 'previous-report.json').write_bytes(previous_data)
+    report['previous_diff']['previous']['report_sha256'] = digest(previous_data)
+    report['dump_sha256'] = old['dump_sha256']
+    report['build_artifact_sha256'] = old['build_artifact_sha256']
+    save_fixture(path, row, report)
+    previous_manifest = json.loads((path / 'previous-manifest.json').read_bytes())
+    previous_manifest['report']['sha256'] = digest(previous_data)
+    (path / 'previous-manifest.json').write_bytes(canonical(previous_manifest))
+    return row, report
+
+
 def evidence_bindings(path, row, report_bytes):
     return {'rel': row.get('rel'), 'dump_sha256': 'sha256:' + digest((path / 'corpus.dump').read_bytes()),
             'build_artifact_sha256': 'sha256:' + digest((path / 'MANIFEST.sha256').read_bytes()),

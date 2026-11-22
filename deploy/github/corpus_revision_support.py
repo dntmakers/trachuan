@@ -6,7 +6,7 @@ from corpus_test_support import digest, fixture_repository, git, recipe_fixture
 
 PREVIOUS_REL, CANDIDATE_REL = '20990101_1', '20990102_1'
 MODES = ('exact', 'ann')
-SCORERS = {2: 'agent-eval/5', 3: 'agent-eval/6'}
+SCORERS = {2: 'agent-eval/5', 3: 'agent-eval/6', 4: 'agent-eval/6'}
 LEGACY_PATH = 'apps/corpus/internal/evaluation/testdata/vn/legacy.json'
 OLD_PRODUCT_PATH = 'apps/corpus/internal/evaluation/testdata/vn/old-product.json'
 
@@ -130,6 +130,10 @@ def build_report(version, rel, fixture, ranks, cohorts=None, old_ranks=None):
         else:
             report['not_run']['development_period'] = 'not_run'
     report['non_regression'] = copy.deepcopy(report['cohorts']['old_product']['non_regression'])
+    if version >= 4:
+        report['fixture_hashes']['Warnings'] = digest(b'[]\n')
+        report['warning_cases'] = []
+        report['not_run']['warning_cases'] = 'not_run'
     return report
 
 

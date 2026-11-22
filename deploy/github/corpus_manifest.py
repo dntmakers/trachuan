@@ -18,6 +18,7 @@ from corpus_old_product import check_rejection_records
 from corpus_period import PERIOD, check_partition, check_period, check_record_fields, no_historical_policy
 from corpus_revision import validate_version_three
 from corpus_rules import DECISION_FIELDS, has_decision, older_shape_allowed, require_status_country
+from corpus_warning import validate_authorized
 
 
 def unique_object(pairs):
@@ -229,6 +230,8 @@ def validated_inputs(country, rel, directory, report_path, signing=False):
     if not isinstance(row, dict) or row.get('country') != country or row.get('rel') != rel:
         raise ValueError('release row identity differs from inputs')
     validate_report(report, country, rel, release_row=row)
+    if report['version'] == 4:
+        validate_authorized(report, country, resign=True)
     run = row.get('run')
     if not isinstance(run, dict) or run.get('complete') is not True or run.get('incomplete_items') != 0 or run.get('unaccepted_gaps') != 0:
         raise ValueError('run must be complete with every gap accepted')

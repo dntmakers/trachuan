@@ -30,8 +30,8 @@ func decisionReport(t *testing.T, mutate func(map[string]any)) []byte {
 	return data
 }
 
-func TestParseDecisionReport_AcceptsCompleteVersion2And3(t *testing.T) {
-	for _, version := range []int{2, 3} {
+func TestParseDecisionReport_AcceptsCompleteVersion2And3And4(t *testing.T) {
+	for _, version := range []int{2, 3, 4} {
 		report, err := ParseDecisionReport(decisionReport(t, func(r map[string]any) { r["version"] = version }))
 		if err != nil {
 			t.Fatal(err)
@@ -48,8 +48,8 @@ func TestParseDecisionReport_Refuses(t *testing.T) {
 		mutate func(map[string]any)
 		want   string
 	}{
-		{"version 1", func(r map[string]any) { r["version"] = 1 }, "want version 2 or 3"},
-		{"version 4", func(r map[string]any) { r["version"] = 4 }, "want version 2 or 3"},
+		{"version 1", func(r map[string]any) { r["version"] = 1 }, "want version 2, 3 or 4"},
+		{"version 5", func(r map[string]any) { r["version"] = 5 }, "want version 2, 3 or 4"},
 		{"version 3 recipe missing", func(r map[string]any) { r["version"] = 3; delete(r, "retrieval_recipe") }, "retrieval recipe missing"},
 		{"historical policy", func(r map[string]any) { r["historical_policy"] = "agent" }, "historical_policy"},
 		{"recipe missing", func(r map[string]any) { delete(r, "retrieval_recipe") }, "retrieval recipe missing"},

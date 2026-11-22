@@ -39,7 +39,7 @@ func New(cfg Config) *Stage { return &Stage{cfg: cfg} }
 func (*Stage) Name() string { return "eval" }
 
 func (s *Stage) Recipe(stage.Snapshot) string {
-	return stage.RecipeHash("eval", evaluation.ScorerVersion, "legacy-matcher/2", "product-matcher/1", "recall,mrr,current-law-precision,abstention,evidence,ann/1", strings.Join(s.cfg.Suite.Rejections, "\x00"), "diacritics_required:Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.", "cache/1:200:100", "nearest-rank", "gates:0.99;targets:recall20=0.90,mrr8=0.66,recall8=0.90,abstention-balanced=0.85;nonregression:recall20,mrr8,abstention-balanced", "compact/1", "corpus-text-counts/1", "filter-gate/1", "inheritance-gate/2")
+	return stage.RecipeHash("eval", evaluation.ScorerVersion, "legacy-matcher/2", "product-matcher/1", "recall,mrr,current-law-precision,abstention,evidence,ann/1", strings.Join(s.cfg.Suite.Rejections, "\x00"), "diacritics_required:Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.", "cache/1:200:100", "nearest-rank", "gates:0.99;targets:recall20=0.90,mrr8=0.66,recall8=0.90,abstention-balanced=0.85;nonregression:recall20,mrr8,abstention-balanced", "compact/1", "corpus-text-counts/1", "filter-gate/1", "inheritance-gate/2", "warning-cases/1")
 }
 
 func dateForRun(run stage.Run) (time.Time, error) {
@@ -68,7 +68,7 @@ func (s *Stage) inputHash(art artifact.Result, run stage.Run) (string, error) {
 		previous = fmt.Sprintf("%x", sha256.Sum256(b))
 	}
 	h := s.cfg.Suite.Hashes
-	return stage.RecipeHash("eval-input", "2", art.SHA256, h.Legacy, h.OldProduct, h.IdentityMap, h.ValidityCases, h.Development, previous, d.Format("2006-01-02"), "exact,ann"), nil
+	return stage.RecipeHash("eval-input", "2", art.SHA256, h.Legacy, h.OldProduct, h.IdentityMap, h.ValidityCases, h.Development, s.cfg.Suite.WarningHash, previous, d.Format("2006-01-02"), "exact,ann"), nil
 }
 
 func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage.Item, error) {
@@ -129,6 +129,17 @@ func (s *Stage) evaluateBuild(ctx context.Context, env stage.Env, run stage.Run,
 		return evaluation.Report{}, evaluation.Cache{}, fmt.Errorf("load evaluation inventory: %w", err)
 	}
 	suite := s.cfg.Suite
+	suite.WarningCases, err = suite.PinnedWarningCases(run.Country)
+	if err != nil {
+		return evaluation.Report{}, evaluation.Cache{}, fmt.Errorf("verify warning cases: %w", err)
+	}
+	opts.WarningScope = func(ctx context.Context, target, carrier string) (bool, error) {
+		return warningScope(ctx, pool, target, carrier)
+	}
+	opts.WarningResults, err = bindBuildWarnings(env.Artifacts.Abs(art.Path), run.Country, suite.WarningCases)
+	if err != nil {
+		return evaluation.Report{}, evaluation.Cache{}, fmt.Errorf("bind warning cases: %w", err)
+	}
 	suite.Map, err = suite.PinnedMap()
 	if err != nil {
 		return evaluation.Report{}, evaluation.Cache{}, fmt.Errorf("verify identity map: %w", err)

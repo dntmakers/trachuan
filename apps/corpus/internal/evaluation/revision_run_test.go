@@ -127,13 +127,13 @@ func TestRun_UnchangedFixtureWithDifferentCohortsRefused(t *testing.T) {
 	}
 }
 
-func TestRun_VersionThreeScorerSix(t *testing.T) {
+func TestRun_VersionFourScorerSix(t *testing.T) {
 	date := retrieval.Date{Year: 2099, Month: 1, Day: 2}
 	r, _, err := Run(context.Background(), &recordedEngine{fakeEngine: fakeEngine{date: date}}, developmentSuite(), Options{EvaluationDate: date})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Version != 3 || r.Scorer != "agent-eval/6" || ScorerVersion != "agent-eval/6" {
+	if r.Version != 4 || r.Scorer != "agent-eval/6" || ScorerVersion != "agent-eval/6" {
 		t.Fatalf("version %d scorer %s", r.Version, r.Scorer)
 	}
 }
@@ -226,7 +226,7 @@ func TestRun_HistoricalPolicyRemoved(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, value := range []string{`null`, `"agent"`} {
-		marked := strings.Replace(string(previous), `"version":3`, `"historical_policy":`+value+`,"version":3`, 1)
+		marked := strings.Replace(string(previous), `"version":4`, `"historical_policy":`+value+`,"version":4`, 1)
 		marked = strings.Replace(marked, `"non_current_tail":null`, `"historical_policy":`+value+`,"non_current_tail":null`, 1)
 		path := filepath.Join(t.TempDir(), "report.json")
 		if err = os.WriteFile(path, []byte(marked), 0600); err != nil {

@@ -1,6 +1,7 @@
 from repositories_test_support import enable_dual_policy as setUpModule
 
 import copy
+import hashlib
 import io
 import json
 import os
@@ -12,7 +13,8 @@ from unittest.mock import patch
 
 import corpus_production
 from corpus_manifest import create, manifest_fields
-from corpus_test_support import add_heading_build, digest, save_older_shape, write_evidence, write_fixture
+from corpus_test_support import (add_heading_build, digest, git, release_fixture_history, save_older_shape,
+                                 write_evidence, write_fixture)
 
 PREVIOUS, REL, CUTOFF = '20990101_1', '20990102_1', '20990102_2'
 DECISION = dict(eval_report_sha256='e' * 64, previous_report_sha256='b' * 64)
@@ -28,7 +30,9 @@ def manifest(rel=REL, sequence=11, report='b' * 64, **fields):
 
 
 def report_for(rel=PREVIOUS, digest='b' * 64):
-    return dict(previous_diff=dict(previous=dict(country='vn', rel=rel, report_sha256=digest)))
+    return dict(version=4, fixture_hashes={'Warnings': hashlib.sha256(b'[]\n').hexdigest()}, warning_cases=[],
+                not_run={'warning_cases': 'not_run'},
+                previous_diff=dict(previous=dict(country='vn', rel=rel, report_sha256=digest)))
 
 
 def leaf_paths(value, path=()):
@@ -115,11 +119,20 @@ class SigningTraceTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.path = Path(temporary.name)
+        repository = self.path / 'repository'
+        release_fixture_history(repository)
+        self.commit = git(repository, 'rev-parse', 'HEAD').decode().strip()
+        from corpus_warning import validate_authorized
+        authorization = patch('corpus_production.validate_authorized',
+                              side_effect=lambda report, country, **kwargs: validate_authorized(
+                                  report, country, root=repository, **kwargs))
+        authorization.start()
+        self.addCleanup(authorization.stop)
 
     def signable(self, rebuilt, current, existing=None, run=None, report=None, resign=False):
         with patch('corpus_production.production', return_value=current), \
                 patch('corpus_production.existing_release', return_value=existing):
-            return corpus_production.require_signable(rebuilt, report or report_for(),
+            return corpus_production.require_signable(rebuilt | {'commit': self.commit}, report or report_for(),
                                                       DECISION if run is None else run, self.path, 'dannyota/trachuan',
                                                       resign=resign)
 

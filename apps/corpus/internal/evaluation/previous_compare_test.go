@@ -45,7 +45,7 @@ func TestRun_RefusesIncompatiblePreviousReport(t *testing.T) {
 	}{
 		{"compatible", func(map[string]any) {}},
 		{"version zero", func(o map[string]any) { o["version"] = 0 }},
-		{"version four", func(o map[string]any) { o["version"] = 4 }},
+		{"version five", func(o map[string]any) { o["version"] = 5 }},
 		{"unknown scorer", func(o map[string]any) { o["scorer"] = "agent-eval/7" }},
 		{"legacy fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["Legacy"] = "other" }},
 		{"old product fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["OldProduct"] = "other" }},

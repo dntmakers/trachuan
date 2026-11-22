@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 import corpus_production
-from corpus_test_support import FakeCurl
+from corpus_test_support import FakeCurl, git, release_fixture_history
 
 PREVIOUS, REL = '20990101_1', '20990102_1'
 URL = 'https://trachuan.vn/api/v1/public/status'
@@ -27,6 +28,9 @@ class ProductionTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.path = Path(temporary.name)
+        self.repository = self.path / 'repository'
+        release_fixture_history(self.repository)
+        self.commit = git(self.repository, 'rev-parse', 'HEAD').decode().strip()
         self.log = self.path / 'calls.jsonl'
         self.curl = FakeCurl(self.path, self.log)
         search_path = patch.dict(os.environ, PATH=f"{self.path}{os.pathsep}{os.environ['PATH']}")
@@ -109,10 +113,39 @@ class ProductionTest(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def signable(self, candidate, current, existing=None, existing_error=None):
+        from corpus_warning import validate_authorized
         run = dict(eval_report_sha256='e' * 64, previous_report_sha256='b' * 64)
+        candidate = candidate | {'version': 4, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]\n').hexdigest()},
+                                 'warning_cases': [], 'not_run': {'warning_cases': 'not_run'}}
         with patch('corpus_production.production', return_value=current), \
-                patch('corpus_production.existing_release', return_value=existing, side_effect=existing_error):
-            return corpus_production.require_signable(manifest(rel=REL, sequence=11), candidate, run, self.path, 'dannyota/trachuan')
+                patch('corpus_production.existing_release', return_value=existing, side_effect=existing_error), \
+                patch('corpus_production.validate_authorized',
+                      side_effect=lambda report, country, **kwargs: validate_authorized(
+                          report, country, root=self.repository, **kwargs)):
+            return corpus_production.require_signable(manifest(rel=REL, sequence=11) | {'commit': self.commit}, candidate, run, self.path, 'dannyota/trachuan')
+
+    def test_first_signing_checks_warning_fixture_at_manifest_commit(self):
+        candidate = report() | {'version': 3}
+        new = manifest(rel=REL, sequence=11) | {'commit': 'a' * 40}
+        with patch('corpus_production.production', return_value=manifest()), \
+                patch('corpus_production.existing_release', return_value=None), \
+                patch('corpus_production.validate_authorized', create=True, side_effect=ValueError('version 4')):
+            with self.assertRaisesRegex(ValueError, 'version 4'):
+                corpus_production.require_signable(new, candidate, {'eval_report_sha256': 'e' * 64}, self.path, 'dannyota/trachuan')
+
+    def test_first_signing_rejects_old_fixture_and_version_three(self):
+        candidate = report() | {'version': 4, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]').hexdigest()},
+                                'warning_cases': [], 'not_run': {'warning_cases': 'not_run'}}
+        new = manifest(rel=REL, sequence=11) | {'commit': 'a' * 40}
+        run = {'eval_report_sha256': 'e' * 64}
+        with patch('corpus_production.production', return_value=manifest()), \
+                patch('corpus_production.existing_release', return_value=None), \
+                patch('corpus_warning.git', return_value=b'[{}]'):
+            with self.assertRaisesRegex(ValueError, 'warning fixture differs'):
+                corpus_production.require_signable(new, candidate, run, self.path, 'dannyota/trachuan')
+            candidate['version'] = 3
+            with self.assertRaisesRegex(ValueError, 'version 4'):
+                corpus_production.require_signable(new, candidate, run, self.path, 'dannyota/trachuan')
 
     def test_first_signing_requires_the_comparison(self):
         self.assertEqual(self.signable(report(), manifest())['rel'], PREVIOUS)
@@ -120,6 +153,16 @@ class ProductionTest(unittest.TestCase):
                                    (report(), manifest(rel='20990101_2')), (report(), manifest(report='0' * 64))):
             with self.subTest(candidate=candidate, current=current), self.assertRaises(ValueError):
                 self.signable(candidate, current)
+
+    def test_signed_version_three_can_be_resigned(self):
+        candidate = report() | {'version': 3}
+        signed = manifest(rel=REL, sequence=10) | {'commit': 'a' * 40}
+        current = manifest(rel='20990103_1', sequence=12, report='c' * 64)
+        with patch('corpus_production.production', return_value=current), \
+                patch('corpus_production.existing_release', return_value=signed), \
+                patch('corpus_production.validate_authorized') as validate:
+            self.assertIs(corpus_production.require_signable(signed, candidate, {}, self.path, 'dannyota/trachuan', resign=True), current)
+            validate.assert_not_called()
 
     def test_retry_of_a_failed_activation_is_exempt(self):
         current = manifest(rel=REL, sequence=10, report='c' * 64)

@@ -5,7 +5,7 @@ from corpus_watermark import carried_high_water
 
 
 TOLERANCE = .005
-SCORERS = {1: ('agent-eval/1', 'agent-eval/2', 'agent-eval/3', 'agent-eval/4'), 2: ('agent-eval/5',), 3: ('agent-eval/6',)}
+SCORERS = {1: ('agent-eval/1', 'agent-eval/2', 'agent-eval/3', 'agent-eval/4'), 2: ('agent-eval/5',), 3: ('agent-eval/6',), 4: ('agent-eval/6',)}
 REVISION_FIELDS = ('revision', 'numerator', 'denominator', 'previous_numerator', 'previous_denominator')
 FIXTURES = {'old_product': ('Legacy', 'OldProduct'), 'development': ('Development',)}
 

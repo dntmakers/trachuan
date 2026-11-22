@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from corpus_test_support import save_fixture, save_older_shape, write_fixture
+from corpus_test_support import git, save_fixture, save_older_shape, write_release_fixture
 from corpus_manifest import create
 
 
@@ -18,7 +18,29 @@ class CorpusPublishTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name)
-        self.row, _ = write_fixture(self.path)
+        repository = self.path / 'repository'
+        self.row, _ = write_release_fixture(self.path, repository)
+        self.commit = git(repository, 'rev-parse', 'HEAD').decode().strip()
+        from corpus_fixture_history import FixtureHistory
+        from corpus_warning import WARNING_PATH, validate_authorized
+        fixture = git(repository, 'show', f'{self.commit}:{WARNING_PATH}')
+
+        def warning_git(root, *args):
+            self.assertEqual(root, repository)
+            self.assertEqual(args, ('show', f'{self.commit}:{WARNING_PATH}'))
+            return fixture
+
+        warning_git_patch = patch('corpus_warning.git', side_effect=warning_git)
+        warning_git_patch.start()
+        self.addCleanup(warning_git_patch.stop)
+        history = patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(repository))
+        history.start()
+        self.addCleanup(history.stop)
+        for target in ('corpus_manifest.validate_authorized', 'corpus_production.validate_authorized'):
+            authorization = patch(target, side_effect=lambda report, country, **kwargs: validate_authorized(
+                report, country, root=repository, **kwargs))
+            authorization.start()
+            self.addCleanup(authorization.stop)
         self.current = json.loads((self.path / 'previous-manifest.json').read_bytes()) | {'sequence': 3}
 
     def report_sha256(self):
@@ -28,7 +50,7 @@ class CorpusPublishTest(unittest.TestCase):
         return hashlib.sha256((self.path / 'release.json').read_bytes()).hexdigest()
 
     def manifest(self, sequence):
-        (self.path / 'manifest.json').write_bytes(create('dannyota/trachuan', 'a' * 40, sequence, 'vn', '20990102_1',
+        (self.path / 'manifest.json').write_bytes(create('dannyota/trachuan', self.commit, sequence, 'vn', '20990102_1',
                                                        self.path, self.path / 'report.json'))
 
     def publish(self, current=None, existing=None, sign_error=None, report_sha256=None, release_sha256=None):
@@ -38,13 +60,13 @@ class CorpusPublishTest(unittest.TestCase):
                 patch('publish.subprocess.run') as run:
             self.module.publish(self.report_sha256() if report_sha256 is None else report_sha256,
                                 self.release_sha256() if release_sha256 is None else release_sha256,
-                                self.path, 'refs/heads/main', 'a' * 40, 'dannyota/trachuan')
+                                self.path, 'refs/heads/main', self.commit, 'dannyota/trachuan')
         return sign, run
 
     def test_signs_and_publishes_two_layers_then_moves_country_pointer(self):
         self.manifest(7)
         sign, run = self.publish()
-        self.assertEqual(sign.call_args.args[2:], ('dannyota/trachuan', 'corpus-release.yml', 'refs/heads/main', 'a' * 40))
+        self.assertEqual(sign.call_args.args[2:], ('dannyota/trachuan', 'corpus-release.yml', 'refs/heads/main', self.commit))
         push = run.call_args_list[0].args[0]
         self.assertEqual(push[:3], ['oras', 'push', 'ghcr.io/dannyota/trachuan-corpus-release:vn-20990102_1'])
         self.assertIn('application/vnd.trachuan.corpus-release.v1', push)
@@ -70,7 +92,7 @@ class CorpusPublishTest(unittest.TestCase):
             with patch('corpus_publish.sign', side_effect=ValueError('signature')), \
                     patch('corpus_production.production', return_value=self.current), \
                     patch('corpus_production.existing_release', return_value=None):
-                self.module.publish(self.report_sha256(), self.release_sha256(), self.path, 'refs/heads/main', 'a' * 40,
+                self.module.publish(self.report_sha256(), self.release_sha256(), self.path, 'refs/heads/main', self.commit,
                                     'dannyota/trachuan')
         run.assert_not_called()
 
@@ -81,7 +103,7 @@ class CorpusPublishTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.module.publish(self.report_sha256() if report_sha256 is None else report_sha256,
                                     self.release_sha256() if release_sha256 is None else release_sha256,
-                                    self.path, 'refs/heads/main', 'a' * 40, 'dannyota/trachuan')
+                                    self.path, 'refs/heads/main', self.commit, 'dannyota/trachuan')
         sign.assert_not_called()
         run.assert_not_called()
 
@@ -177,7 +199,7 @@ class CorpusPublishTest(unittest.TestCase):
     def test_wrong_ref_or_commit_prevents_signing(self):
         self.manifest(7)
         with patch('corpus_publish.sign') as sign:
-            for ref, commit in [('refs/heads/other', 'a' * 40), ('refs/heads/main', 'b' * 40)]:
+            for ref, commit in [('refs/heads/other', self.commit), ('refs/heads/main', 'b' * 40)]:
                 with self.assertRaises(ValueError):
                     self.module.publish(self.report_sha256(), self.release_sha256(), self.path, ref, commit,
                                         'dannyota/trachuan')

@@ -28,7 +28,7 @@ func TestRecipes_ExistingStagesUnchangedByEvidence(t *testing.T) {
 		"chunk":    "40c50d47068734972075a0a0a6cd78b1e5dc55fc43bfb4dfce34944049336d82",
 		"embed":    "11496930ffabf11a1ffd3b3f31cf155f616d15ef6272a5ff35373ba917a2338d",
 		"build":    "68fa166c5587645be0e8474d9df08cf22d5a10eff13c173150508988360c92fb",
-		"eval":     "58f7f5dac2ab0f829646c48babe81d19d8e173389e1bbf50e273bc57892ecd32",
+		"eval":     "2f904c9223035c3bc4ead5d6cbd5d2d383e608170aaaf27691e6144003b1b42c",
 	}
 	snapshot := stage.Snapshot{SourceList: json.RawMessage(`{"country":"vn","vbpl":{"selection_version":1},"status_codes":{}}`), SourceListHash: "source-hash"}
 	decided := snapshot

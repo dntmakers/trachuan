@@ -347,8 +347,8 @@ func TestRun_TimingSummariesPresent(t *testing.T) {
 func TestCache_KeyChangesWithVectorAndInputs(t *testing.T) {
 	a := Cache{Vectors: [][]float32{{1}}}
 	b := Cache{Vectors: [][]float32{{.5}}}
-	x := cacheKey(a, Options{DumpSHA256: "dump"}, FixtureHashes{})
-	if x == cacheKey(b, Options{DumpSHA256: "dump"}, FixtureHashes{}) || x == cacheKey(a, Options{DumpSHA256: "other"}, FixtureHashes{}) {
+	x := cacheKey(a, Options{DumpSHA256: "dump"}, EvalFixtureHashes{})
+	if x == cacheKey(b, Options{DumpSHA256: "dump"}, EvalFixtureHashes{}) || x == cacheKey(a, Options{DumpSHA256: "other"}, EvalFixtureHashes{}) {
 		t.Fatal("cache key did not change")
 	}
 }

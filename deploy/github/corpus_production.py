@@ -9,6 +9,7 @@ from corpus_dispatch import dispatch_command
 from corpus_manifest import decode, identity, manifest_fields, validate_manifest
 from corpus_registry import existing_release, production
 from corpus_rules import first_signing_allowed, require_status_country
+from corpus_warning import validate_authorized
 from manifest import canonical
 from repositories import workflow
 
@@ -84,6 +85,7 @@ def require_signable(manifest, report, run, directory, repository, resign=False)
             raise ValueError(f'an empty release SHA-256 signs only an already signed {country}-{rel}')
         if not first_signing_allowed(country, rel, run):
             raise ValueError('a release without a decision below the cutoff needs a signed manifest')
+        validate_authorized(report, country, commit=manifest['commit'])
     else:
         changed = changed_fields(existing, manifest)
         if changed:

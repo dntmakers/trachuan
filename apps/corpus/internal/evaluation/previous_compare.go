@@ -18,7 +18,7 @@ func comparablePrevious(o Options, suite Suite, r *Report) (*Report, string, err
 	if err != nil {
 		return nil, "", err
 	}
-	if prior.Version < 1 || prior.Version > 3 || !knownPreviousScorer(prior.Scorer, r.Scorer) || prior.FixtureHashes.Legacy != r.FixtureHashes.Legacy || prior.FixtureHashes.OldProduct != r.FixtureHashes.OldProduct {
+	if prior.Version < 1 || prior.Version > 4 || !knownPreviousScorer(prior.Scorer, r.Scorer) || prior.FixtureHashes.Legacy != r.FixtureHashes.Legacy || prior.FixtureHashes.OldProduct != r.FixtureHashes.OldProduct {
 		return nil, "", fmt.Errorf("incompatible previous scorer or fixtures")
 	}
 	if r.revision, err = resolveRevision(suite, &prior); err != nil {

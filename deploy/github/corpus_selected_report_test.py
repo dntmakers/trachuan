@@ -41,6 +41,48 @@ class SelectedReportTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, message):
             self.sign()
 
+    def test_version_four_requires_warning_records_against_historical_fixture(self):
+        self.report.update(version=4, fixture_hashes={'Warnings': digest(b'[]')})
+        save_fixture(self.path, self.row, self.report)
+        with patch('corpus_manifest.validate_report'), \
+                patch('corpus_warning.FixtureHistory') as history:
+            history.return_value.fixture.return_value = b'[]'
+            with self.assertRaisesRegex(ValueError, 'warning cases'):
+                self.upload()
+
+    def test_version_four_historical_fixture_and_adversarial_records(self):
+        case = dict(entry_id='effect-example', question='Question?', target='vn:vbpl:1#dieu-5',
+                    acting='vn:vbpl:2#dieu-2', relation_kind='repeals')
+        match = dict(carrier=case['target'], dir='in', kind='repeals', key='vn:vbpl:2',
+                     in_release=True, source=case['acting'], target=case['target'], exact=True)
+        search = [dict(mode=mode, limit=limit, detail=detail, match=copy.deepcopy(match))
+                  for mode in ('exact', 'ann') for limit in (8, 20) for detail in ('compact', 'full')]
+        fixture = json.dumps([case]).encode()
+        record = dict(entry_id=case['entry_id'], outcome='applied', search=search, read=match)
+        self.report.update(version=4, fixture_hashes={'Warnings': digest(fixture)},
+                           warning_cases=[record], not_run={})
+        with patch('corpus_manifest.validate_report'), patch('corpus_warning.FixtureHistory') as history:
+            history.return_value.fixture.return_value = fixture
+            save_fixture(self.path, self.row, self.report)
+            self.upload()
+            self.sign()
+            for change in ('kind', 'key', 'target', 'carrier', 'stale', 'order', 'duplicate', 'missing'):
+                bad = copy.deepcopy(self.report)
+                row = bad['warning_cases'][0]
+                if change in ('kind', 'key', 'target', 'carrier'):
+                    row['search'][0]['match'][change] = 'vn:vbpl:999#dieu-1'
+                elif change == 'stale':
+                    row.update(outcome='stale', reason='changed', search=[], read=None)
+                elif change == 'order':
+                    row['search'][0], row['search'][1] = row['search'][1], row['search'][0]
+                elif change == 'duplicate':
+                    bad['warning_cases'].append(copy.deepcopy(row))
+                else:
+                    del bad['warning_cases']
+                save_fixture(self.path, self.row, bad)
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    self.upload()
+
     def test_matching_hashes_pass_upload_and_signing(self):
         self.upload()
         self.sign()

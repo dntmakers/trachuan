@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 REL = '20990102_1'
 
 
-def write_fixture(path):
-    row, report = support.write_fixture(path)
+def write_fixture(path, repository):
+    row, report = support.write_release_fixture(path, repository)
     save_older_shape(path, row)
     return row, report
 
@@ -162,7 +162,6 @@ class CorpusUploadTest(unittest.TestCase):
         self.path = Path(self.temp.name)
         self.build = self.path / 'build with spaces'
         self.build.mkdir()
-        self.row, self.report = write_fixture(self.build)
         self.bin = self.path / 'bin'
         self.bin.mkdir()
         for name in ('aws', 'gh', 'oras', 'cosign'):
@@ -174,6 +173,18 @@ class CorpusUploadTest(unittest.TestCase):
         self.remote = self.path / 'remote'
         self.remote.mkdir()
         self.script = self.checkout_script('repo')
+        self.row, self.report = write_fixture(self.build, self.script.parents[1])
+        from corpus_fixture_history import FixtureHistory
+        from corpus_warning import validate_authorized
+        repository = self.script.parents[1]
+        history_patch = patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(repository))
+        history_patch.start()
+        self.addCleanup(history_patch.stop)
+        for target in ('corpus_manifest.validate_authorized', 'corpus_upload.validate_authorized'):
+            authorization = patch(target, side_effect=lambda report, country, **kwargs: validate_authorized(
+                report, country, root=repository, **kwargs))
+            authorization.start()
+            self.addCleanup(authorization.stop)
         self.env = dict(PATH=str(self.bin) + os.pathsep + os.environ['PATH'], HOME=str(self.path),
                         OCI_S3_ENDPOINT='https://synthetic.compat.objectstorage.ap-singapore-1.oraclecloud.com',
                         FAKE_LOG=str(self.log), FAKE_BUILD=str(self.build), FAKE_REMOTE=str(self.remote),
@@ -196,6 +207,8 @@ class CorpusUploadTest(unittest.TestCase):
         rules.write_text(text.replace(cutoff, f"LEGACY_CUTOFF = {{'vn': {REL!r}}}"))
         (repo / 'sources').mkdir()
         shutil.copyfile(ROOT / 'sources/vn-heading-reviews.yaml', repo / 'sources/vn-heading-reviews.yaml')
+        if hasattr(self, 'script'):
+            support.release_fixture_history(repo)
         return script
 
     def repo_tool(self, name):
@@ -498,7 +511,7 @@ class CorpusUploadTest(unittest.TestCase):
                    lambda: self.row['run'].update(complete=False)]
         for index, change in enumerate(changes):
             with self.subTest(index=index):
-                self.row, self.report = write_fixture(self.build)
+                self.row, self.report = write_fixture(self.build, self.script.parents[1])
                 change()
                 save_fixture(self.build, self.row, self.report)
                 result = self.run_upload()
@@ -594,7 +607,7 @@ class CorpusUploadTest(unittest.TestCase):
     def test_previous_report_hash_and_signature_fail_before_any_upload(self):
         for fault in ('report_hash', 'manifest_hash', 'signature', 'missing'):
             with self.subTest(fault=fault):
-                self.row, self.report = write_fixture(self.build)
+                self.row, self.report = write_fixture(self.build, self.script.parents[1])
                 self.log.unlink(missing_ok=True)
                 if fault == 'report_hash':
                     self.report['previous_diff']['previous']['report_sha256'] = '0' * 64
@@ -620,7 +633,7 @@ class CorpusUploadTest(unittest.TestCase):
 
         self.env.update(GITHUB_REF='refs/heads/main', GITHUB_SHA='a' * 40, GITHUB_RUN_NUMBER='10', GITHUB_REPOSITORY='dannyota/trachuan')
         for fault in ('empty development', 'version downgrade'):
-            self.row, self.report = write_fixture(self.build)
+            self.row, self.report = write_fixture(self.build, self.script.parents[1])
             self.log.unlink(missing_ok=True)
             if fault == 'empty development':
                 self.report['cases'] = [row for row in self.report['cases'] if row['cohort'] != 'development']

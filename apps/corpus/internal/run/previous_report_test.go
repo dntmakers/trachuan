@@ -98,8 +98,8 @@ func TestDecide_FreezesReportBytesInStore(t *testing.T) {
 	}
 }
 
-func TestDecide_AcceptsVersion2And3(t *testing.T) {
-	for _, version := range []int{2, 3} {
+func TestDecide_AcceptsVersion2And3And4(t *testing.T) {
+	for _, version := range []int{2, 3, 4} {
 		path, sum := previousReportFile(t, func(r map[string]any) { r["version"] = version })
 		snapshot := stage.Snapshot{}
 		if _, err := decide(context.Background(), decideInput(t, ReportChoice{Path: path}, false, &snapshot)); err != nil {
@@ -117,8 +117,8 @@ func TestDecide_RefusesUnusableReport(t *testing.T) {
 		mutate func(map[string]any)
 		want   string
 	}{
-		{"version", func(r map[string]any) { r["version"] = 1 }, "want version 2 or 3"},
-		{"later version", func(r map[string]any) { r["version"] = 4 }, "want version 2 or 3"},
+		{"version", func(r map[string]any) { r["version"] = 1 }, "want version 2, 3 or 4"},
+		{"later version", func(r map[string]any) { r["version"] = 5 }, "want version 2, 3 or 4"},
 		{"status", func(r map[string]any) { r["status"] = "incomplete" }, "not complete"},
 		{"recipe", func(r map[string]any) { delete(r, "retrieval_recipe") }, "retrieval recipe"},
 		{"country", func(r map[string]any) { r["country"] = "us" }, "country"},
