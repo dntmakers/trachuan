@@ -43,7 +43,7 @@ func configureFrameworks(ctx context.Context, cfg config, pool *pgxpool.Pool, qu
 	if !cfg.frameworks {
 		return func() {}
 	}
-	resolver := &release.Resolver{Auth: frameworksStore{pool}, URLTemplate: cfg.corpusURL, Clock: time.Now,
+	resolver := &release.Resolver{Auth: frameworksStore{pool}, URLTemplate: cfg.corpusURL, Clock: time.Now, Logger: tools.Logger,
 		Frameworks: &frameworkserve.Options{CursorKey: cfg.frameworksKey},
 		EmbedderFor: func(hash string, expected embedding.Recipe) retrieval.Embedder {
 			return embedding.Query{Client: client, RecipeHash: hash, ExpectedRecipe: &expected}

@@ -128,26 +128,28 @@ clears it.
 The flag stays off until this measurement fits
 [host budgets](../design/budgets-host.md#host-memory-estimates). It needs the
 host, so the coordinator runs it. Check that at least 3 GB is free first
-(`free -m`): the probe runs beside the serving server. It shares the auth
-database and background work with the serving server for its short life; mail,
-report and retention workers claim rows with `FOR UPDATE SKIP LOCKED`, so each
-row is handled once.
+(`free -m`): the probe runs beside the serving server.
 
-Create a personal token for the probe at `https://trachuan.vn/account` with the
-shortest expiry, and revoke it when the probe ends. On the host, as `trachuan`,
-with shell tracing off, start a one-off server from the serving image on a free
-loopback port that Caddy does not route, with the flag on and the server
-Quadlet's limits (no swap, no core dumps, four CPUs, 2,500 MB):
+The probe is a one-off server from the serving image with the flag on and the
+server Quadlet's limits (no swap, no core dumps, four CPUs, 2,500 MB). It
+receives no request and holds no token: at start the server loads the active law
+release's sparse postings and opens the active frameworks release on its own,
+and logs each (`sparse postings` with `status`, `frameworks release` with
+`status`). Its listener is on a loopback port that Caddy does not route, and
+nothing is sent to it. It shares the auth database and background workers with
+the serving server for its short life; stop it with `podman stop`, which lets
+the mail worker finish a send in progress, and keep `--timeout` only as the
+backstop.
+
+On the host, as `trachuan`:
 
 ```sh
 sudo -iu trachuan
-set +x
 export XDG_RUNTIME_DIR=/run/user/$(id -u)
 PORT=18080
 NAME=trachuan-server-memcheck
-ss -Hltn "sport = :$PORT" | grep -q . && { echo "port $PORT is in use"; exit 1; }
 SERVER_IMAGE=$(grep '^SERVER_IMAGE=' /srv/trachuan/host/images.env | cut -d= -f2-)
-trap 'podman rm -f "$NAME" >/dev/null 2>&1' EXIT
+trap 'podman stop --time 30 "$NAME" >/dev/null 2>&1; podman rm "$NAME" >/dev/null 2>&1' EXIT
 podman run -d --name "$NAME" --timeout 900 --network host \
   --user 65532:65532 --cap-drop=ALL --security-opt=no-new-privileges --read-only \
   --cpus=4 --memory=2500m --memory-swap=2500m --memory-reservation=2000m \
@@ -164,51 +166,37 @@ podman run -d --name "$NAME" --timeout 900 --network host \
 ```
 
 `--memory-swap` equal to `--memory` gives the probe no swap, as
-`MemorySwapMax=0` does for the service; `--timeout` ends it after 15 minutes
-even if the shell dies. Before sending the token, wait for `/healthz` and
-confirm that the only listener on the port is the probe:
+`MemorySwapMax=0` does for the service. Wait up to five minutes for both load
+lines; anything other than `ready` postings and an `opened` frameworks release
+ends the probe as failed:
 
 ```sh
-for i in $(seq 1 30); do
-  podman exec "$NAME" /app/healthcheck "http://127.0.0.1:$PORT/healthz" && break
-  sleep 2
+ready=
+for i in $(seq 1 60); do
+  logs=$(podman logs "$NAME" 2>&1)
+  law=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "sparse postings") | .status' | tail -n 1)
+  fw=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "frameworks release") | .status' | tail -n 1)
+  if [ "$law" = ready ] && [ "$fw" = opened ]; then ready=1; break; fi
+  if [ -n "$fw" ] && [ "$fw" != opened ]; then break; fi
+  sleep 5
 done
-test "$(ss -Hltn "sport = :$PORT" | wc -l)" -eq 1 && podman ps --filter name="$NAME" --format '{{.Status}}'
+echo "law=${law:-none} frameworks=${fw:-none}"
+[ -n "$ready" ] || exit 1
 ```
 
-Warm both kinds with one search each. The token is typed at a hidden prompt and
-reaches `curl` on standard input, never on a command line; `-q` skips any curl
-configuration file and `--noproxy '*'` keeps the request local. Each call prints
-only `ok` or `fail`: `ok` needs a JSON-RPC result that is not an error and holds
-at least one hit. Retry a `fail` a few times while the frameworks engine opens:
-
-```sh
-read -rs TOKEN
-mcp() {
-  printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" |
-    curl -q -sS --noproxy '*' -K - \
-      -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-      --data "$1" "http://127.0.0.1:$PORT/mcp" |
-    jq -e '.result and (.result.isError != true) and ((.result.structuredContent.hits // []) | length > 0)' >/dev/null &&
-    echo ok || echo fail
-}
-mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search","arguments":{"country":"vn","query":"lãi suất cho vay"}}}'
-mcp '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"corpus":"frameworks","query":"access control"}}}'
-unset TOKEN
-```
-
-Both must print `ok`. Then record the probe's resident memory and stop it:
+Then record the probe's resident memory; the EXIT trap stops and removes it:
 
 ```sh
 PID=$(podman inspect --format '{{.State.Pid}}' "$NAME")
 grep -E '^(VmRSS|VmHWM)' "/proc/$PID/status"
-podman rm -f "$NAME"
+exit
 ```
 
-Revoke the probe token. Compare `VmHWM` with the server row and its 2,500 MB
-container limit. Write the figures only to private evidence under
-`FRAMEWORKS_WORK_DIR` and give them to the coordinator; they are derived from
-licensed files and never enter Git, a pull request or a log.
+Compare `VmHWM` with the server row and its 2,500 MB container limit. Write the
+figures only to private evidence under `FRAMEWORKS_WORK_DIR` and give them to
+the coordinator; they are derived from licensed files and never enter Git, a
+pull request or a log. Search caches fill only with traffic and are already
+bounded by their byte caps in the budget.
 
 ## Entitlement and flag
 
