@@ -30,7 +30,7 @@ func (r Recipe) Validate() error {
 }
 
 func (r Recipe) validate(historical bool) error {
-	if r.Model != "claude-haiku-5-5" && r.Model != "claude-sonnet-5-5" {
+	if _, ok := priceForModel(r.Model); !ok {
 		return fmt.Errorf("unsupported classification model")
 	}
 	if r.Effort != "low" && r.Effort != "medium" && r.Effort != "high" && r.Effort != "xhigh" && r.Effort != "max" {
@@ -68,13 +68,26 @@ func (r Recipe) Reserve(input int64) (int64, error) {
 	if input < 1 || input > r.InputBound {
 		return 0, fmt.Errorf("counted input exceeds classification recipe bound or is empty")
 	}
-	return r.cost(input, r.outputTokens()), nil
+	return r.cost(input, r.outputTokens())
 }
 
-func (r Recipe) cost(input, output int64) int64 {
+type batchPrice struct{ inputTwentieths, outputTwentieths int64 }
+
+func priceForModel(model string) (batchPrice, bool) {
 	// Anthropic Batch prices: https://platform.claude.com/docs/en/about-claude/pricing
-	if r.Model == "claude-haiku-5-5" {
-		return (input + 5*output + 19) / 20
+	price, ok := map[string]batchPrice{
+		"claude-haiku-5-5":  {1, 5},
+		"claude-sonnet-5-5": {20, 100},
+		"claude-opus-5-5":   {40, 200},
+		"claude-fable-5-2":  {80, 400},
+	}[model]
+	return price, ok
+}
+
+func (r Recipe) cost(input, output int64) (int64, error) {
+	price, ok := priceForModel(r.Model)
+	if !ok {
+		return 0, fmt.Errorf("unsupported classification model")
 	}
-	return input + 5*output
+	return (price.inputTwentieths*input + price.outputTwentieths*output + 19) / 20, nil
 }

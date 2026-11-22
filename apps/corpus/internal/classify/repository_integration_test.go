@@ -5,8 +5,10 @@ package classify
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/testdb"
 	"danny.vn/trachuan/internal/testpg"
 	"github.com/anthropics/anthropic-sdk-go/v2"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -65,6 +68,54 @@ func TestScreen_DatabaseSettlementAndReplay(t *testing.T) {
 	}
 	if f.creates != 1 || f.downloads != 1 {
 		t.Fatal("replayed provider operations after settlement")
+	}
+}
+
+func TestRepository_RestoreRequiresMatchingBudgetPair(t *testing.T) {
+	ctx := context.Background()
+	db, err := pgxpool.New(ctx, testdb.New(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(db.Close)
+	var runID int64
+	if err = db.QueryRow(ctx, `INSERT INTO run(country,rel,state,snapshot) VALUES('vn',$1,'paused','{}') RETURNING id`, testpg.Release(t)).Scan(&runID); err != nil {
+		t.Fatal(err)
+	}
+	repo := &PGRepository{Pool: db}
+	unlock, err := repo.Lock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(unlock)
+	recipe, err := NewRecipe("claude-fable-5-2", strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := []Item{{Key: "vn:vbpl:1", RequestHash: strings.Repeat("a", 64), InputTokens: 100}}
+	for _, tc := range []struct {
+		name, digit, budget string
+		amount              int64
+		wantViolation       bool
+	}{
+		{"valid trial", "a", "trial", 200000000, false},
+		{"pilot with trial amount", "b", "pilot", 200000000, true},
+		{"trial with pilot amount", "c", "trial", 15000000, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Submission{ID: strings.Repeat(tc.digit, 32), RunID: runID, ScreenHash: strings.Repeat(tc.digit, 64), Recipe: recipe, Items: items, ItemsHash: itemsHash(items), State: "uncertain", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Budget: tc.budget, BudgetMicroUSD: tc.amount, ReserveMicroUSD: 82320}
+			err := repo.Restore(ctx, []Submission{s})
+			if !tc.wantViolation {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var pgErr *pgconn.PgError
+			if !errors.As(err, &pgErr) || pgErr.Code != "23514" || pgErr.ConstraintName != "submission_budget_pair_check" {
+				t.Fatalf("restore error = %v; want submission_budget_pair_check violation", err)
+			}
+		})
 	}
 }
 

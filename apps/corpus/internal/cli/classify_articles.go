@@ -65,14 +65,16 @@ func parseArticleOptions(cc, rel string, args []string) (articleOptions, error) 
 	if !ok || selection == "" || flags["--families"] == "" || flags["--out"] == "" {
 		return o, fmt.Errorf("articles requires --families FILE --select labels:FILE --out DIR")
 	}
-	if flags["--budget"] != "pilot" || flags["--budget-usd"] != "15" {
-		return o, fmt.Errorf("articles requires --budget pilot --budget-usd 15")
+	budget := flags["--budget"]
+	amount, err := parseClassifyBudget(budget, flags["--budget-usd"])
+	if err != nil {
+		return o, err
 	}
 	recipe, err := classify.NewRecipe(flags["--recipe"], strings.Repeat("0", 64))
 	if err != nil {
 		return o, err
 	}
-	o = articleOptions{Options: classify.Options{Country: cc, Release: rel, Recipe: recipe, Out: flags["--out"], Budget: "pilot", BudgetMicroUSD: 15000000, DryRun: flags["--dry-run"] == "true", Step1Artifact: flags["--step-1"]}, Families: flags["--families"], Labels: selection, MaxTokens: o.MaxTokens, Step: o.Step}
+	o = articleOptions{Options: classify.Options{Country: cc, Release: rel, Recipe: recipe, Out: flags["--out"], Budget: budget, BudgetMicroUSD: amount, DryRun: flags["--dry-run"] == "true", Step1Artifact: flags["--step-1"]}, Families: flags["--families"], Labels: selection, MaxTokens: o.MaxTokens, Step: o.Step}
 	return o, nil
 }
 
@@ -83,7 +85,7 @@ func runClassifyArticles(ctx context.Context, args []string, stdout, stderr io.W
 func runClassifyArticlesWith(ctx context.Context, args []string, stdout, stderr io.Writer, load func(context.Context, string, string, taxonomy.Labels) (classificationEvidence, error)) int {
 	fail := func(code int, err error) int { _, _ = fmt.Fprintln(stderr, err); return code }
 	if len(args) < 2 {
-		return fail(2, fmt.Errorf("usage: corpus classify articles <cc> <rel> --families FILE --select labels:FILE --recipe MODEL --out DIR --budget pilot --budget-usd 15 [--max-tokens N] [--step 1|2] [--step-1 FILE] [--dry-run]"))
+		return fail(2, fmt.Errorf("usage: corpus classify articles <cc> <rel> --families FILE --select labels:FILE --recipe MODEL --out DIR %s [--max-tokens N] [--step 1|2] [--step-1 FILE] [--dry-run]", classifyBudgetFlags))
 	}
 	o, err := parseArticleOptions(args[0], args[1], args[2:])
 	if err != nil {

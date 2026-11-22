@@ -159,6 +159,62 @@ func TestScreen_UncertainSubmissionBlocksSpending(t *testing.T) {
 	}
 }
 
+func TestOptions_TrialBudget(t *testing.T) {
+	_, _, _, o := screenFixture(t)
+	o.Budget = "trial"
+	for _, tc := range []struct {
+		name      string
+		amount    int64
+		wantError bool
+	}{
+		{"exact", 200000000, false},
+		{"omitted", 0, true},
+		{"below", 199999999, true},
+		{"above", 200000001, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			o.BudgetMicroUSD = tc.amount
+			if err := o.validate(); (err != nil) != tc.wantError {
+				t.Fatalf("trial budget = %d micro-USD, error %v; want error %v", tc.amount, err, tc.wantError)
+			}
+		})
+	}
+}
+
+func TestScreen_TrialPricingAndSettlement(t *testing.T) {
+	for _, tc := range []struct {
+		model         string
+		reserve, cost int64
+	}{
+		{"claude-haiku-5-5", 1029, 8},
+		{"claude-sonnet-5-5", 20580, 150},
+		{"claude-opus-5-5", 41160, 300},
+		{"claude-fable-5-2", 82320, 600},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			r, m, _, o := screenFixture(t)
+			o.Recipe.Model = tc.model
+			o.Budget, o.BudgetMicroUSD = "trial", 200000000
+			summary, err := r.Screen(context.Background(), o, documents(), families())
+			if err != nil || !summary.Admitted || summary.ReserveMicroUSD != tc.reserve {
+				t.Fatalf("summary %+v, error %v; want reserve %d", summary, err, tc.reserve)
+			}
+			if len(m.rows) != 1 || !m.rows[0].Settled || m.rows[0].CostMicroUSD != tc.cost {
+				t.Fatalf("ledger %+v; want settled cost %d", m.rows, tc.cost)
+			}
+		})
+	}
+}
+
+func TestApply_UnsupportedModelRetainsReserve(t *testing.T) {
+	_, _, _, o := screenFixture(t)
+	o.Recipe.Model = "unsupported"
+	s := Submission{Recipe: o.Recipe, State: "submitted", ReserveMicroUSD: 1000}
+	if err := apply(&s, nil); err == nil || s.Settled || s.State != "submitted" {
+		t.Fatalf("ledger %+v, error %v; want unsettled submission", s, err)
+	}
+}
+
 func TestScreen_AdmissionCountsEveryUnsettledRow(t *testing.T) {
 	for _, state := range []string{"submitted", "failed", "abandoned", "cancelled"} {
 		t.Run(state, func(t *testing.T) {

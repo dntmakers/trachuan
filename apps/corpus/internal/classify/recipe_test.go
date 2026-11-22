@@ -30,6 +30,29 @@ func TestRecipe_BindsEveryRequestSetting(t *testing.T) {
 	}
 }
 
+func TestReserve_BatchPricesByModel(t *testing.T) {
+	for _, tc := range []struct {
+		model string
+		want  int64
+	}{
+		{"claude-haiku-5-5", 11},
+		{"claude-sonnet-5-5", 208},
+		{"claude-opus-5-5", 416},
+		{"claude-fable-5-2", 832},
+	} {
+		t.Run(tc.model, func(t *testing.T) {
+			r, err := NewRecipe(tc.model, strings.Repeat("a", 64))
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.MaxTokens = 17
+			if got, err := r.Reserve(123); err != nil || got != tc.want {
+				t.Fatalf("reserve = %d micro-USD, error %v; want %d", got, err, tc.want)
+			}
+		})
+	}
+}
+
 func TestReserve_RoundsUpAndRejectsTierCrossing(t *testing.T) {
 	r, _ := NewRecipe("claude-haiku-5-5", strings.Repeat("a", 64))
 	r.MaxTokens = 1
