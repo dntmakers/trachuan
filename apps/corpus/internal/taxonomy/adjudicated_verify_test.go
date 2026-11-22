@@ -53,3 +53,17 @@ func TestVerifyAdjudicated(t *testing.T) {
 		t.Fatal("accepted unpinned file")
 	}
 }
+
+func TestVerifyScoringInputRejectsUnknownClassifierProvider(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "evaluation", "testdata", "vn", "taxonomy-multi-family.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, provider := range []string{"", "Anthropic", "OPENAI", "unknown"} {
+		t.Run(provider, func(t *testing.T) {
+			if _, _, _, err := VerifyScoringInput(provider, data); err == nil {
+				t.Fatalf("accepted classifier provider %q", provider)
+			}
+		})
+	}
+}

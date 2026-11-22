@@ -28,6 +28,9 @@ func VerifyAdjudicated(classifierProvider string, data []byte) (string, string, 
 
 func VerifyScoringInput(classifierProvider string, data []byte) (string, string, FrozenLabels, error) {
 	var labels FrozenLabels
+	if classifierProvider != "openai" && classifierProvider != "anthropic" {
+		return "", "", labels, fmt.Errorf("unknown classifier provider")
+	}
 	hash := fmt.Sprintf("%x", sha256.Sum256(data))
 	for _, pin := range adjudicatedPins() {
 		if pin.hash != hash {
@@ -49,7 +52,7 @@ func VerifyScoringInput(classifierProvider string, data []byte) (string, string,
 		if provider != pin.provider || labels.DrawRule != AdjudicatedDrawRule {
 			return "", "", FrozenLabels{}, fmt.Errorf("inconsistent adjudicated provenance")
 		}
-		if classifierProvider == "" || provider == classifierProvider {
+		if provider == classifierProvider {
 			return "", "", FrozenLabels{}, fmt.Errorf("classifier and labeler providers must differ")
 		}
 		return pin.slice, provider, labels, nil
