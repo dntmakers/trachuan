@@ -14,6 +14,8 @@ The primary session plans, writes and reviews designs, ADRs and documentation, m
 |Searches, summaries, mechanical reading|Claude `Explore` agent|
 |Optional second design draft|Codex CLI `designer`, docs only, at the primary's discretion|
 
+Each tier runs its newest model. `.codex/agents/` and the owner's user-level agents hold the only pins; the primary moves a pin when a newer model ships, after a no-tool smoke test of the exact ID. Plans and briefs name the tier (Terra, Sol, Astra), not a model ID.
+
 Dispatch every worker as a fresh `Agent` subagent. Claude models take `model` (`sonnet`, `opus`, `fable`); GPT models take `subagent_type` `terra`, `sol` or `astra`, the owner's user-level agents with the model in frontmatter, and no `model` override. Confirm the child's runtime model before relying on it. These agents have every tool, so each brief carries the role rules from `.codex/agents/implementer.toml` or `reviewer.toml`; a reviewer brief forbids edits, writing commands and Git. Give reviewers the exact diff, worktree status, local checks and exact-commit CI evidence. State the route in the brief; choose a different model from the author and resume the same reviewer for confirmations.
 
 If direct dispatch fails or the runtime model cannot be confirmed, use `scripts/codex-agent.sh [--model <m>] [--effort <e>] [--search] [--resume <session-id>] <role> <worktree> <brief-file> <report-file>`. A CLI resume requires the model that started the worker, even when it differs from the role default.

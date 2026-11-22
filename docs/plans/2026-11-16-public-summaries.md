@@ -1,6 +1,6 @@
 # Public Document Summaries Plan (Plan 19)
 
-> **For agentic workers:** Routes (`instructions/workflow.md`): every implementation stage is hard work, implemented by Codex `implementer` with `--model gpt-6.1-sol` and reviewed by `reviewer` with `--model gpt-6-astra`, because it moves the account boundary. The primary runs `make pre-push`, `make test`, `make test-integration`, `make web-test`, `make web-build` and `make e2e` as each stage needs, and runs the capacity acceptance itself.
+> **For agentic workers:** Routes (`instructions/workflow.md`): every implementation stage is hard work, implemented by Sol and reviewed by Astra, because it moves the account boundary. The primary runs `make pre-push`, `make test`, `make test-integration`, `make web-test`, `make web-build` and `make e2e` as each stage needs, and runs the capacity acceptance itself.
 
 **Goal:** visitors without an account read a document's identity, status, outline and approved chapter and article titles at `/vn/documents/{key}/summary`; reading the full text still needs an account ([ADR 0005](../adr/0005-google-login-and-embedded-oauth.md), History 2026-11-16).
 
