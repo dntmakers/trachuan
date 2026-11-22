@@ -181,7 +181,7 @@ class ProcessTest(unittest.TestCase):
     def test_termination_does_not_reap_before_final_group_signal(self):
         events = []
         process = mock.Mock(pid=123, returncode=None)
-        process.wait.side_effect = lambda: events.append('reap')
+        process.wait.side_effect = lambda timeout: events.append('reap')
         with mock.patch.object(io.os, 'killpg', side_effect=lambda pid, sig: events.append(sig)), \
                 mock.patch.object(io.os, 'waitid', side_effect=lambda *args: events.append('observe') or object()):
             io.terminate(process)
