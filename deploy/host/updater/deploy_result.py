@@ -11,12 +11,14 @@ RESULT_LIMIT = 65536
 
 def timestamp(value):
     if not isinstance(value, str) or len(value) > 64:
-        return False
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
-        return parsed.utcoffset() == timezone.utc.utcoffset(parsed)
+        if parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+            return None
+        return parsed.isoformat().replace('+00:00', 'Z')
     except (ValueError, OverflowError):
-        return False
+        return None
 
 
 def previous_fields(value):
@@ -29,7 +31,8 @@ def previous_fields(value):
             continue
         item = value[key]
         if key in ('last_success_at', 'waiting_since'):
-            valid = timestamp(item)
+            item = timestamp(item)
+            valid = item is not None
         elif key == 'mode':
             valid = isinstance(item, str) and item in ('new', 'retained')
         elif key == 'release_floor':

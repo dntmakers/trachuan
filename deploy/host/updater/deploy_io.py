@@ -36,6 +36,14 @@ def decode(data, what):
         raise ValueError('invalid ' + what + ' JSON') from error
 
 
+def sync_dir(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def atomic(path, data, mode=0o600):
     path = Path(path)
     descriptor, name = tempfile.mkstemp(prefix='.' + path.name + '.', dir=path.parent)
@@ -46,11 +54,7 @@ def atomic(path, data, mode=0o600):
             output.flush()
             os.fsync(output.fileno())
         os.replace(name, path)
-        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        sync_dir(path.parent)
     finally:
         Path(name).unlink(missing_ok=True)
 

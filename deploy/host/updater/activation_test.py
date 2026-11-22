@@ -1,6 +1,8 @@
 import copy
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import tempfile
 import unittest
@@ -106,7 +108,57 @@ class ActivationFixture:
 
 
 class ActivationTest(ActivationFixture, unittest.TestCase):
+    def test_terminal_recovery_barrier_failure_keeps_ingress_held(self):
+        for terminal in ('activated', 'rolled_back'):
+            with self.subTest(terminal=terminal):
+                self.setUp()
+                if terminal == 'activated':
+                    self.engine.activate(self.new)
+                else:
+                    self.crash_step = 'migrate'
+                    with self.assertRaises(Crash):
+                        self.engine.activate(self.new)
+                    self.assertEqual(self.engine.recover(), 'rolled_back')
+                self.host.hold()
+                self.calls.clear()
+                with mock.patch('updater.deploy_activate.sync_dir', side_effect=OSError('sync unavailable')):
+                    with self.assertRaisesRegex(OSError, 'sync unavailable'):
+                        self.engine.recover()
+                self.assertTrue(self.paths.hold.exists())
+                self.assertFalse(any(args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']
+                                     for args, _ in self.calls))
+
+    def test_terminal_recovery_syncs_state_directory_before_reopening_ingress(self):
+        self.engine.activate(self.new)
+        self.host.hold()
+        directory = os.stat(self.state.path.parent)
+        original_fsync, runner = os.fsync, self.host.runner
+        synced, started = [], []
+        def fsync(fd):
+            info = os.fstat(fd)
+            if stat.S_ISDIR(info.st_mode) and (info.st_dev, info.st_ino) == (directory.st_dev, directory.st_ino):
+                synced.append(True)
+            return original_fsync(fd)
+        def command(args, **kwargs):
+            if args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']:
+                self.assertTrue(synced)
+                started.append(True)
+            return runner(args, **kwargs)
+        self.host.runner = command
+        with mock.patch('updater.deploy_io.os.fsync', side_effect=fsync):
+            self.assertIsNone(self.engine.recover())
+        self.assertTrue(started)
+        self.assertFalse(self.paths.hold.exists())
+
+    def test_resume_rejects_nonterminal_state_before_ingress(self):
+        self.calls.clear()
+        with self.assertRaisesRegex(ValueError, 'terminal'):
+            self.engine.resume_ingress()
+        self.assertFalse(any(args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']
+                             for args, _ in self.calls))
+
     def test_resume_failure_stops_caddy_when_hold_write_fails(self):
+        self.engine.activate(self.new)
         with mock.patch.object(self.host, 'probe', side_effect=[None, ValueError('edge failed')]), \
                 mock.patch.object(self.host, 'hold', side_effect=OSError('hold unavailable')), \
                 mock.patch.object(self.host, 'cancel_edge') as cancel:

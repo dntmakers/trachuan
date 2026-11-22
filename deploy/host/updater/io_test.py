@@ -29,6 +29,26 @@ class IOTest(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b'previous')
             self.assertEqual(list(Path(directory).iterdir()), [path])
 
+    def test_prior_surrogate_timestamp_is_normalized_for_normal_and_overflow_receipts(self):
+        for oversized in (False, True):
+            with self.subTest(oversized=oversized), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path, log = root / 'release.json', root / 'deploy.log'
+                path.write_bytes(b'{"last_success_at":"2026-01-01\\ud80000:00:00+00:00",'
+                                 b'"waiting_since":"2026-01-01\\ud80000:00:00+00:00"}')
+                result = ReleaseResult(SimpleNamespace(result=root / 'result.json', log=log), lambda: 1767312000)
+                if oversized:
+                    with self.assertRaisesRegex(ValueError, 'result too large'):
+                        result.write('failed', 'result', 'x' * 100000)
+                else:
+                    result.write('failed', 'result', 'failed')
+                value = json.loads(path.read_bytes())
+                self.assertEqual(value['last_success_at'], '2026-01-01T00:00:00Z')
+                self.assertEqual(value['waiting_since'], '2026-01-01T00:00:00Z')
+                observed = observations.result(path, 'release')
+                self.assertEqual(observed['last_success_at'], 1767225600)
+                self.assertEqual(observed['waiting_since'], 1767225600)
+
     def test_overflow_uses_valid_previous_floor_when_state_is_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:
             path, log = Path(directory) / 'result.json', Path(directory) / 'deploy.log'

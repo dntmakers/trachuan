@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -40,6 +42,33 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         secret_phase = mock.patch('updater.deploy_run.Secrets.run', return_value=True)
         secret_phase.start()
         self.addCleanup(secret_phase.stop)
+
+    def test_post_rename_sync_failure_never_reopens_ingress_without_durable_barrier(self):
+        self.paths.mode.write_text('activate\n')
+        original_fsync = os.fsync
+        state_dir = os.stat(self.state.path.parent)
+        failed, later_starts = [], []
+        runner = self.app.host.runner
+        def command(args, **kwargs):
+            if failed and args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']:
+                later_starts.append(args)
+            return runner(args, **kwargs)
+        def fsync(fd):
+            info = os.fstat(fd)
+            if (stat.S_ISDIR(info.st_mode) and (info.st_dev, info.st_ino) == (state_dir.st_dev, state_dir.st_ino)
+                    and json.loads(self.state.path.read_bytes())['journal'] is not None
+                    and json.loads(self.state.path.read_bytes())['journal']['status'] == 'activated'):
+                failed.append(True)
+                raise OSError('state directory sync failed')
+            return original_fsync(fd)
+        self.app.host.runner = command
+        with mock.patch('updater.deploy_io.os.fsync', side_effect=fsync):
+            self.assertEqual(self.app.run(), 1)
+        self.assertGreaterEqual(len(failed), 2)
+        self.assertTrue(self.paths.hold.exists())
+        self.assertEqual(later_starts, [])
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'activated')
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
 
     def test_interruption_stops_caddy_even_when_hold_raises(self):
         self.app.host.unverified_ingress = True

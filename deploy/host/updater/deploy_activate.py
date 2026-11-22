@@ -2,7 +2,7 @@ import copy
 
 from . import deploy_state
 from .deploy_floor import bundle_floor
-from .deploy_io import canonical, check_stop, interrupted
+from .deploy_io import canonical, check_stop, interrupted, sync_dir
 
 
 class Activator:
@@ -40,6 +40,11 @@ class Activator:
 
     def resume_ingress(self):
         try:
+            self.state.data = deploy_state.State(self.state.path).data
+            journal = self.state.data['journal']
+            if not journal or journal['status'] not in ('activated', 'rolled_back'):
+                raise ValueError('activation journal not terminal')
+            sync_dir(self.state.path.parent)
             self.host.probe()
             self.host.clear_hold()
             self.host.systemctl('start', 'caddy')
