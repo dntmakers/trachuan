@@ -275,7 +275,10 @@ func (d *openAISubmitDisk) advance(s Submission, n int, build func([]submitRecor
 		}
 		r.At = d.now().UTC()
 		if r.At.Before(s.CreatedAt) {
-			return fmt.Errorf("invalid clock")
+			r.At = s.CreatedAt.UTC()
+		}
+		if len(prev) > 0 && r.At.Before(prev[len(prev)-1].At) {
+			r.At = prev[len(prev)-1].At
 		}
 		return d.write(dir, submitNames[n], r)
 	})
