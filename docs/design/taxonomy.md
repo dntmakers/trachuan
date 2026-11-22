@@ -278,16 +278,16 @@ counts as a miss in its slice, so the denominator never shrinks; when more than
 re-adjudicated and frozen again. A redraw is a reviewed change, never automatic.
 
 A model-adjudicated set gates a classifier only when its labeler uses a
-different provider. Scoring checks the provider in the frozen file; with no
-independent set, the slice is unavailable and the classifier fails it. For
-OpenAI, a blind Claude agent session (Fable, or Opus when Fable is unavailable)
-labels the frozen multi-family and post-2023 article lists under the same rule
-as the first labeler, without access to existing labels, seeds, inherited nodes
-or classifier output. This matches the first sets' agent-session method without
-a paid corpus call. Do not draw or replace an article. The coordinator reads the
-same sample sizes as for the first sets and labels any article the second
-labeler leaves blank, under the same rule. Freeze
-`taxonomy-<slice>-anthropic.json` only when every article has a label. The
+different provider. Without an independent set, the slice fails. For OpenAI, a
+fresh Claude session (Fable, or Opus when unavailable) labels the frozen
+multi-family and post-2023 articles under the same rule, blind to existing
+labels, seeds, inherited nodes and classifier output. Do not redraw or replace
+articles. Give a second fresh blind session only the blank entries to label.
+Freeze `taxonomy-<slice>-anthropic.json` only when every article is labeled. The
+coordinator reads the frozen set at the same sample sizes as for the first sets,
+without comparing labels or classifier output, and supplies no labels. Any
+correction goes to a new blind session, without labels or scores. Freeze the
+revision and finish all checks before anyone compares the sets or scores. The
 [packet and freeze commands](classification-openai.md#independent-evaluation-inputs)
 preserve the exact lists and text hashes.
 

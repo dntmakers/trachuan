@@ -25,8 +25,11 @@ scoring rules are not part of a request and never change a key.
 
 ## Attempts
 
-An attempt is one request inside a batch the provider accepted (the batch id is
-recorded). Each attempt's outcome is written once, immutably, to
+An attempt is one request actually sent in a batch the provider accepted (the
+batch id is recorded). Before dispatch, retain the set of submitted `custom_id`
+values with their original intent item indices. Replayed or skipped items are
+not sent, have no new attempt and are not part of settlement. Each attempt's
+outcome is written once, immutably, to
 `results/<key>/<submission id>-<item index>.json` in the intent log store before
 anything applies it: the outcome, the raw provider body, the usage counts by
 token kind, the cost in micro-USD and the price-table version used. Result
@@ -55,7 +58,7 @@ attempt and costs nothing.
 
 One rule closes every case where it is unclear whether a paid request ran or
 what it cost: a key is never resubmitted and a reserve is never released without
-stored provider evidence. Each item settles from one of these:
+stored provider evidence. Settle only submitted items, using one of these:
 
 - a returned result matched by `custom_id`: a model response with its usage
   counts, priced by token kind; or a result the provider marks as not run or not
@@ -63,12 +66,21 @@ stored provider evidence. Each item settles from one of these:
   error line), at zero cost;
 - for the whole submission, a provider batch that ended in validation failure
   with no requests processed, at zero cost; or
-- for the whole submission, a stored, fully paginated listing of the provider's
-  batches in the key's workspace (Anthropic) or project (OpenAI) over the
-  submission's time window, in which every candidate batch was checked and none
-  carries the submission (Anthropic by `custom_id` prefix, OpenAI by the
-  submission id in batch metadata and the recorded input file id); this records
-  the submission `abandoned` at zero cost.
+- for the whole submission, at least 24 hours after its creation, a stored,
+  fully paginated listing of the provider's batches in the key's workspace
+  (Anthropic) or project (OpenAI) from one minute before its creation to at
+  least 24 hours after it, in which every candidate batch has ended and has a
+  complete stored results capture, and none carries the submission (Anthropic by
+  `custom_id` prefix, OpenAI by the submission id in batch metadata and the
+  recorded input file id); this records the submission `abandoned` at zero cost,
+  and the `.abandoned` record names that listing by path and SHA-256. A
+  candidate still running, or one whose results cannot be fully captured, blocks
+  abandonment. The listing counts as complete only when its cursors move forward
+  and its last page reports no further pages; a candidate's capture counts as
+  complete only when its distinct `custom_id` lines equal the batch's request
+  counts. The intent and the listing both record the account fingerprint (the
+  first 16 bytes of the SHA-256 of the API key, never the key), and evidence
+  counts only when the two match.
 
 A deadline, a timeout, a missing or expired result file, an item with no
 outcome, a duplicate or unknown `custom_id`, or usage that cannot be priced
@@ -76,9 +88,9 @@ settles nothing; in classification, `failed` and `abandoned` in
 [batch submissions](batch-submissions.md) release keys and reserves only on this
 evidence. When results can never be complete, the submission stays unsettled for
 good: its reserve stays in the ledger, labelled an estimate in every report, and
-each item without evidence becomes an `unknown` attempt. An `unknown` key is
-never submitted again by any run; it stays a gap until its key changes. An
-operator note may record reconciliation, but only provider evidence lets the
+each submitted item without evidence becomes an `unknown` attempt. An `unknown`
+key is never submitted again by any run; it stays a gap until its key changes.
+An operator note may record reconciliation, but only provider evidence lets the
 same key run again.
 
 Each settlement, with its evidence, is written to `submissions/<id>.settled` in
@@ -87,31 +99,43 @@ pilot submissions, settled before this note, get their `.settled` files from the
 current workshop database once; they have no result records and are never
 replayed.
 
+Before starting the listing, hold the creator guard and check its quiet period.
+Wait 24 hours and 10 minutes from the recorded creator finish if it dispatched,
+from intent creation if a finished creator did not dispatch, or from the
+recorded observation of creator absence if there is no finish record. A listing
+cannot predate a recorded creator finish. OpenAI also uses the
+[dedicated project and input file receipt](classification-openai.md#submission-and-recovery)
+to identify the batch.
+
 Two invariants hold for the whole intent store. First, it is consistent: every
 file belongs to an intent, every dispatch trace and every receipt needs its
 intent, and every attempt record and settlement needs its intent and a receipt
 with the same batch id. Rebuild and every admission check this first, and any
 violation stops both for the whole store until an operator repairs it; an
 `abandoned` submission may be replaced only when it has no dispatch trace and no
-attempt. Second, evidence is never discarded: results downloaded for a batch id
-that matches an unsettled submission are recorded whatever the submission's
+attempt, or when its `.abandoned` record names a listing that meets the evidence
+rule above. Second, evidence is never discarded: results downloaded for a batch
+id that matches an unsettled submission are recorded whatever the submission's
 state, and a deadline only stops polling. Provider data is written to the intent
 log store as soon as it arrives, before any other step that can fail: a batch id
 the moment `create` returns it, each result line as it is decoded, a partial
 download up to its last complete line. A later error changes state only, never
 what was written.
 
-Store only unbilled token counts apart from intents: `counts/<key>.json` is
-written once when the count arrives, including in dry runs, needs no intent, and
-never touches the ledger, locks or reserves. Reserves and replay read it; a new
-count that disagrees with the stored one for the same key is an error.
+Store token counts separately from intents and count-call evidence:
+`counts/<key>.json` is written once when the count arrives, including in dry
+runs, needs no intent, and never touches the ledger, locks or reserves. Reserves
+and replay read it; a new count that disagrees with the stored one for the same
+key is an error. The
+[OpenAI count journal](classification-openai.md#requests-counts-and-reserve)
+records the calls separately.
 
 One verification of the whole store gates both rebuild and every admission. A
-receipted batch settles only from a complete stored results capture with priced
-outcomes, or from explicit zero-work validation evidence. The `.settled` file
-names the stored evidence and its hash. Attempts recovered from a partial
-download can be replayed but never settle a submission, and a lost download
-never promotes them.
+receipted batch settles only from a complete stored results capture with exactly
+one priced outcome per submitted `custom_id`, or from explicit zero-work
+validation evidence for the submitted items. The `.settled` file names the
+stored evidence and its hash. Attempts recovered from a partial download can be
+replayed but never settle a submission, and a lost download never promotes them.
 
 ## Key locks and admission
 
