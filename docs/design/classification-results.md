@@ -4,7 +4,7 @@ This note owns where paid model calls may run, how every paid result is kept,
 settled and reused, which providers and models may classify, and how runs are
 admitted. [Taxonomy](taxonomy.md) owns the classification layers, request shapes
 and the evaluation gate; [batch submissions](batch-submissions.md) owns the
-submission lifecycle and recovery, which this note extends.
+submission lifecycle and recovery, which this note tightens for classification.
 
 ## Write path only
 
@@ -15,80 +15,89 @@ and the classification artifact, never a call.
 
 ## Request key
 
-A request key is the SHA-256 of a canonical record, `key_version` 1: provider,
-endpoint, the model ID as sent, and the complete request body as sent
-(instructions, messages, effort, maximum output tokens, response schema and
-every other parameter), serialized with
-[RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) canonical JSON. Transport
-fields (`custom_id`, batch metadata) are left out; prices, thresholds and
-scoring rules are not part of a request and never change a key. Any change in
-article text, document context, menu, prompt, model or parameter is a new key.
+A request key (`key_version` 1) is the SHA-256 of the provider name, the
+endpoint path and the exact bytes of the request body as sent: Anthropic's
+`params`, OpenAI's line `body`. Bodies are built by one encoder with a fixed
+field order, so the same request always has the same bytes, and two bodies that
+differ in any way, including schema property order, are different keys.
+`custom_id` and batch metadata sit outside the body. Prices, thresholds and
+scoring rules are not part of a request and never change a key.
 
 ## Attempts
 
 An attempt is one request inside a batch the provider accepted (the batch id is
 recorded). Each attempt's outcome is written once, immutably, to
 `results/<key>/<submission id>-<item index>.json` in the intent log store before
-anything applies it: the outcome, the raw provider body when there is one, the
-usage counts by token kind, the cost in micro-USD and the price-table version
-used. Like the intent records, result records are never part of a checkpoint and
-are never deleted. The workshop database keeps an index of them, which
-`corpus submissions --rebuild` rebuilds from the store.
+anything applies it: the outcome, the raw provider body, the usage counts by
+token kind, the cost in micro-USD and the price-table version used. Result
+records are never part of a checkpoint and are never deleted. The workshop
+database keeps an index of them, which `corpus submissions --rebuild` rebuilds
+from the store.
 
-One fail-closed rule sets the outcome. An attempt is `final` only when the
-provider reports success for the item, the response is complete (Anthropic
-`stop_reason` `end_turn`; OpenAI response `status` `completed`), and the body
-parses under the request's schema. Everything else is `failed`: an error item,
-an expired or cancelled item, a refusal, an incomplete or truncated response, a
-schema failure, or an item with no outcome when the provider reports the batch
-ended. A batch rejected before processing (OpenAI validation failure) records
-every item `failed` at zero cost.
+An attempt is `final` only when the provider returns a result for the item that
+reports success, the response is complete (Anthropic `stop_reason` `end_turn`;
+OpenAI response `status` `completed`), and the body parses under the request's
+schema. A returned result that is anything else (an error item, an expired or
+cancelled item, a refusal, an incomplete or truncated response, a schema
+failure) is `failed`, at the cost its usage shows.
 
 A key with a `final` attempt is never submitted again. Its first `final` attempt
 is replayed through the same validation as a fresh response, so replay is
 deterministic, including dropped codes, missing anchors (gap `invalid_response`
 for those articles) and `no_family`. A key with no `final` attempt may be
 submitted while it has fewer than three attempts across all runs and releases;
-the third failure leaves it a gap until its key changes. A stored replay is not
-an attempt.
+the third failure leaves it a gap until its key changes. A replay is not an
+attempt and costs nothing.
 
-## Key locks
+## Evidence rule
 
-The intent record lists every key it carries. A key is locked while any
-submission that carries it is `preparing`, `submitted`, `uncertain` or
-`cancelling`, in any run or release; a new submission refuses locked keys. An
-`uncertain` submission keeps its keys locked until the operator matches it or
-marks it `abandoned` under the batch-submissions procedure. An OpenAI batch is
-created with the submission id in its metadata and its input file id recorded,
-so the operator matches by metadata and input file, not only by `custom_id`. A
-timeout or a missing result file never releases a lock by itself.
+One rule closes every case where it is unclear whether a paid request ran or
+what it cost: keys stay locked and reserves stay held until stored provider
+evidence settles them. Only two kinds of evidence settle a submission:
 
-## Settlement and admission
+- downloaded results that give each item in the intent exactly one outcome with
+  usage counts, matched by `custom_id`; or
+- a stored listing of the provider's batches over the submission's time window
+  that shows no batch carrying the submission (Anthropic by `custom_id` prefix,
+  OpenAI by the submission id in batch metadata and the recorded input file id),
+  which records the submission `abandoned` at zero cost.
 
-A submission is settled only when every item in its intent has a result record.
-Its cost is the sum of its attempts' costs from the provider's usage counts,
-priced by token kind (input, cache write, cache read, output) at the price-table
-version recorded on the submission; a refusal or unusable response is paid like
-any other. Until settled, its reserve stays held. A replay costs nothing. The
-ledger is the sum of settled costs plus unsettled reserves; pilot submissions
-settled before this note stay in the ledger and have no result records, so they
-are never replayed.
+A deadline, a timeout, a missing or expired result file, an item with no
+outcome, a duplicate or unknown `custom_id`, or usage that cannot be priced
+settles nothing; in classification, `failed` and `abandoned` in
+[batch submissions](batch-submissions.md) release keys and reserve only on this
+evidence. When results can never be complete, the operator may settle the
+submission at its full reserve: every item without a returned result becomes a
+`failed` attempt, so cost is never undercounted. Each settlement, with its
+evidence, is written to `submissions/<id>.settled` in the intent log store, and
+`--rebuild` restores the ledger from those files. The pilot submissions, settled
+before this note, get their `.settled` files from the current workshop database
+once; they have no result records and are never replayed.
 
-A reserve prices every input token at the highest input-side rate the request
-can incur (the cache-write rate when it carries a cache marker, else the input
-rate) and every request's maximum output tokens at the output rate. Admission is
-unchanged: the ledger plus this batch's reserve must fit the named budget, or
-the batch is not submitted. The plan sets budget names and amounts; code accepts
-only those pairs and records them on the submission. Each key comes from its
-file under `~/.config`, is passed per command and is never printed.
+## Key locks and admission
+
+The intent record lists every key it carries, each once. A key is locked while
+any submission carrying it is unsettled, in any run or release. The lock check,
+the admission check and the `preparing` row are one transaction under the ledger
+lock, so two runs cannot submit the same key.
+
+The ledger is the sum of settled costs plus unsettled reserves. A reserve prices
+every input token at the highest input-side rate the price table lists for the
+model (the cache-write rate when it exceeds the input rate) and every request's
+maximum output tokens at the output rate. The ledger plus this batch's reserve
+must fit the named budget, or the batch is not submitted. The plan sets budget
+names and amounts; code accepts only those pairs and records them on the
+submission. Each key comes from its file under `~/.config`, is passed per
+command and is never printed.
 
 ## Caching
 
 Requests put the stable part first (instructions, then the menu or subtrees) and
 the document after it. Anthropic requests mark the prefix with `cache_control`
 ([prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
-OpenAI caches prefixes automatically. Batch cache hits are best effort, so the
-reserve never assumes one.
+OpenAI caches prefixes automatically
+([prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)).
+Batch cache hits are best effort, so the reserve never assumes one.
 
 ## Providers and models
 
@@ -98,8 +107,8 @@ or OpenAI Batch on `/v1/responses`
 ([batch guide](https://developers.openai.com/api/docs/guides/batch)) with
 structured outputs and the recipe effort as reasoning effort (`none` is not
 allowed). OpenAI output order is not input order, so results match on
-`custom_id`, merged from the output and error files; both files expire after 30
-days by default, so they are downloaded and recorded as soon as the batch ends.
+`custom_id`, merged from the output and error files; both expire after 30 days
+by default, so they are downloaded and recorded as soon as the batch ends.
 
 One price table in code lists every allowed model with its Batch rates per token
 kind, its version and source page
@@ -109,5 +118,7 @@ without a row cannot run. Trials use the newest model of each tier. A new model
 enters by a table row and an evaluated trial.
 
 Among models that pass every applicable floor, the full run uses the one with
-the best gating metrics; price decides only when they are within 0.01 of each
-other on every gating metric.
+the highest level-2 top-1 precision on the seeded non-fragment slice, then the
+highest level-2 recall on that slice, then the lowest price. Precision comes
+first because a wrong subject misleads an agent more than a missing one. The
+seeded slice comes from the package, so it ranks models of both providers alike.

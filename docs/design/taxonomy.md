@@ -282,10 +282,12 @@ from a different provider than the classifier; `corpus eval` reads the provider
 from the set file and refuses the slice otherwise, so with no independent set
 the slice is unavailable and the classifier fails it. A second, independent set
 for a slice keeps the first set's frozen article list (no new draw and no
-replacement), is labeled blind under the same labeling rule with an empty label
-set kept as `no_node`, is read like the first and is frozen as
-`taxonomy-<slice>-<provider>.json`. Its labeling run is a paid corpus command
-under the plan's trial budget, with results kept as
+replacement) and is labeled blind under the same labeling rule. An article the
+second labeler leaves without any code goes to the coordinator, who labels it
+from its text under the same rule; the set is read like the first, frozen as
+`taxonomy-<slice>-<provider>.json`, and gates only when every article in the
+list has a label. Its labeling run is a paid corpus command under the plan's
+trial budget, with results kept as
 [classification results](classification-results.md) says.
 
 The report also lists assignment counts per node, unassigned counts, and the

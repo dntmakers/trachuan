@@ -4,7 +4,7 @@
 
 **Goal:** every primary article in the release carries subject nodes: seeds from the 2023 codification package, then inheritance through consolidations, then an LLM layer in batches for the rest, gated by the floors in [taxonomy](../design/taxonomy.md#evaluation-gate).
 
-**Budget:** the owner approved paid use on both keys on 2026-11-22 with no per-run approval; the 150 USD cap is lifted. Budget names and amounts on the whole ledger: pilot 15 USD (closed at 9.54), trial 200 USD, full set from the trial's projection before the full run. Admission is unchanged: before each submission or retry, settled cost plus the reserved cost of every unsettled batch plus this batch's reserve (counted input tokens at the batch input price, plus every request's `max_tokens` at the batch output price) must fit the named budget; otherwise it is not submitted. A batch's reserve is released only when its cost is settled from its results.
+**Budget:** the owner approved paid use on both keys on 2026-11-22 with no per-run approval; the 150 USD cap is lifted. Budget names and amounts on the whole ledger: pilot 15 USD (closed at 9.54), trial 200 USD, and `full`, which the primary sets before the full run from the chosen trial's cost per article times the remaining articles plus 25 percent, adds to code, and raises when the ledger nears it (the standing approval covers a raise). Admission, reserves and settlement follow [classification results](../design/classification-results.md).
 
 **Spec:** [classification results](../design/classification-results.md), [taxonomy](../design/taxonomy.md) ("Classification layers", "Serving", "Evaluation gate"), [batch submissions](../design/batch-submissions.md), [evaluation](../design/evaluation.md) filter gate. The spec wins over this plan.
 
@@ -61,8 +61,8 @@
 Order: no new paid call runs before the result store lands, whatever its outcome.
 
 - [ ] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget (migration for the submission checks).
-- [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, key locks across releases, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
+- [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
 - [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
 - [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
 - [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a `gpt-6.2-astra` trial on every slice.
-- [ ] Full run with the model chosen by classification-results.md "Providers and models"; the `full` budget is set from the chosen trial's projection.
+- [ ] Full run with the model chosen by classification-results.md "Providers and models", under the `full` budget set as above.
