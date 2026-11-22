@@ -1,12 +1,12 @@
 # Classification Plan (Plan 8)
 
-> **For agentic workers:** Routes (`instructions/workflow.md`): every task that submits or prepares paid batches is hard: Sol implements, Astra reviews; the design delta is written by the primary and reviewed by Astra. Executor: trachuan-dev. Paid calls use `ANTHROPIC_API_KEY_DANNY` only, passed per command, never exported, never switched while a batch is in flight.
+> **For agentic workers:** Routes (`instructions/workflow.md`): every task that submits or prepares paid batches is hard: Sol implements, Astra reviews; the design delta is written by the primary and reviewed by Astra. Executor: the primary. Paid calls use `ANTHROPIC_API_KEY` from `~/.config/claude-api-keys.env` or `OPENAI_API_KEY` from `~/.config/openai-api-keys.env`, passed per command, never exported, never switched while a batch is in flight.
 
 **Goal:** every primary article in the release carries subject nodes: seeds from the 2023 codification package, then inheritance through consolidations, then an LLM layer in batches for the rest, gated by the floors in [taxonomy](../design/taxonomy.md#evaluation-gate).
 
-**Budget:** owner cap 150 USD on the key, pilot included. Pilot budget 15 USD. The full batch is pre-approved when the pilot passes every applicable floor and the projection, pilot included, stays under 100 USD; otherwise, and before any Opus run, report to the coordinator. Admission: before each submission or retry, settled cost plus the reserved cost of every unsettled batch plus this batch's reserve (counted input tokens at the batch input price, plus every request's `max_tokens` at the batch output price) must fit the applicable budget (pilot 15 USD, full batch 100 USD, cap 150 USD); otherwise it is not submitted. A batch's reserve is released only when its cost is settled from its results.
+**Budget:** the owner approved paid use on both keys on 2026-11-22 with no per-run approval; the 150 USD cap is lifted. Budget names and amounts on the whole ledger: pilot 15 USD (closed at 9.54), trial 200 USD, full set from the trial's projection before the full run. Admission is unchanged: before each submission or retry, settled cost plus the reserved cost of every unsettled batch plus this batch's reserve (counted input tokens at the batch input price, plus every request's `max_tokens` at the batch output price) must fit the named budget; otherwise it is not submitted. A batch's reserve is released only when its cost is settled from its results.
 
-**Spec:** [taxonomy](../design/taxonomy.md) ("Classification layers", "Serving", "Evaluation gate"), [batch submissions](../design/batch-submissions.md), [evaluation](../design/evaluation.md) filter gate. The spec wins over this plan.
+**Spec:** [classification results](../design/classification-results.md), [taxonomy](../design/taxonomy.md) ("Classification layers", "Serving", "Evaluation gate"), [batch submissions](../design/batch-submissions.md), [evaluation](../design/evaluation.md) filter gate. The spec wins over this plan.
 
 ## Measured size (corpus_vn_20261114_5, 2026-11-15)
 
@@ -55,3 +55,11 @@
 ### 8.5 Full batch (paid, after the coordinator confirms the estimate)
 
 - [ ] The cheapest model that passed the floors; unassigned gaps below threshold; evaluated corpus run; release.
+
+### 8.6 Newest models (reopened 2026-11-22)
+
+- [ ] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget.
+- [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice. A pass on every applicable floor goes to the result store and the full run; a fail is recorded in ADR 0004 History.
+- [ ] Result store and reuse ([classification results](../design/classification-results.md)): request key, `results/<key>.json`, index, reuse before submission, retry count per key; prompt prefix first for caching.
+- [ ] OpenAI Batch provider on `/v1/responses` and `gpt-6.2-astra` trial on the seeded 300; Anthropic adjudication of the multi-family and post-2023 sets before they gate an OpenAI classifier.
+

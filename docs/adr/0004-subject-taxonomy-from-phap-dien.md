@@ -88,3 +88,11 @@ classifier. Hard-cut subject filtering.
   split-half check gave the same result in both directions. Level 2 comes from
   seeds and overrides only, as the design already allows, until a classifier
   passes the floors with real coverage.
+- 2026-11-22: the LLM layer reopens with the newest models of both providers.
+  The pilot used the cheapest models to stay inside a 150 USD cap, and Opus was
+  never tried; the owner lifted the cap. Classification is a one-time backfill
+  plus a few new documents a day, so quality outweighs price, provided no paid
+  result is computed twice: every result is stored by request key and reused,
+  and calls stay in the corpus write path
+  ([classification results](../design/classification-results.md)). The floors
+  are unchanged.

@@ -95,9 +95,11 @@ under the corpus rules.
    the union. Any other case (no such article, an empty or different heading)
    inherits nothing, goes to the LLM layer and is counted. No LLM is involved.
 3. LLM in batches over public legal text, after `chunk` and `embed` have run,
-   for articles that hold no seed or inherited node and are not fragments (see
-   the evaluation gate); a fragment has no subject of its own, so it keeps seeds
-   and inheritance only:
+   with results stored and reused as
+   [classification results](classification-results.md) says, for articles that
+   hold no seed or inherited node and are not fragments (see the evaluation
+   gate); a fragment has no subject of its own, so it keeps seeds and
+   inheritance only:
    - One request per document (title, scope article, table of contents, VBPL
      field) chooses from a menu of active level-2 nodes, each shown as
      `<level-1 name> > <level-2 name>`; a level-2 node with no provisions and no
