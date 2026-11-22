@@ -25,7 +25,7 @@ A reviewer never runs on the author's model. Astra and Fable never write code. T
 3. Brief one implementer per bounded task with exact owned paths. Failing test first, then the smallest fix. Adversarial cases for hostile input, authorization, races and bounds belong to the author.
 4. The primary runs `make pre-push` and the checks the brief names, inspects the diff and report, then dispatches the independent reviewer once after the last code task. One-line and test-only changes skip review.
 5. Return findings to the author; the same reviewer confirms the fixes.
-6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head. The owner merges with a signed merge; delete merged branches. A change only to agent setup or working process (`.claude/`, AGENTS.md, CLAUDE.md, `instructions/`) needs no independent review: the primary merges it after `make pre-push` with `gh pr merge --admin`, which the repository admin role may bypass on the `main` ruleset.
+6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head; the primary then merges (feature PRs without `--admin`) and deletes the branch. A change only to agent setup or working process (`.claude/`, AGENTS.md, CLAUDE.md, `instructions/`) needs no independent review: the primary merges it after `make pre-push` with `gh pr merge --admin`, which the repository admin role may bypass on the `main` ruleset.
 7. When CI fails, the primary saves the failing job logs to the scratchpad and briefs `implementer` with them. Two red runs from the same cause means stop and repair the process.
 
 ## Reviews
