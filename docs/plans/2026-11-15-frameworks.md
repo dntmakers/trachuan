@@ -14,23 +14,23 @@
 
 ## 15.2 Registry and free frameworks (corpus; dev)
 - [x] `sources/frameworks.yaml` with validation (hashes, access, licence kind and URL for `free`), seeded from compliary's registry; `FRAMEWORKS_SOURCE_DIR` reader that refuses unknown hashes.
-- [ ] Release schema `frameworks` version 1 in `internal/corpusdb`; stages for the kind; structured parsers first: NIST SP 800-53 r5 (OSCAL), NIST CSF 2.0 and CIS Controls v8.1 (XLSX), each with an exact control-count check.
-- [ ] Mapping edges from catalogs, NIST OLIR and CIS workbooks, by business key, unresolved targets counted.
-- [ ] Body and public-field indexes; dense recipe of the law corpus; golden cases re-adjudicated; first measured run; floors written into frameworks.md.
+- [x] Release schema `frameworks` version 1 in `internal/corpusdb`; stages for the kind; structured parsers first: NIST SP 800-53 r5 (OSCAL), NIST CSF 2.0 and CIS Controls v8.1 (XLSX), each with an exact control-count check. Landed in #316, #318, #320 and #325; CIS v8.1 is out of releases until the licence review (#398, `parser: ''`).
+- [x] Mapping edges from catalogs, NIST OLIR and CIS workbooks, by business key, unresolved targets counted. Landed in #321.
+- [x] Body and public-field indexes; dense recipe of the law corpus; golden cases re-adjudicated; first measured run; floors written into frameworks.md. Landed in #326, #336, #375, #396, #399 and #401; public floors are in `sources/frameworks-floors.yaml` (frameworks-evaluation.md), licensed floors in the private source directory.
 
 ## 15.3 Licensed frameworks and scans (corpus; dev)
 - [ ] PDF text parsers with count checks: PCI DSS v4.0.1, ISO/IEC 27001:2022 with Amd 1, 27002:2022, 27017:2015, 27018:2019, AICPA criteria, COBIT 2019, CSA CCM v4.1 (XLSX), TCVN 11930:2017.
 - [ ] OCR path for `tcvn-14423-2025.pdf`: record both providers' data-use terms in the registry first (else gap `ocr_blocked`); Vision OCR, cross-check, flags; waivers in a file under `FRAMEWORKS_SOURCE_DIR`, never in `sources/`; compare with compliary's text file when reviewing flags; report cost before running.
-- [ ] Paraphrased titles imported from compliary's `control_title.csv`, coverage test.
+- [ ] Paraphrased titles imported from compliary's `control_title.csv`, coverage test. Partial: build reads `trachuan/titles.csv` with gap `title_missing` (#325); missing the importer from `control_title.csv` and the coverage test (frameworks-build.md).
 
 ## 15.4 Serving (server and web; dev2)
 - [x] `docs/design/frameworks-results.md`: field-level input and output contract under the fixed rules of frameworks.md "Serving"; reviewed by `gpt-6-astra` in three rounds (A-01 to A-07, S-01 to S-09) and a ranking confirmation (S-10, S-11); accepted 2026-11-15.
-- [ ] Engine for the kind: authorization before candidate selection, body index per version and public-field index with isolated statistics, exact dense scan, caches partitioned by release and access set, `no-store` responses; `corpus: "frameworks"` on `corpus_status`, `search`, `read`, `quality_gaps`; new tool `mappings`; guide text; reduced records.
-- [ ] Invariant suite with synthetic frameworks: changing inaccessible text changes nothing observable (hits, order, scores, abstention, counts, cursors) for reduced and mixed access sets, across cache hits and pagination; it gates signing.
-- [ ] `/api/v1/frameworks` routes, OpenAPI, website pages and the corpus switch on search; responsive sweep covers them.
+- [x] Engine for the kind: authorization before candidate selection, body index per version and public-field index with isolated statistics, exact dense scan, caches partitioned by release and access set, `no-store` responses; `corpus: "frameworks"` on `corpus_status`, `search`, `read`, `quality_gaps`; new tool `mappings`; guide text; reduced records. Landed in #341, #345, #363, #396 and #400.
+- [x] Invariant suite with synthetic frameworks: changing inaccessible text changes nothing observable (hits, order, scores, abstention, counts, cursors) for reduced and mixed access sets, across cache hits and pagination; it gates signing. Landed in #341, #345 and #399; signing refuses a report without `quality_pass` (#434).
+- [x] `/api/v1/frameworks` routes, OpenAPI, website pages and the corpus switch on search; responsive sweep covers them. Landed in #366, #382, #428 and #430.
 
 ## 15.5 Release (deploy; dev, primary)
-- [ ] Corpus kind in release identity: manifest `corpus_kind`, per-kind sequence history, pointer, journal and retired list on the host, first-release bootstrap with `previous: null`, release-check per kind, image then release floor then first release; signing job persists nothing; memory measured with both corpora active; runbook.
+- [ ] Corpus kind in release identity: manifest `corpus_kind`, per-kind sequence history, pointer, journal and retired list on the host, first-release bootstrap with `previous: null`, release-check per kind, image then release floor then first release; signing job persists nothing; memory measured with both corpora active; runbook. Partial: manifest, per-kind pointer and journal, bootstrap, release-check and signing landed (#402, #403, #407, #412, #414, #434); missing the `frameworks` block in `deploy/host/deploy-policy.json` (image B), the first release, memory with both corpora active and a frameworks release runbook.
 - [ ] Owner entitlement created on the host; feature flag on; acceptance with an entitled and a non-entitled account.
 
 ## 15.6 Downstream contract (corpus and server; dev, dev2)
