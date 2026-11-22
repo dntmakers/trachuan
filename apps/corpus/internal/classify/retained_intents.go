@@ -55,6 +55,16 @@ func readRetainedFile(path string, value any) error {
 	if err = json.Unmarshal(b, value); err != nil {
 		return fmt.Errorf("decode classification record %s: %w", path, err)
 	}
+	if s, ok := value.(*Submission); ok {
+		var fields map[string]json.RawMessage
+		if err = json.Unmarshal(b, &fields); err != nil {
+			return fmt.Errorf("decode classification record %s: %w", path, err)
+		}
+		_, pricePresent := fields["price_version"]
+		if err = validateLegacyItems(fields["items"], *s, pricePresent); err != nil {
+			return fmt.Errorf("decode classification record %s: %w", path, err)
+		}
+	}
 	return nil
 }
 

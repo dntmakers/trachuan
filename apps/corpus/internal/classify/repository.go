@@ -116,6 +116,9 @@ func (p *PGRepository) List(ctx context.Context) ([]Submission, error) {
 				return nil, fmt.Errorf("decode submission ledger: %w", err)
 			}
 		}
+		if err = validateLegacyItems(v.ItemList, s, v.PriceVersion != nil); err != nil {
+			return nil, fmt.Errorf("decode submission ledger: %w", err)
+		}
 		if s.ItemsHash != itemsHash(s.Items) {
 			return nil, fmt.Errorf("submission ordered item hash mismatch")
 		}
