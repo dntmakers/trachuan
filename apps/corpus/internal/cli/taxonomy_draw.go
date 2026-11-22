@@ -25,6 +25,9 @@ func runTaxonomyDraw(ctx context.Context, args []string, stderr io.Writer) int {
 	return runTaxonomyDrawWith(ctx, args, stderr, loadDrawEvidence)
 }
 func runTaxonomyDrawWith(ctx context.Context, args []string, stderr io.Writer, load func(context.Context, string, string) (drawEvidence, error)) int {
+	return runTaxonomyDrawWithSource(ctx, args, stderr, load, taxonomy.ReadFrozenSource)
+}
+func runTaxonomyDrawWithSource(ctx context.Context, args []string, stderr io.Writer, load func(context.Context, string, string) (drawEvidence, error), read func(string, string, string, string) (taxonomy.FrozenLabels, error)) int {
 	fail := func(code int, err error) int { _, _ = fmt.Fprintln(stderr, err); return code }
 	if len(args) < 2 {
 		return fail(2, fmt.Errorf("usage: corpus taxonomy draw <cc> <rel> --slice SLICE --seed N --out FILE [--families FILE] [--exclude FILE]"))
@@ -32,9 +35,36 @@ func runTaxonomyDrawWith(ctx context.Context, args []string, stderr io.Writer, l
 	if _, err := build.DatabaseName(args[0], args[1]); err != nil {
 		return fail(2, err)
 	}
-	opts, err := options(args[2:], map[string]bool{"--slice": true, "--seed": true, "--out": true, "--families": true, "--exclude": true})
+	opts, err := options(args[2:], map[string]bool{"--slice": true, "--seed": true, "--out": true, "--families": true, "--exclude": true, "--from-frozen": true})
 	if err != nil {
 		return fail(2, err)
+	}
+	if path, provided := opts["--from-frozen"]; provided {
+		_, seedProvided := opts["--seed"]
+		_, familiesProvided := opts["--families"]
+		_, excludeProvided := opts["--exclude"]
+		if path == "" || opts["--out"] == "" || seedProvided || familiesProvided || excludeProvided || (opts["--slice"] != "multi-family" && opts["--slice"] != "post-2023") {
+			return fail(2, fmt.Errorf("invalid frozen draw options"))
+		}
+		source, readErr := read(path, opts["--slice"], args[0], args[1])
+		if readErr != nil {
+			return fail(1, readErr)
+		}
+		e, loadErr := load(ctx, args[0], args[1])
+		if loadErr != nil {
+			return fail(1, loadErr)
+		}
+		if e.manualCount != 0 {
+			return fail(1, fmt.Errorf("release has %d manual taxonomy assignments", e.manualCount))
+		}
+		packet, packetErr := taxonomy.PacketFromFrozen(source, e.articles, e.tree, opts["--slice"])
+		if packetErr != nil {
+			return fail(1, packetErr)
+		}
+		if writeErr := writeTaxonomyJSON(opts["--out"], packet); writeErr != nil {
+			return fail(1, writeErr)
+		}
+		return 0
 	}
 	if opts["--out"] == "" || opts["--seed"] == "" || (opts["--slice"] != "multi-family" && opts["--slice"] != "post-2023" && opts["--slice"] != "inheritance") {
 		return fail(2, fmt.Errorf("--slice, --seed and --out are required"))

@@ -54,6 +54,8 @@ type FrozenLabels struct {
 	Seed             int64          `json:"seed"`
 	DrawRule         string         `json:"draw_rule"`
 	Labeler          string         `json:"labeler"`
+	Provider         string         `json:"provider,omitempty"`
+	SourceListSHA256 string         `json:"source_list_sha256,omitempty"`
 	Articles         []LabelArticle `json:"articles"`
 }
 
