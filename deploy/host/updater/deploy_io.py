@@ -81,6 +81,10 @@ class Lock:
         self.file.close()
 
 
+class StopRequested(Exception):
+    pass
+
+
 class CommandError(Exception):
     def __init__(self, message, reason='failed', returncode=None, detail=None, code=None, safe=None):
         super().__init__(message)
@@ -166,7 +170,7 @@ def bounded_output(process, limit, timeout, input=None):
                 raise subprocess.TimeoutExpired('host command', timeout)
             ready = selector.select(remaining)
             if not ready:
-                raise subprocess.TimeoutExpired('host command', timeout)
+                continue
             for key, _ in ready:
                 if key.data == 'input':
                     try:
@@ -224,6 +228,9 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
                     pass
                 process.communicate()
                 raise
+    except subprocess.TimeoutExpired as error:
+        raise CommandError('command timed out', reason='timeout',
+                           detail=Path(args[0]).name + ': timeout') from error
     except (OSError, subprocess.SubprocessError) as error:
         raise CommandError('command failed') from error
     if len(output) > 16 * 1024 * 1024:
@@ -234,7 +241,7 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
 def interrupted(error):
     seen = set()
     while error is not None and id(error) not in seen:
-        if isinstance(error, InterruptedError):
+        if isinstance(error, (InterruptedError, StopRequested)):
             return True
         seen.add(id(error))
         error = error.__cause__ or error.__context__

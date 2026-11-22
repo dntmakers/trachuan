@@ -9,7 +9,7 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import atomic, Busy, command, CommandError, Lock, remove, Result
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, Lock, remove, Result
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
 from .deploy_secrets_state import raw_pending, SecretsState
@@ -185,7 +185,7 @@ class Updater:
                 status = activator.recover()
                 if status == 'stopped':
                     recovery_message = activator.recovery_message
-            except (OSError, ValueError, CommandError, InterruptedError):
+            except (OSError, ValueError, CommandError, InterruptedError, StopRequested):
                 status = 'failed'
         if isinstance(error, ValueError):
             reason = str(error)
@@ -238,7 +238,7 @@ class Updater:
                             return 1
                         failed = True
             return int(failed or self.secrets_failed)
-        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError) as error:
+        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
             return self.failure(result, state, error)
 
     def bootstrap(self, hash_value, release_floor=None):
@@ -275,7 +275,7 @@ class Updater:
                         self.runner(['systemctl', 'enable', '--now', 'trachuan-deploy.timer'])
                         result.write('bootstrapped', 'complete', 'bootstrap verified; mode verify', hash_value, candidate.manifest)
                         return 0
-                except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError) as error:
+                except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
                     return self.failure(result, None, error)
         except Busy:
             return 1

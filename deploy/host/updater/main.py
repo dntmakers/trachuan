@@ -11,12 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from updater.deploy_run import Updater
 from updater.deploy_store import Paths
-from updater.deploy_io import Busy, Lock, Result
+from updater.deploy_io import Busy, Lock, Result, StopRequested
 from updater.deploy_state import State
 
 
 def interrupted(signum, frame):
-    raise InterruptedError('updater interrupted')
+    raise StopRequested('updater interrupted')
 
 
 def trusted(path, mode):

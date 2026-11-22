@@ -192,6 +192,12 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         self.assertEqual(State(self.state.path).data['active'], self.new.hash)
         self.assertFalse(any('deploy_vault.py' in ' '.join(args) for args, _, _ in self.secret_calls))
 
+class SecretsStopTest(fixture.SecretsFixture, unittest.TestCase):
+    def test_forced_reconcile_propagates_interruption(self):
+        with mock.patch.object(self.reconcile, 'fetch', side_effect=InterruptedError('stop')):
+            with self.assertRaises(InterruptedError):
+                self.reconcile.run(force=True)
+
 
 if __name__ == '__main__':
     unittest.main()
