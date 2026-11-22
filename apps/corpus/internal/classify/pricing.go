@@ -31,9 +31,13 @@ const (
 func openAIPriceForModel(model string) (openAIPriceRow, bool) {
 	switch model {
 	case "gpt-6.2-sol":
-		return openAIPriceRow{1000, 50, 1250, 2500, 5000}, true
+		return openAIPriceRow{2000, 100, 2500, 5000, 10000}, true
 	case "gpt-6.2-astra":
-		return openAIPriceRow{4000, 200, 5000, 10000, 20000}, true
+		return openAIPriceRow{8000, 400, 10000, 20000, 40000}, true
+	case "gpt-6.1-terra":
+		return openAIPriceRow{1000, 50, 1250, 2500, 5000}, true
+	case "gpt-6-luna":
+		return openAIPriceRow{100, 10, 125, 250, 500}, true
 	default:
 		return openAIPriceRow{}, false
 	}

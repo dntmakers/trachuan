@@ -8,7 +8,7 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/batchapi"
 )
 
-const openAIPriceUnit int64 = 1000
+const openAIPriceUnit int64 = 2000
 
 func openAIPrice(model, version string, input, bound, output int64) (openAIPriceRow, error) {
 	p, ok := openAIPriceForModel(model)

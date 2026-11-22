@@ -34,7 +34,7 @@ func openAIRecipe(r Recipe) (Recipe, error) {
 	if err := r.Validate(); err != nil {
 		return Recipe{}, fmt.Errorf("invalid OpenAI recipe: %w", err)
 	}
-	if r.Model != "gpt-6.2-sol" && r.Model != "gpt-6.2-astra" {
+	if r.Model != "gpt-6.2-sol" && r.Model != "gpt-6.2-astra" && r.Model != "gpt-6.1-terra" && r.Model != "gpt-6-luna" {
 		return Recipe{}, fmt.Errorf("unsupported OpenAI model")
 	}
 	if r.Effort != "low" && r.Effort != "medium" && r.Effort != "high" && r.Effort != "xhigh" && r.Effort != "max" {

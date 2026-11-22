@@ -10,10 +10,21 @@ import (
 )
 
 func VerifyScoreLabels(recipe Recipe, data []byte) (string, error) {
-	if _, ok := priceForModel(recipe.Model); !ok || !strings.HasPrefix(recipe.Model, "claude-") {
+	provider := recipe.Provider
+	switch provider {
+	case "", "anthropic":
+		if _, ok := priceForModel(recipe.Model); !ok || !strings.HasPrefix(recipe.Model, "claude-") {
+			return "", fmt.Errorf("unknown classifier provider")
+		}
+		provider = "anthropic"
+	case "openai":
+		if _, ok := openAIPriceForModel(recipe.Model); !ok {
+			return "", fmt.Errorf("unknown classifier provider")
+		}
+	default:
 		return "", fmt.Errorf("unknown classifier provider")
 	}
-	slice, _, _, err := taxonomy.VerifyScoringInput("anthropic", data)
+	slice, _, _, err := taxonomy.VerifyScoringInput(provider, data)
 	return slice, err
 }
 
