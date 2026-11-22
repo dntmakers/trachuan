@@ -58,11 +58,12 @@
 
 ### 8.6 Newest models (reopened 2026-11-22)
 
-Order: no new paid call runs before the result store lands, whatever its outcome.
+Order: wait for the result-store follow-up and OpenAI provider to land, and freeze both independent references before the paid trials. The budget paragraph above names Anthropic's budgets only.
 
-- [x] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget (migration for the submission checks).
-- [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
-- [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
-- [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
-- [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a trial of the newest Astra model on every slice.
-- [ ] Full run with the model chosen by classification-results.md "Providers and models", under the `full` budget set as above.
+- [x] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the Anthropic `trial` budget (migration for the submission checks).
+- [ ] Land the result-store follow-up: complete listing evidence, exact-name provider evidence, account fingerprint and cache-ordered prompts ([classification results](../design/classification-results.md)).
+- [ ] Add the [OpenAI adapter](../design/classification-openai.md) and per-provider admission. Verify project scope and count parity, Batch output and error shapes, and cache usage before starting the full trial population.
+- [x] Decided by the primary under the owner's standing approval (2026-11-22): cap OpenAI at `openai-trial` 40 USD and `openai-full` 175 USD, both cumulative on the OpenAI ledger, leaving about 25 USD of the reported credit outside the cap. Keep Anthropic `trial` at 200 USD on its own ledger and `full` as above. Verify usable provider credit before spending; a cap is not a credit balance.
+- [x] Decided by the primary: use the [blind Claude agent session](../design/taxonomy.md#evaluation-gate) for the frozen multi-family and post-2023 lists, not a paid adjudication command.
+- [ ] Run `claude-fable-5-2` under Anthropic `trial` and `gpt-6.2-astra` under `openai-trial` in parallel. Use the same frozen article lists, document-then-article stages and level-2 scope. Score every applicable slice against the other provider's labels where adjudicated. Dry-run each ledger; split and settle batches if reserves limit admission. Record both outcomes in ADR 0004 History whether they pass or fail.
+- [ ] Pick the winner by [Providers and models](../design/classification-results.md#providers-and-models). Estimate its remaining cost from the trial cost per article, with 25 percent headroom. Check the approved full cap against the winner's ledger plus that estimate and verify the provider credit covers the remaining spend and unresolved reserves. Owner approval: if either check fails, pause for funding or an approved cap change rather than switching models. If no model passes, publish no LLM assignments.

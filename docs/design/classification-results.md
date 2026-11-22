@@ -101,18 +101,17 @@ the moment `create` returns it, each result line as it is decoded, a partial
 download up to its last complete line. A later error changes state only, never
 what was written.
 
-Token counts are free and carry no money, so they are kept apart from intents:
-`counts/<key>.json` is written once when the count arrives, including in dry
-runs, needs no intent, and never touches the ledger, locks or reserves. Reserves
-and replay read it; a new count that disagrees with the stored one for the same
-key is an error.
+Store only unbilled token counts apart from intents: `counts/<key>.json` is
+written once when the count arrives, including in dry runs, needs no intent, and
+never touches the ledger, locks or reserves. Reserves and replay read it; a new
+count that disagrees with the stored one for the same key is an error.
 
-One verification of the whole store gates both rebuild and every admission, and
-one path settles: a submission settles only from a stored download of its
-receipted batch that ended complete, in which every line carries a known
-`custom_id` of that submission and priced usage; the `.settled` file names that
-download and its hash. Attempts recovered from a partial download can be
-replayed but never settle a submission, and a lost download never promotes them.
+One verification of the whole store gates both rebuild and every admission. A
+receipted batch settles only from a complete stored results capture with priced
+outcomes, or from explicit zero-work validation evidence. The `.settled` file
+names the stored evidence and its hash. Attempts recovered from a partial
+download can be replayed but never settle a submission, and a lost download
+never promotes them.
 
 ## Key locks and admission
 
@@ -121,34 +120,37 @@ any submission carrying it is unsettled, in any run or release. The lock check,
 the admission check and the `preparing` row are one transaction under the ledger
 lock, so two runs cannot submit the same key.
 
-The ledger is the sum of settled costs plus unsettled reserves. A reserve prices
-every input token at the highest input-side rate the price table lists for the
-model (the cache-write rate when it exceeds the input rate) and every request's
-maximum output tokens at the output rate. The ledger plus this batch's reserve
-must fit the named budget, or the batch is not submitted. The plan sets budget
-names and amounts; code accepts only those pairs and records them on the
-submission. Each key comes from its file under `~/.config`, is passed per
-command and is never printed.
+Each provider has a ledger of settled costs plus unsettled reserves across all
+its runs, releases and budget names. Admission checks only the ledger of the
+provider being submitted to. A reserve prices every input token at the highest
+input rate allowed by the recipe and every request's maximum output at its
+output rate. The provider ledger plus this batch's reserve must fit its named
+budget. The plan sets the allowed `(provider, name, amount)` tuples; record that
+tuple in the intent and reject other tuples before admission. A budget change
+does not reset a ledger, and no provider can draw on another's budget.
+
+Rebuild reproduces both ledgers from retained evidence. Existing intents,
+counts, price versions and charges belong to Anthropic under their existing
+format. Treat a missing provider as Anthropic only in that historical format; do
+not rewrite request keys, recipe hashes or immutable files, or lose pilot
+charges. New records identify their provider; the provider on a recipe, intent,
+price row and evidence must agree. Each key comes from its file under
+`~/.config`, is passed per command and is never printed.
 
 ## Caching
 
 Requests put the stable part first (instructions, then the menu or subtrees) and
 the document after it. Anthropic requests mark the prefix with `cache_control`
 ([prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
-OpenAI caches prefixes automatically
-([prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)).
-Batch cache hits are best effort, so the reserve never assumes one.
+[OpenAI classification](classification-openai.md#cache-and-price) defines the
+OpenAI breakpoint and token kinds. Batch cache hits are best effort, so the
+reserve never assumes one.
 
 ## Providers and models
 
 The recipe names a provider: Anthropic Message Batches
 ([batch processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing))
-or OpenAI Batch on `/v1/responses`
-([batch guide](https://developers.openai.com/api/docs/guides/batch)) with
-structured outputs and the recipe effort as reasoning effort (`none` is not
-allowed). OpenAI output order is not input order, so results match on
-`custom_id`, merged from the output and error files; both expire after 30 days
-by default, so they are downloaded and recorded as soon as the batch ends.
+or [OpenAI Batch on `/v1/responses`](classification-openai.md).
 
 One price table in code lists every allowed model with its Batch rates per token
 kind, its version and source page
@@ -162,3 +164,8 @@ the highest level-2 top-1 precision on the seeded non-fragment slice, then the
 highest level-2 recall on that slice, then the lowest price. Precision comes
 first because a wrong subject misleads an agent more than a missing one. The
 seeded slice comes from the package, so it ranks models of both providers alike.
+Use stored cost per scored article on the common trial population for the price
+tiebreaker, including reused results at their original cost. If the winner's
+provider cannot cover the estimated full run, pause without publishing LLM
+assignments. Resume only after the provider's usable credit and the approved
+budget cover the run. Never switch provider or pick the runner-up silently.

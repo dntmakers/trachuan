@@ -277,18 +277,19 @@ counts as a miss in its slice, so the denominator never shrinks; when more than
 5 percent of a set's entries fail, the slice is unavailable until the set is
 re-adjudicated and frozen again. A redraw is a reviewed change, never automatic.
 
-A model-adjudicated set gates a classifier only when its labeling model comes
-from a different provider than the classifier; `corpus eval` reads the provider
-from the set file and refuses the slice otherwise, so with no independent set
-the slice is unavailable and the classifier fails it. A second, independent set
-for a slice keeps the first set's frozen article list (no new draw and no
-replacement) and is labeled blind under the same labeling rule. An article the
-second labeler leaves without any code goes to the coordinator, who labels it
-from its text under the same rule; the set is read like the first, frozen as
-`taxonomy-<slice>-<provider>.json`, and gates only when every article in the
-list has a label. Its labeling run is a paid corpus command under the plan's
-trial budget, with results kept as
-[classification results](classification-results.md) says.
+A model-adjudicated set gates a classifier only when its labeler uses a
+different provider. Scoring checks the provider in the frozen file; with no
+independent set, the slice is unavailable and the classifier fails it. For
+OpenAI, a blind Claude agent session (Fable, or Opus when Fable is unavailable)
+labels the frozen multi-family and post-2023 article lists under the same rule
+as the first labeler, without access to existing labels, seeds, inherited nodes
+or classifier output. This matches the first sets' agent-session method without
+a paid corpus call. Do not draw or replace an article. The coordinator reads the
+same sample sizes as for the first sets and labels any article the second
+labeler leaves blank, under the same rule. Freeze
+`taxonomy-<slice>-anthropic.json` only when every article has a label. The
+[packet and freeze commands](classification-openai.md#independent-evaluation-inputs)
+preserve the exact lists and text hashes.
 
 The report also lists assignment counts per node, unassigned counts, and the
 diff of node changes against the previous release. A failed floor blocks
