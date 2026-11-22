@@ -170,3 +170,50 @@ func TestTaxonomyDraw_RejectsMalformedExclusionFile(t *testing.T) {
 		t.Fatal("missing articles accepted")
 	}
 }
+
+func TestFrozenDrawRejectsConflictingOptions(t *testing.T) {
+	for _, flag := range []string{"--seed", "--families", "--exclude"} {
+		t.Run(flag, func(t *testing.T) {
+			var stderr bytes.Buffer
+			code := runTaxonomyDrawWith(context.Background(), []string{"vn", "20990101", "--slice", "post-2023", "--from-frozen", "file", flag, "", "--out", "out"}, &stderr, func(context.Context, string, string) (drawEvidence, error) {
+				t.Fatal("loaded database")
+				return drawEvidence{}, nil
+			})
+			if code != 2 {
+				t.Fatalf("got %d: %s", code, stderr.String())
+			}
+		})
+	}
+}
+
+func TestFrozenDrawPacket(t *testing.T) {
+	source := taxonomy.FrozenLabels{Country: "vn", Release: "20990101", DrawRule: "rule", LabelerFragments: 5, Articles: []taxonomy.LabelArticle{{Key: "b", Anchor: "2", OwnTextSHA256: taxonomy.OwnTextSHA256("second"), Codes: []string{"secret"}}, {Key: "a", Anchor: "1", OwnTextSHA256: taxonomy.OwnTextSHA256("first"), Codes: []string{"secret"}}}}
+	load := func(context.Context, string, string) (drawEvidence, error) {
+		return drawEvidence{articles: []taxonomy.DrawArticle{{PacketArticle: taxonomy.PacketArticle{Key: "a", Anchor: "1", Text: "first", Number: "n1", Title: "t1"}}, {PacketArticle: taxonomy.PacketArticle{Key: "b", Anchor: "2", Text: "second", Number: "n2", Title: "t2"}}}, tree: []taxonomy.PacketNode{{Code: "1", Name: "node"}}}, nil
+	}
+	read := func(path, slice, country, release string) (taxonomy.FrozenLabels, error) {
+		if path != "pinned" || slice != "post-2023" || country != "vn" || release != "20990101" {
+			t.Fatal("wrong source arguments")
+		}
+		return source, nil
+	}
+	path := t.TempDir() + "/packet.json"
+	var stderr bytes.Buffer
+	if code := runTaxonomyDrawWithSource(context.Background(), []string{"vn", "20990101", "--slice", "post-2023", "--from-frozen", "pinned", "--out", path}, &stderr, load, read); code != 0 {
+		t.Fatalf("%d %s", code, stderr.String())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte(`"codes"`)) || bytes.Contains(data, []byte(`"candidates"`)) || bytes.Contains(data, []byte("secret")) {
+		t.Fatalf("leaked labels: %s", data)
+	}
+	var got taxonomy.Packet
+	if err = json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Articles) != 2 || got.Articles[0].Key != "b" || got.Articles[0].Text != "second" || got.Articles[0].Number != "n2" || got.Articles[0].Title != "t2" || got.Articles[1].Key != "a" || got.LabelerFragments != 0 || got.LabelingRule != taxonomy.LabelingRule || len(got.Tree) != 1 {
+		t.Fatalf("packet: %+v", got)
+	}
+}
