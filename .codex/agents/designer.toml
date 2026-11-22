@@ -1,6 +1,6 @@
 name = "designer"
 description = "Writes trachuan design notes, ADRs, contract proposals and UI specs. No implementation or code review."
-model = "gpt-6-astra"
+model = "gpt-6.2-astra"
 model_reasoning_effort = "high"
 sandbox_mode = "workspace-write"
 developer_instructions = """

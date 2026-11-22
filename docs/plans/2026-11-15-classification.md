@@ -1,6 +1,6 @@
 # Classification Plan (Plan 8)
 
-> **For agentic workers:** Routes (`instructions/workflow.md`): every task that submits or prepares paid batches goes to Codex `implementer` with `--model gpt-6.1-sol`, reviewed by `reviewer` with `--model gpt-6-astra`; the design delta is written by the primary and reviewed by `gpt-6-astra`. Executor: trachuan-dev. Paid calls use `ANTHROPIC_API_KEY_DANNY` only, passed per command, never exported, never switched while a batch is in flight.
+> **For agentic workers:** Routes (`instructions/workflow.md`): every task that submits or prepares paid batches is hard: Sol implements, Astra reviews; the design delta is written by the primary and reviewed by Astra. Executor: trachuan-dev. Paid calls use `ANTHROPIC_API_KEY_DANNY` only, passed per command, never exported, never switched while a batch is in flight.
 
 **Goal:** every primary article in the release carries subject nodes: seeds from the 2023 codification package, then inheritance through consolidations, then an LLM layer in batches for the rest, gated by the floors in [taxonomy](../design/taxonomy.md#evaluation-gate).
 
@@ -35,7 +35,7 @@
 
 - [x] Labeled set from seeds: the 300 masked articles of taxonomy.md "Evaluation gate", drawn by `corpus taxonomy labels` from vn/20261115_3 (seed 1, 197 documents), frozen as `taxonomy-labels.json`.
 - [x] Candidate selection: embedding and lexical candidates measured on the masked set fell far short of 0.95 (ADR 0004 History); taxonomy.md now limits each article to the subtrees of its document request's level-2 families and gates family recall at 0.95.
-- [ ] Model-adjudicated sets (no Anthropic calls; Codex gpt-6-astra labels blind): inheritance (100 inherited consolidated articles) now; multi-family (100 unseeded articles, half from documents with a multi-topic document-level result) after the 8.4 screening pass, frozen before any multi-family scoring; post-2023 (100 articles). Multi-family and post-2023 frozen from vn/20261115_3 as taxonomy-multi-family.json and taxonomy-post-2023.json (gpt-6-astra, blind, under the labeling rule; the coordinator read 30 and then 20 items); inheritance unavailable (32 eligible). The coordinator reads 10 of multi-family and 20 of post-2023 before either gates.
+- [ ] Model-adjudicated sets (no Anthropic calls; Astra labels blind): inheritance (100 inherited consolidated articles) now; multi-family (100 unseeded articles, half from documents with a multi-topic document-level result) after the 8.4 screening pass, frozen before any multi-family scoring; post-2023 (100 articles). Multi-family and post-2023 frozen from vn/20261115_3 as taxonomy-multi-family.json and taxonomy-post-2023.json (gpt-6-astra, blind, under the labeling rule; the coordinator read 30 and then 20 items); inheritance unavailable (32 eligible). The coordinator reads 10 of multi-family and 20 of post-2023 before either gates.
 
 ### 8.3 Classify stage and batch submission
 
