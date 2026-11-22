@@ -67,6 +67,13 @@ class CorpusVerificationTest(unittest.TestCase):
                 with self.subTest(reason=reason), self.assertRaises(CommandError):
                     v.verify(path, self.rules, reject)
 
+    def test_compatibility_rejects_wrong_report_shapes(self):
+        report = description(self.m)
+        for bad in (None, {}, dict(report, running_query=None), dict(report, retrieval_recipes=[None]),
+                    dict(report, retrieval_recipes=[{'abstention': None}]), dict(report, schema_versions=None)):
+            with self.subTest(report=bad), self.assertRaises(ValueError):
+                v.compatible(self.m, bad)
+
     def test_schema_refuses_and_recipe_difference_waits(self):
         report = description(self.m)
         self.assertTrue(v.compatible(self.m, report))

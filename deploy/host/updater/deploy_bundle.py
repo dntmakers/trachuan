@@ -3,6 +3,7 @@ from pathlib import PurePosixPath
 import tarfile
 
 from .deploy_floor import bundle_floor, check_floor
+from .deploy_io import JSON_LIMIT
 
 
 def bundle(path, manifest):
@@ -40,6 +41,8 @@ def contents(path):
             if member.size < 0 or total > 64 * 1024 * 1024:
                 raise ValueError('bundle expanded size limit')
             name = '/'.join(parts[2:])
+            if name == 'deploy-policy.json' and member.size > JSON_LIMIT:
+                raise ValueError('policy too large')
             files[name] = archive.extractfile(member).read()
     if not {'install.sh', 'server.env', 'web.env', 'deploy-policy.json',
             'quadlet/trachuan-postgres.container'} <= files.keys():

@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import time
 
-from .deploy_io import atomic, canonical, read_json_bytes
+from .deploy_io import atomic, canonical, JSON_LIMIT, read_json_bytes
 
 
 VERSION = 1
@@ -156,6 +156,8 @@ class Record:
         self.data['alerts'] = self.recent(self.data['alerts'])
         validate(self.data, self.check)
         raw = canonical(self.data) + b'\n'
+        if len(raw) > JSON_LIMIT:
+            raise ValueError('activation record too large')
         if raw != self.written:
             atomic(self.path, raw)
             self.written = raw

@@ -216,10 +216,16 @@ applies to each filesystem, including retained releases.
 
 ## Updater input limits
 
-Every JSON document the updater reads from outside its own process (manifests,
-registry and attestation output, host state, results, journals) is parsed by
-`deploy_io.decode`, which turns a malformed or too deeply nested document into a
-recorded failure. Reads with no tighter bound stop at `JSON_LIMIT`, 1 MiB, in
-`deploy/host/updater/deploy_io.py`. Release SQL output and secret inspection
-keep 4 MiB, signature bundles 2 MiB, and a whole decompressed host bundle 64
-MiB.
+The updater bounds JSON read from outside its own process, including manifests,
+registry and attestation output, host state, results and journals.
+`deploy_io.decode` turns malformed or too deeply nested JSON into a typed
+failure. The activation record parser also rejects duplicate keys; the
+attestation envelope parser accepts concatenated JSON. Reads with no tighter
+bound stop at `JSON_LIMIT`, 1 MiB, in `deploy/host/updater/deploy_io.py`. Host
+state uses `STATE_LIMIT`, 16 MiB, for both reads and writes in
+`deploy/host/updater/deploy_state.py`. Registry tag output uses
+`TAG_LIST_LIMIT`, 7,721,024 bytes, in `deploy/host/updater/deploy_registry.py`,
+enough for 10,000 escaped tags of 128 characters. Release SQL output and secret
+inspection keep 4 MiB, signature bundles 2 MiB, and a whole decompressed host
+bundle 64 MiB. The host-bundle policy file keeps the same 1 MiB limit during
+verification and installation.

@@ -70,9 +70,11 @@ class Database:
 
     def catalog(self, locked=True):
         value = decode(self.query(CATALOG) if locked else self.unlocked(CATALOG), 'database catalog')
-        if not isinstance(value, dict):
+        if not isinstance(value, dict) or any(
+                not isinstance(item, dict) or type(item.get('oid')) is not int or item['oid'] < 1
+                or not isinstance(item.get('owner'), str) for item in value.values()):
             raise ValueError('invalid database catalog')
-        return {name: dict(oid=int(item['oid']), owner=item['owner']) for name, item in value.items()}
+        return {name: dict(oid=item['oid'], owner=item['owner']) for name, item in value.items()}
 
     def remember_target(self, row):
         name = self.target(row['database_name'])

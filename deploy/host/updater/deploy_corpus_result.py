@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from .deploy_io import Result, atomic, canonical
+from .deploy_io import Result
 
 
 class ReleaseResult(Result):
@@ -27,6 +27,5 @@ class ReleaseResult(Result):
                      integrity=self.integrity(),
                      last_success_at=finished if status in ('ok', 'verified', 'current')
                      else self.previous.get('last_success_at'))
-        atomic(self.path, canonical(value) + b'\n', 0o640)
-        self.append(value)
+        self.publish(value)
         self.previous = value

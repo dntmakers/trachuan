@@ -87,6 +87,13 @@ class LawFixture(GuardAssertions):
             return b'f\n'
         return b''
 
+    def test_catalog_rejects_wrong_entry_shapes(self):
+        for value in ({'db': None}, {'db': []}, {'db': {'oid': 1, 'owner': None}},
+                      {'db': {'oid': None, 'owner': 'owner'}}):
+            with self.subTest(value=value), mock.patch.object(self.db, 'query', return_value=json.dumps(value)):
+                with self.assertRaises(ValueError):
+                    self.db.catalog()
+
     def row_paths(self, value):
         row = dict(self.row, database_name=value)
         return dict(validate=lambda: self.db.validate(row),

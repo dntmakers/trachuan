@@ -238,6 +238,14 @@ class ActivationTest(ActivationFixture, unittest.TestCase):
         self.assertEqual(self.state.data['journal']['baseline'], 7)
         self.assertEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
 
+    def test_prune_rejects_wrong_retained_manifest_shape(self):
+        path = self.store.directory / self.old.hash / 'manifest.json'
+        for value in (None, [], {'host_bundle': None}, {'host_bundle': {'sha256': []}}):
+            with self.subTest(value=value):
+                path.write_bytes(canonical(value))
+                with self.assertRaises(ValueError):
+                    self.store.prune(self.state)
+
     def test_retention_keeps_five_and_never_discards_sequence_bindings(self):
         for sequence in range(16, 23):
             candidate = self.candidate(sequence, str(sequence).encode())

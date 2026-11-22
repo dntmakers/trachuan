@@ -260,7 +260,10 @@ def pull_image(image, runner, user_prefix):
             runner(pull, timeout=600)
         raw = runner(inspect, stdout_limit=JSON_LIMIT)
     rows = decode(raw, 'image inspection')
-    if len(rows) != 1 or image not in rows[0].get('RepoDigests', []):
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+            or not isinstance(rows[0].get('RepoDigests'), list)
+            or not all(isinstance(item, str) for item in rows[0]['RepoDigests'])
+            or image not in rows[0]['RepoDigests']):
         raise ValueError('local digest mismatch')
 
 

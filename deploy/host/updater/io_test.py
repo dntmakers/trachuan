@@ -18,6 +18,29 @@ class IOTest(unittest.TestCase):
             self.assertEqual(path.read_bytes(), b'previous')
             self.assertEqual(list(Path(directory).iterdir()), [path])
 
+    def test_oversized_result_records_bounded_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            log = Path(directory) / 'deploy.log'
+            with self.assertRaisesRegex(ValueError, 'result too large'):
+                Result(path, log).write('ok', 'complete', 'x' * (1024 * 1024))
+            value = json.loads(path.read_bytes())
+            self.assertEqual((value['status'], value['step'], value['message']),
+                             ('failed', 'result', 'result too large'))
+            self.assertLessEqual(path.stat().st_size, 1024 * 1024)
+
+    def test_corrupt_previous_result_is_logged_without_blocking_new_result(self):
+        for raw in (b'{', b' ' * (1024 * 1024 + 1)):
+            with self.subTest(size=len(raw)), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'result.json'
+                log = Path(directory) / 'deploy.log'
+                path.write_bytes(raw)
+                Result(path, log).write('failed', 'manifest', 'rejected')
+                self.assertEqual(json.loads(path.read_bytes())['status'], 'failed')
+                events = [json.loads(line) for line in log.read_bytes().splitlines()]
+                self.assertTrue(any(event.get('level') == 'warning' and
+                                    event.get('message') == 'previous result unreadable' for event in events))
+
     def test_decode_wraps_recursion_error(self):
         with mock.patch('updater.deploy_io.json.loads', side_effect=RecursionError):
             with self.assertRaisesRegex(ValueError, 'invalid manifest JSON'):

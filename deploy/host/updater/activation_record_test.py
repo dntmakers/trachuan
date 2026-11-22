@@ -5,6 +5,9 @@ import stat
 import tempfile
 import unittest
 
+from unittest import mock
+
+from updater import deploy_activation_record as record_module
 from updater import deploy_corpus_sql as law
 from updater import deploy_frameworks_sql as frameworks
 from updater.deploy_activation_record import ALERTS, Record, STEPS, Unreadable, parse, stamp
@@ -35,6 +38,17 @@ class RecordFixture(unittest.TestCase):
 
 
 class RecordFileTest(RecordFixture):
+    def test_oversized_record_save_preserves_previous(self):
+        self.record.data = sample()
+        self.record.save()
+        previous = self.path.read_bytes()
+        self.record.data['retired'].append(dict(database='corpus_vn_20990104', oid=2,
+                                                dump_sha256=DUMP, retired_at='2026-11-18T01:00:00Z'))
+        with mock.patch.object(record_module, 'JSON_LIMIT', len(previous), create=True):
+            with self.assertRaisesRegex(ValueError, 'activation record too large'):
+                self.record.save()
+        self.assertEqual(self.path.read_bytes(), previous)
+
     def test_save_is_canonical_root_only_and_atomic(self):
         self.record.data = sample()
         self.record.save()

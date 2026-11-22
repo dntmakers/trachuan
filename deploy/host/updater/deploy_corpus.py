@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import hashlib
 import os
 from pathlib import Path
@@ -12,7 +12,7 @@ from .deploy_corpus_database import Database
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_result import ReleaseResult
 from .deploy_corpus_sql import JournalRefused, REFUSED, SUPERUSER_REFUSED
-from .deploy_io import atomic, canonical, CommandError, StopRequested, decode, interrupted, read_json_bytes
+from .deploy_io import atomic, canonical, CommandError, StopRequested, decode, interrupted, read_json_bytes, ResultTooLarge
 from .deploy_release_tables import PointerRefused
 from .deploy_release_target import Held, LockUnavailable, Waiting
 from .deploy_verify import match
@@ -232,7 +232,15 @@ class Corpus:
             return
         marker = self.host.paths.state / self.kind.marker
         day = datetime.fromtimestamp(self.clock(), timezone.utc).date().isoformat()
-        previous = decode(read_json_bytes(marker, 'marker'), 'marker') if marker.exists() else None
+        previous = None
+        if marker.exists():
+            previous = decode(read_json_bytes(marker, 'marker'), 'marker')
+            try:
+                valid = isinstance(previous, str) and date.fromisoformat(previous).isoformat() == previous
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError('invalid prune marker')
         if previous == day:
             return
         with self.db.lock():
@@ -372,6 +380,8 @@ class Corpus:
                 self.record.raise_alert('lock_unavailable')
             self.result.write('waiting', self.step, str(error), self.hash, self.manifest, self.mode)
             return True
+        except ResultTooLarge:
+            return False
         except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested, RecursionError) as error:
             self.interrupted = interrupted(error)
             reason = str(error) if isinstance(error, ValueError) else self.label + ' command failed or run interrupted'

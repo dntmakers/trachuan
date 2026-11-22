@@ -39,6 +39,23 @@ class RegistryTest(unittest.TestCase):
             return b''
         raise AssertionError(args)
 
+    def test_tag_limit_accepts_maximum_valid_tag_list(self):
+        payload = canonical({'tags': ['a' * 128] * 10000})
+        def read_tags(args, **kwargs):
+            self.assertGreaterEqual(kwargs['stdout_limit'], len(payload))
+            return payload
+        self.assertEqual(len(r.Registry(self.policy, read_tags).tags(self.policy['release_repository'])), 10000)
+
+    def test_wrong_registry_shapes_raise_value_error(self):
+        for artifact in (None, [], {'artifactType': 'application/vnd.trachuan.release.v1', 'layers': None},
+                         {'artifactType': 'application/vnd.trachuan.release.v1', 'layers': [None]},
+                         {'artifactType': 'application/vnd.trachuan.release.v1', 'layers': [{'annotations': None}]}):
+            with self.subTest(artifact=artifact), self.assertRaises(ValueError):
+                r.layers(artifact, 'release')
+        for payload in (b'[]', b'null', b'{"tags":{}}', b'{"tags":false}'):
+            with self.subTest(payload=payload), self.assertRaises(ValueError):
+                r.Registry(self.policy, lambda *args, **kwargs: payload).tags(self.policy['release_repository'])
+
     def test_registry_json_rejects_invalid_encoding_with_typed_failure(self):
         def invalid(*args, **kwargs):
             return b'\xff'

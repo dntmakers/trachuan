@@ -6,6 +6,8 @@ import unittest
 from unittest import mock
 
 from updater import deploy_run as r
+from updater import deploy_registry
+from updater import deploy_state
 from updater import activation_test as fixture
 from updater.activation_test import Crash
 from updater.deploy_io import canonical
@@ -36,6 +38,41 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         secret_phase = mock.patch('updater.deploy_run.Secrets.run', return_value=True)
         secret_phase.start()
         self.addCleanup(secret_phase.stop)
+
+    def test_status_rejects_wrong_result_shape(self):
+        self.paths.result.write_bytes(b'[]')
+        with self.assertRaisesRegex(ValueError, 'invalid result'):
+            self.app.status()
+
+    def test_oversized_success_receipt_stays_failed_through_handler(self):
+        with mock.patch('updater.deploy_io.JSON_LIMIT', 100):
+            self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result, {'status': 'failed', 'step': 'result', 'message': 'result too large'})
+
+    def test_oversized_failure_receipt_does_not_escape_failure_handler(self):
+        self.images.side_effect = ValueError('x' * (1024 * 1024))
+        self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
+
+    def test_bad_registry_shape_records_failure(self):
+        def registry_command(args, **kwargs):
+            return b'sha256:' + b'a' * 64 if 'resolve' in args else b'null'
+        self.app.registry = deploy_registry.Registry(self.rules, registry_command)
+        self.assertEqual(self.app.run(), 1)
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_state_size_failure_records_result_and_preserves_state(self):
+        previous = self.state.path.read_bytes()
+        manifest = dict(self.new.manifest, sequence=16)
+        (self.new.directory / 'manifest.json').write_bytes(canonical(manifest))
+        with mock.patch.object(deploy_state, 'STATE_LIMIT', len(previous), create=True):
+            self.assertEqual(self.app.run(), 1)
+        self.assertEqual(self.state.path.read_bytes(), previous)
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+        self.assertIn('state too large', json.loads(self.paths.result.read_bytes())['message'])
 
     def test_bad_manifest_records_failure(self):
         for data, message in ((b'[' * 100000 + b']' * 100000, 'invalid release'),

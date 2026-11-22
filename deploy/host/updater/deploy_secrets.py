@@ -6,7 +6,7 @@ import re
 import time
 from urllib.parse import quote
 
-from .deploy_io import CommandError, decode, Result, interrupted
+from .deploy_io import CommandError, decode, Result, interrupted, ResultTooLarge
 from .deploy_secrets_state import raw_pending, SecretsState
 
 
@@ -179,6 +179,10 @@ class Secrets:
             changed = self.reconcile(bundles)
             result.write('ok' if changed else 'current', 'secrets', 'Vault secrets reconciled')
             return True
+        except ResultTooLarge:
+            if self.data and self.data['pending']:
+                self.host.hold()
+            raise
         except (OSError, ValueError, TypeError, CommandError, InterruptedError) as error:
             if interrupted(error):
                 if self.data and self.data['pending']:

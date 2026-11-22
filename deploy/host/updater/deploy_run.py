@@ -8,10 +8,10 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, decode, interrupted, Lock, read_json_bytes, remove, Result, stop
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, decode, interrupted, Lock, read_json_bytes, remove, Result, stop, ResultTooLarge
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
-from .deploy_secrets_state import raw_pending, SecretsState
+from .deploy_secrets_state import SecretsState
 from .deploy_state import State
 from .deploy_store import Candidate, Paths, Store
 from .deploy_verify import match, policy, positive, Verifier, verify_manifest
@@ -57,7 +57,8 @@ class Updater:
         try:
             return bool(SecretsState(self.paths.state / 'secrets-state.json').data['pending'])
         except (OSError, ValueError):
-            return raw_pending(self.paths.state / 'secrets-state.json')
+            self.host.note('secrets', 'secret state unreadable; recovery withheld')
+            return True
 
     def secrets(self, state, directory, mode, result, force=False, candidate=None):
         self.step = 'secrets'
@@ -203,7 +204,13 @@ class Updater:
                 reason += '; caddy stopped'
             except (OSError, CommandError):
                 reason += '; caddy stop failed'
-        result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
+        if isinstance(error, ResultTooLarge):
+            result.publish(dict(status='failed', step='result', message='result too large'))
+            return 1
+        try:
+            result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
+        except ResultTooLarge:
+            pass
         return 1
 
     def run(self):
@@ -292,5 +299,9 @@ class Updater:
 
     def status(self):
         state = State(self.paths.state / 'state.json')
-        result = decode(read_json_bytes(self.paths.result, 'result'), 'result') if self.paths.result.exists() else None
+        result = None
+        if self.paths.result.exists():
+            result = decode(read_json_bytes(self.paths.result, 'result'), 'result')
+            if not isinstance(result, dict):
+                raise ValueError('invalid result')
         return dict(mode=self.mode(), active=state.data['active'], journal=state.data['journal'], result=result)
