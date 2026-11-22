@@ -75,3 +75,15 @@ func TestStep_RequiresSupportedChunkRepresentation(t *testing.T) {
 		require.False(t, validStep([]byte(raw), "chunk"))
 	}
 }
+
+func TestStep_ParseRecipeVersions(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		want    bool
+	}{{"1", true}, {"2", true}, {"3", false}} {
+		t.Run(tc.version, func(t *testing.T) {
+			raw := []byte(`{"name":"parse","version":` + tc.version + `,"parameters":{}}`)
+			require.Equal(t, tc.want, validStep(raw, "parse"))
+		})
+	}
+}
