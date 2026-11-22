@@ -50,6 +50,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [control frameworks: restore](frameworks-release-restore.md)                     | What a frameworks dump may do on the host, log settings, restore steps and smoke                                 |
 | [control frameworks: release](frameworks-release.md)                             | Bucket, upload, signing workflow, host phase, schema, key and flag, and order for frameworks releases            |
 | [control frameworks: build](frameworks-build.md)                                 | Offline build command: steps, artifacts, resume, gaps and signing evidence                                       |
+| [control frameworks: licensed parsers](frameworks-parsers.md)                    | PDF and workbook parsers, version profiles, title import and coverage                                            |
 | [account mail](account-mail.md)                                                  | Mail outbox: classes, sender, content                                                                            |
 | [web API](web-api.md)                                                            | Google login flow, web sessions, CSRF, `/api/v1` routes, OpenAPI contract                                        |
 | [OAuth](oauth.md)                                                                | MCP authorization server: clients, consent, codes, tokens, aboutme import gaps                                   |
