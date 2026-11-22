@@ -284,12 +284,16 @@ type RunMembershipEvidence struct {
 }
 
 type RunOcrSelection struct {
-	RunID      int64
-	ItemKey    string
-	Gap        string
-	PdfSha256  *string
-	OcrTextID  *int64
-	OcrCheckID *int64
+	RunID            int64
+	ItemKey          string
+	Gap              string
+	PdfSha256        *string
+	OcrTextID        *int64
+	OcrCheckID       *int64
+	SelectionVersion int32
+	SelectionState   *string
+	TextSource       *string
+	FetchSha256      *string
 }
 
 type RunScope struct {

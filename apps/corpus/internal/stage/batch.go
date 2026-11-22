@@ -18,7 +18,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// BatchInput identifies one batch of one stage.
 type BatchInput struct {
 	RunID      int64
 	Generation int
@@ -26,23 +25,19 @@ type BatchInput struct {
 	Batch      int
 }
 
-// BatchResult counts the batch's items by outcome.
 type BatchResult struct {
 	Done, Gap, Failed, Pending int
 	Cancelling                 bool
 }
 
-// BatchConfig bounds a batch run.
 type BatchConfig struct {
 	HeartbeatEvery   time.Duration
 	HeartbeatTimeout time.Duration
 	MaxAttempts      int
 }
 
-// ErrSuperseded reports that the run's generation moved past the caller's.
 var ErrSuperseded = errors.New("superseded")
 
-// RunBatch processes the pending items of one batch.
 func RunBatch(ctx context.Context, env Env, st Stage, in BatchInput, attempt int, cfg BatchConfig, heartbeat func(details ...any)) (BatchResult, error) {
 	ctx = sourcegate.WithActivity(ctx)
 	var result BatchResult
@@ -138,39 +133,39 @@ func RunBatch(ctx context.Context, env Env, st Stage, in BatchInput, attempt int
 					return result, fmt.Errorf("open artifact for %q: %w", item.Key, err)
 				}
 			}
+			var processErr error
 			if found && !acquired {
-				output = Output{Artifact: &art, State: "done"}
+				itemCtx := sourcegate.WithItem(sourcegate.WithRunID(ctx, in.RunID), item.Key)
+				output, processErr = reuseOpenedArtifact(itemCtx, env, st, run, item, art)
 			} else if !found {
 				itemCtx := sourcegate.WithItem(sourcegate.WithRunID(ctx, in.RunID), item.Key)
 				var telemetry *sourcegate.Telemetry
 				if in.Stage == "discover" || in.Stage == "expand" {
 					itemCtx, telemetry = sourcegate.WithTelemetry(itemCtx)
 				}
-				output, err = st.Process(itemCtx, env, run, item)
+				output, processErr = st.Process(itemCtx, env, run, item)
 				if telemetry != nil {
 					commit.Requests = telemetry.Records()
 				}
-				commit.SourceRead = err == nil
-				if err != nil {
-					// Only the activity's own context ends the batch; a timeout
-					// inside one item stays with that item.
-					if ctx.Err() != nil || errors.Is(err, ErrSuperseded) {
-						return result, err
-					}
-					var retryable *RetryableError
-					var pendingPause interface{ PausePending() bool }
-					pausePending := errors.As(err, &pendingPause) && pendingPause.PausePending()
-					if errors.As(err, &retryable) && retryBatch(retryable) && (!errors.Is(err, sourcegate.ErrSourcePaused) || pausePending) && (attempt < cfg.MaxAttempts || pausePending || retryable.Cause.Cause == CauseHTTP429) {
-						result.Pending++
-						last.Store(int64(i))
-						continue
-					}
-					sources := output.Sources
-					output = processFailure(err, retryable)
-					output.Sources = sources
-				} else if output.Artifact != nil {
-					fault.Hit("after_rename", i)
+				commit.SourceRead = processErr == nil
+			}
+			if processErr != nil {
+				if ctx.Err() != nil || errors.Is(processErr, ErrSuperseded) {
+					return result, processErr
 				}
+				var retryable *RetryableError
+				var pendingPause interface{ PausePending() bool }
+				pausePending := errors.As(processErr, &pendingPause) && pendingPause.PausePending()
+				if errors.As(processErr, &retryable) && retryBatch(retryable) && (!errors.Is(processErr, sourcegate.ErrSourcePaused) || pausePending) && (attempt < cfg.MaxAttempts || pausePending || retryable.Cause.Cause == CauseHTTP429) {
+					result.Pending++
+					last.Store(int64(i))
+					continue
+				}
+				sources := output.Sources
+				output = processFailure(processErr, retryable)
+				output.Sources = sources
+			} else if !found && output.Artifact != nil {
+				fault.Hit("after_rename", i)
 			}
 			commit.State, commit.Message, commit.Gaps, commit.Artifact, commit.Sources, commit.Observations = output.State, output.Message, output.Gaps, output.Artifact, output.Sources, output.Observations
 			if output.Artifact != nil {
@@ -231,9 +226,6 @@ func RunBatch(ctx context.Context, env Env, st Stage, in BatchInput, attempt int
 	return result, nil
 }
 
-// itemError reports whether err belongs to one item (its data or its files)
-// rather than to the infrastructure the whole batch shares. Only the activity's
-// own context ends the batch; a timeout inside one item stays with that item.
 func itemError(ctx context.Context, err error) bool {
 	if ctx.Err() != nil || errors.Is(err, ErrSuperseded) {
 		return false
@@ -242,22 +234,15 @@ func itemError(ctx context.Context, err error) bool {
 	if errors.As(err, &pgErr) {
 		return dataError(pgErr)
 	}
-	// Match concrete network and connection errors only: syscall.Errno also
-	// satisfies net.Error, so a missing local file would look like a network fault.
 	var opErr *net.OpError
 	var connErr *pgconn.ConnectError
 	return !errors.As(err, &opErr) && !errors.As(err, &connErr)
 }
 
-// dataError reports PostgreSQL data exceptions (class 22) and integrity
-// violations (class 23), which one item's content causes.
 func dataError(e *pgconn.PgError) bool {
 	return strings.HasPrefix(e.Code, "22") || strings.HasPrefix(e.Code, "23")
 }
 
-// processFailure turns a final Process error into an item outcome: a retryable
-// error with a gap kind becomes that gap, source data becomes gap
-// invalid_source_data, anything else a failed item.
 func processFailure(err error, retryable *RetryableError) Output {
 	c := itemCommit(Commit{}, err)
 	if errors.Is(err, sourcegate.ErrSourcePaused) {
@@ -289,9 +274,6 @@ func trimRunes(s string, n int) string {
 	return string(r)
 }
 
-// sourceDataError reports errors caused by the source document's content
-// (broken payload JSON, text PostgreSQL rejects, duplicate ids), which a retry
-// cannot fix and the owner may accept as a gap.
 func sourceDataError(err error) bool {
 	var syntax *json.SyntaxError
 	var typeErr *json.UnmarshalTypeError
@@ -299,8 +281,6 @@ func sourceDataError(err error) bool {
 	return errors.Is(err, ErrSourceData) || errors.As(err, &syntax) || errors.As(err, &typeErr) || (errors.As(err, &pgErr) && dataError(pgErr))
 }
 
-// itemCommit records an item-level error: source data errors become gap
-// invalid_source_data, anything else a failed item a later attempt may fix.
 func itemCommit(c Commit, err error) Commit {
 	if errors.Is(err, sourcegate.ErrSourcePaused) {
 		return failedCommit(c, sourcegate.ErrSourcePaused)
@@ -333,4 +313,15 @@ func retryBatch(err *RetryableError) bool {
 		return true
 	}
 	return err.GapKind == "" && err.Cause.Origin != OriginGateway && err.Cause.Origin != OriginTransport && !sourceDataError(err)
+}
+
+func reuseOpenedArtifact(ctx context.Context, env Env, st Stage, run Run, item Item, art artifact.Result) (Output, error) {
+	if verifier, ok := st.(interface {
+		VerifyReuse(context.Context, Env, Run, Item, artifact.Result) error
+	}); ok {
+		if err := verifier.VerifyReuse(ctx, env, run, item, art); err != nil {
+			return Output{}, err
+		}
+	}
+	return Output{Artifact: &art, State: "done"}, nil
 }

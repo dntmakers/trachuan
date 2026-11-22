@@ -16,6 +16,8 @@ func TestCrossSignal_RegisteredWithDeclaredFields(t *testing.T) {
 		"relation_kind_disagreement":        {"relation", Review},
 		"waived_document_without_relations": {"document", Info},
 		"external_report":                   {"report", Review},
+		"ocr_label_item_outside_labels":     {"check_item", Review},
+		"tree_transcription_divergence":     {"document", Info},
 	}
 	for _, id := range CrossSignalIDs() {
 		w, ok := want[id]

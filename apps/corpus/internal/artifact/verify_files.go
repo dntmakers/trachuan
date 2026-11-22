@@ -30,22 +30,9 @@ func VerifyFiles(dir string, names ...string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read manifest: %w", err)
 	}
-	entries := map[string]string{}
-	for _, line := range strings.Split(string(data), "\n") {
-		if line == "" {
-			continue
-		}
-		if len(line) < 67 || line[64:66] != "  " {
-			return "", fmt.Errorf("invalid manifest line")
-		}
-		digest, name := line[:64], line[66:]
-		if _, err = hex.DecodeString(digest); err != nil {
-			return "", fmt.Errorf("invalid manifest hash: %w", err)
-		}
-		if _, ok := entries[name]; ok {
-			return "", fmt.Errorf("duplicate manifest entry %q", name)
-		}
-		entries[name] = digest
+	entries, err := parseManifest(data)
+	if err != nil {
+		return "", err
 	}
 	for _, name := range names {
 		if !filepath.IsLocal(name) || name == "." || name == manifestName || strings.ContainsAny(name, "\n\r") {
@@ -90,4 +77,25 @@ func VerifyFiles(dir string, names ...string) (string, error) {
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func parseManifest(data []byte) (map[string]string, error) {
+	entries := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
+		if line == "" {
+			continue
+		}
+		if len(line) < 67 || line[64:66] != "  " {
+			return nil, fmt.Errorf("invalid manifest line")
+		}
+		digest, name := line[:64], line[66:]
+		if _, err := hex.DecodeString(digest); err != nil {
+			return nil, fmt.Errorf("invalid manifest hash: %w", err)
+		}
+		if _, ok := entries[name]; ok {
+			return nil, fmt.Errorf("duplicate manifest entry %q", name)
+		}
+		entries[name] = digest
+	}
+	return entries, nil
 }

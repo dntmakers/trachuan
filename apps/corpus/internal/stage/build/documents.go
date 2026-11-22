@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"danny.vn/trachuan/apps/corpus/internal/stage/chunk"
-	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 	"danny.vn/trachuan/internal/retrieval"
 )
 
@@ -87,10 +86,7 @@ func (l *loader) loadDocuments(ctx context.Context) error {
 			if e != nil {
 				return fmt.Errorf("extract artifact: %w", e)
 			}
-			if ext.InputHash == nil {
-				return fmt.Errorf("missing extract input hash")
-			}
-			if e = fetch.CheckExtractLineage(p, *item.ArtifactSHA256, *ext.InputHash); e != nil {
+			if e = checkBuildExtractLineage(l.inv, ext, p, *item.ArtifactSHA256); e != nil {
 				return fmt.Errorf("extract lineage: %w", e)
 			}
 			textSource, locators, e = readTextMetadata(p)

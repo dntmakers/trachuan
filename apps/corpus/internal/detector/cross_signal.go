@@ -9,11 +9,14 @@ const (
 	UnmatchedOperativeClaim        = "unmatched_operative_claim"
 	WaivedDocumentWithoutRelations = "waived_document_without_relations"
 	ExternalReport                 = "external_report"
+	OCRLabelItemOutsideLabels      = "ocr_label_item_outside_labels"
+	TreeTranscriptionDivergence    = "tree_transcription_divergence"
 
-	SubjectDocument = "document"
-	SubjectClaim    = "claim"
-	SubjectRelation = "relation"
-	SubjectReport   = "report"
+	SubjectDocument  = "document"
+	SubjectClaim     = "claim"
+	SubjectRelation  = "relation"
+	SubjectReport    = "report"
+	SubjectCheckItem = "check_item"
 
 	DiscriminatorNone  = "none"
 	DiscriminatorField = "field"
@@ -23,6 +26,8 @@ const (
 	CompletenessClaimRead        = "source_article_read_and_every_target_resolved"
 	CompletenessOCRDocument      = "ocr_document_without_extract_gap_not_baseline_served"
 	CompletenessReportsFile      = "reports_file_of_the_build_artifact_read"
+	CompletenessOCRCheckItem     = "same_document_checked_item_or_complete_absence"
+	CompletenessTreePair         = "measured_accepted_pair_or_conclusive_exclusion"
 )
 
 func crossSignal() []Detector {
@@ -58,6 +63,18 @@ func crossSignal() []Detector {
 			Inputs: []string{"release.document", "release.relation", "release.coverage_gap", "extract.text.json"}, Severity: Info,
 			Fingerprint:   []string{"waiver_check_sha256", "extract_sha256"},
 			Discriminator: DiscriminatorNone, Completeness: CompletenessOCRDocument,
+		},
+		{
+			ID: OCRLabelItemOutsideLabels, Version: 1, Semantics: 1, Subject: SubjectCheckItem,
+			Inputs: []string{"build.inputs.json", "release.document", "extract.detector_inputs"}, Severity: Review,
+			Fingerprint:   []string{"pdf_sha256", "text_sha256", "engine_id", "checker_id", "verdict", "ocr_reading_sha256", "pdf_reading_sha256", "tail_scope_index", "start_paragraph", "end_paragraph"},
+			Discriminator: DiscriminatorNone, Completeness: CompletenessOCRCheckItem,
+		},
+		{
+			ID: TreeTranscriptionDivergence, Version: 1, Semantics: 1, Subject: SubjectDocument,
+			Inputs: []string{"build.inputs.json", "release.document", "extract.detector_inputs"}, Severity: Info,
+			Fingerprint:   []string{"tree_chars", "transcription_chars", "tree_text_sha256", "transcription_text_sha256"},
+			Discriminator: DiscriminatorNone, Completeness: CompletenessTreePair,
 		},
 		{
 			ID: ExternalReport, Version: 1, Semantics: 1, Subject: SubjectReport,

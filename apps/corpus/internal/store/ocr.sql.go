@@ -106,7 +106,9 @@ func (q *Queries) GetOCRText(ctx context.Context, arg GetOCRTextParams) (OcrText
 
 const getRunOCRSelection = `-- name: GetRunOCRSelection :one
 SELECT s.run_id, s.item_key, s.gap, s.pdf_sha256, s.ocr_text_id, s.ocr_check_id,
-       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged
+       s.selection_version, s.selection_state, s.text_source, s.fetch_sha256,
+       t.pdf_sha256 AS text_pdf_sha256, c.ocr_text_id AS check_ocr_text_id,
+       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged, c.result AS check_result
 FROM run_ocr_selection s
 LEFT JOIN ocr_text t ON t.id = s.ocr_text_id
 LEFT JOIN ocr_check c ON c.id = s.ocr_check_id
@@ -119,17 +121,24 @@ type GetRunOCRSelectionParams struct {
 }
 
 type GetRunOCRSelectionRow struct {
-	RunID        int64
-	ItemKey      string
-	Gap          string
-	PdfSha256    *string
-	OcrTextID    *int64
-	OcrCheckID   *int64
-	EngineID     *string
-	TextSha256   *string
-	CheckerID    *string
-	ResultSha256 *string
-	Flagged      pgtype.Int4
+	RunID            int64
+	ItemKey          string
+	Gap              string
+	PdfSha256        *string
+	OcrTextID        *int64
+	OcrCheckID       *int64
+	SelectionVersion int32
+	SelectionState   *string
+	TextSource       *string
+	FetchSha256      *string
+	TextPdfSha256    *string
+	CheckOcrTextID   *int64
+	EngineID         *string
+	TextSha256       *string
+	CheckerID        *string
+	ResultSha256     *string
+	Flagged          pgtype.Int4
+	CheckResult      []byte
 }
 
 func (q *Queries) GetRunOCRSelection(ctx context.Context, arg GetRunOCRSelectionParams) (GetRunOCRSelectionRow, error) {
@@ -142,11 +151,18 @@ func (q *Queries) GetRunOCRSelection(ctx context.Context, arg GetRunOCRSelection
 		&i.PdfSha256,
 		&i.OcrTextID,
 		&i.OcrCheckID,
+		&i.SelectionVersion,
+		&i.SelectionState,
+		&i.TextSource,
+		&i.FetchSha256,
+		&i.TextPdfSha256,
+		&i.CheckOcrTextID,
 		&i.EngineID,
 		&i.TextSha256,
 		&i.CheckerID,
 		&i.ResultSha256,
 		&i.Flagged,
+		&i.CheckResult,
 	)
 	return i, err
 }
@@ -235,18 +251,23 @@ func (q *Queries) InsertOCRText(ctx context.Context, arg InsertOCRTextParams) (i
 }
 
 const insertRunOCRSelection = `-- name: InsertRunOCRSelection :exec
-INSERT INTO run_ocr_selection (run_id, item_key, gap, pdf_sha256, ocr_text_id, ocr_check_id)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO run_ocr_selection (run_id, item_key, gap, pdf_sha256, ocr_text_id, ocr_check_id,
+                               selection_version, selection_state, text_source, fetch_sha256)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (run_id, item_key) DO NOTHING
 `
 
 type InsertRunOCRSelectionParams struct {
-	RunID      int64
-	ItemKey    string
-	Gap        string
-	PdfSha256  *string
-	OcrTextID  *int64
-	OcrCheckID *int64
+	RunID            int64
+	ItemKey          string
+	Gap              string
+	PdfSha256        *string
+	OcrTextID        *int64
+	OcrCheckID       *int64
+	SelectionVersion int32
+	SelectionState   *string
+	TextSource       *string
+	FetchSha256      *string
 }
 
 func (q *Queries) InsertRunOCRSelection(ctx context.Context, arg InsertRunOCRSelectionParams) error {
@@ -257,6 +278,10 @@ func (q *Queries) InsertRunOCRSelection(ctx context.Context, arg InsertRunOCRSel
 		arg.PdfSha256,
 		arg.OcrTextID,
 		arg.OcrCheckID,
+		arg.SelectionVersion,
+		arg.SelectionState,
+		arg.TextSource,
+		arg.FetchSha256,
 	)
 	return err
 }
@@ -428,7 +453,9 @@ func (q *Queries) ListOpenOCRCheckAttempts(ctx context.Context, checkerID string
 
 const listRunOCRSelections = `-- name: ListRunOCRSelections :many
 SELECT s.run_id, s.item_key, s.gap, s.pdf_sha256, s.ocr_text_id, s.ocr_check_id,
-       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged
+       s.selection_version, s.selection_state, s.text_source, s.fetch_sha256,
+       t.pdf_sha256 AS text_pdf_sha256, c.ocr_text_id AS check_ocr_text_id,
+       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged, c.result AS check_result
 FROM run_ocr_selection s
 LEFT JOIN ocr_text t ON t.id = s.ocr_text_id
 LEFT JOIN ocr_check c ON c.id = s.ocr_check_id
@@ -437,17 +464,24 @@ ORDER BY s.item_key
 `
 
 type ListRunOCRSelectionsRow struct {
-	RunID        int64
-	ItemKey      string
-	Gap          string
-	PdfSha256    *string
-	OcrTextID    *int64
-	OcrCheckID   *int64
-	EngineID     *string
-	TextSha256   *string
-	CheckerID    *string
-	ResultSha256 *string
-	Flagged      pgtype.Int4
+	RunID            int64
+	ItemKey          string
+	Gap              string
+	PdfSha256        *string
+	OcrTextID        *int64
+	OcrCheckID       *int64
+	SelectionVersion int32
+	SelectionState   *string
+	TextSource       *string
+	FetchSha256      *string
+	TextPdfSha256    *string
+	CheckOcrTextID   *int64
+	EngineID         *string
+	TextSha256       *string
+	CheckerID        *string
+	ResultSha256     *string
+	Flagged          pgtype.Int4
+	CheckResult      []byte
 }
 
 func (q *Queries) ListRunOCRSelections(ctx context.Context, runID int64) ([]ListRunOCRSelectionsRow, error) {
@@ -466,11 +500,18 @@ func (q *Queries) ListRunOCRSelections(ctx context.Context, runID int64) ([]List
 			&i.PdfSha256,
 			&i.OcrTextID,
 			&i.OcrCheckID,
+			&i.SelectionVersion,
+			&i.SelectionState,
+			&i.TextSource,
+			&i.FetchSha256,
+			&i.TextPdfSha256,
+			&i.CheckOcrTextID,
 			&i.EngineID,
 			&i.TextSha256,
 			&i.CheckerID,
 			&i.ResultSha256,
 			&i.Flagged,
+			&i.CheckResult,
 		); err != nil {
 			return nil, err
 		}

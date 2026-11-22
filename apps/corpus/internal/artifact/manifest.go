@@ -75,23 +75,32 @@ func manifest(dir string) ([]byte, error) {
 
 // Verify checks the manifest and every file in dir and returns the manifest hash.
 func Verify(dir string) (string, error) {
+	hash, _, err := VerifyWithMembers(dir)
+	return hash, err
+}
+
+func VerifyWithMembers(dir string) (string, map[string]string, error) {
 	info, err := os.Lstat(filepath.Join(dir, manifestName))
 	if err != nil {
-		return "", fmt.Errorf("inspect manifest: %w", err)
+		return "", nil, fmt.Errorf("inspect manifest: %w", err)
 	}
 	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("manifest is not a regular file")
+		return "", nil, fmt.Errorf("manifest is not a regular file")
 	}
 	data, err := os.ReadFile(filepath.Join(dir, manifestName))
 	if err != nil {
-		return "", fmt.Errorf("read manifest: %w", err)
+		return "", nil, fmt.Errorf("read manifest: %w", err)
 	}
 	actual, err := manifest(dir)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if !bytes.Equal(data, actual) {
-		return "", fmt.Errorf("manifest does not match artifact files")
+		return "", nil, fmt.Errorf("manifest does not match artifact files")
 	}
-	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+	entries, err := parseManifest(data)
+	if err != nil {
+		return "", nil, err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(data)), entries, nil
 }

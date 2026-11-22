@@ -49,6 +49,9 @@ type Inputs struct {
 	Release     *pgxpool.Pool
 
 	ArtifactDir func(stage, itemKey string) (string, bool, error)
+
+	detectorInputs func() ([]detectorInput, error)
+	detectorReader func() ([]detectorInput, error)
 }
 
 type Detector interface {

@@ -77,6 +77,12 @@ func selectionFromRow(row store.GetRunOCRSelectionRow) (selection, error) {
 }
 
 func materializeFrozen(ctx context.Context, dir, key string, selected selection) (selection, []vbpl.Node, error) {
+	selected, nodes, err := materializeFrozenRaw(ctx, dir, key, selected)
+	setTreeTranscriptionDefault(key, &selected)
+	return selected, nodes, err
+}
+
+func materializeFrozenRaw(ctx context.Context, dir, key string, selected selection) (selection, []vbpl.Node, error) {
 	if selected.gap == "text_number_mismatch" {
 		current, _, err := choose(ctx, dir, key)
 		if err != nil {

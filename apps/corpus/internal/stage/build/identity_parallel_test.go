@@ -11,12 +11,14 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/evaluation"
+	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/relate"
 )
 
 func TestIdentityInventory_ParallelMatchesSerialAndFirstError(t *testing.T) {
 	store := artifact.Store{Root: t.TempDir()}
-	inv := Inventory{}
+	recipe := strings.Repeat("a", 64)
+	inv := Inventory{ExtractSnapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}}
 	for i := 1; i <= 3; i++ {
 		key := fmt.Sprintf("vn:vbpl:%d", i)
 		input := strings.Repeat(fmt.Sprint(i), 64)
@@ -38,7 +40,7 @@ func TestIdentityInventory_ParallelMatchesSerialAndFirstError(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		inv.Items = append(inv.Items, InventoryItem{Stage: "extract", State: "done", ItemKey: key, Path: &ext.Path, ArtifactSHA256: &ext.SHA256, InputHash: &extractInput})
+		inv.Items = append(inv.Items, InventoryItem{Stage: "extract", State: "done", ItemKey: key, Path: &ext.Path, ArtifactSHA256: &ext.SHA256, InputHash: &extractInput, RecipeHash: &recipe, authority: testExtractAuthority(key, &extractInput, &recipe)})
 		relationInput := relate.PairInputHash(art.SHA256, ext.SHA256)
 		rel, err := store.Publish(context.Background(), "relate", relationInput, strings.Repeat("a", 64), func(dir string) error {
 			return os.WriteFile(filepath.Join(dir, "relations.json"), []byte(`[]`), 0600)

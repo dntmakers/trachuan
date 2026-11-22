@@ -31,7 +31,6 @@ func workflowOpen(ctx context.Context, d Deps, id string) (bool, error) {
 	return desc.WorkflowExecutionInfo.GetStatus() == enumspb.WORKFLOW_EXECUTION_STATUS_RUNNING, nil
 }
 
-// Start starts or resumes a release workflow after fencing earlier generations.
 func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string) error {
 	if !regexp.MustCompile(`^[a-z]{2}$`).MatchString(cc) {
 		return fmt.Errorf("invalid country %q", cc)
@@ -111,24 +110,9 @@ func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string)
 	if err != nil {
 		return err
 	}
-	if existing {
-		snap, _, err = extendSnapshot(snap, includedStages(d.Stages, until, oldStageCount), d.RecipesFor(snap))
-		if err != nil {
-			return err
-		}
-	} else {
-		recipes := d.RecipesFor(snap)
-		snap.Recipes = make(map[string]string, len(snap.Stages))
-		for _, name := range snap.Stages {
-			if recipe, ok := recipes[name]; ok {
-				snap.Recipes[name] = recipe
-			}
-		}
-		for _, name := range snap.Stages {
-			if _, ok := snap.Recipes[name]; !ok {
-				return fmt.Errorf("missing recipe for stage %q", name)
-			}
-		}
+	snap, err = freezeStartSnapshot(snap, includedStages(d.Stages, until, oldStageCount), existing, d.RecipesFor)
+	if err != nil {
+		return err
 	}
 	raw, err = json.Marshal(snap)
 	if err != nil {
@@ -236,7 +220,6 @@ func hasEvalItem(ctx context.Context, q *store.Queries, runID int64) (bool, erro
 	return false, nil
 }
 
-// workerVersion returns the VCS revision the binary was built from, or "unknown".
 func workerVersion() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {

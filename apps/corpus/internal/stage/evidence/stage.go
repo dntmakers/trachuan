@@ -20,6 +20,7 @@ import (
 )
 
 const serialization = "findings.json/2,identity.jsonl/1,changes.jsonl/1"
+const treeDivergenceRecipe = "tree-transcription-divergence/1:5*min<3*max"
 
 type Config struct {
 	Build     build.Config
@@ -27,12 +28,13 @@ type Config struct {
 }
 
 type Stage struct {
-	cfg     Config
-	queries func(stage.Env) store.Querier
-	lookup  func(context.Context, stage.Env, store.Querier, stage.Run) (artifact.Result, error)
-	release func(context.Context, stage.Env, stage.Run) (*pgxpool.Pool, func(), error)
-	summary func(*pgxpool.Pool) summarySource
-	members func(context.Context, stage.Env, stage.Run) (members, error)
+	cfg            Config
+	queries        func(stage.Env) store.Querier
+	lookup         func(context.Context, stage.Env, store.Querier, stage.Run) (artifact.Result, error)
+	release        func(context.Context, stage.Env, stage.Run) (*pgxpool.Pool, func(), error)
+	summary        func(*pgxpool.Pool) summarySource
+	members        func(context.Context, stage.Env, stage.Run) (members, error)
+	detectorReader func() ([]detectorInput, error)
 }
 
 func New(cfg Config) *Stage { return &Stage{cfg: cfg} }
@@ -48,12 +50,27 @@ func (s *Stage) specs() []detector.Detector {
 	return specs
 }
 
-func (s *Stage) Recipe(stage.Snapshot) string {
-	config, err := json.Marshal(s.specs())
+func (s *Stage) Recipe(snapshot stage.Snapshot) string {
+	specs := s.specs()
+	registryHash := evidenceRegistryHash(snapshot)
+	if snapshot.ExtractRecordContract != stage.ExtractRecordV1 {
+		specs = slices.DeleteFunc(specs, func(spec detector.Detector) bool { return needsDetectorInputs(spec.ID) })
+	}
+	config, err := json.Marshal(specs)
 	if err != nil {
 		panic(fmt.Sprintf("encode evidence detectors: %v", err))
 	}
-	return stage.RecipeHash(stage.EvidenceStage, "1", detector.Hash(), string(config), serialization)
+	if snapshot.ExtractRecordContract == stage.ExtractRecordV1 {
+		return stage.RecipeHash(stage.EvidenceStage, "1", registryHash, string(config), serialization, treeDivergenceRecipe)
+	}
+	return stage.RecipeHash(stage.EvidenceStage, "1", registryHash, string(config), serialization)
+}
+
+func evidenceRegistryHash(snapshot stage.Snapshot) string {
+	if snapshot.ExtractRecordContract == stage.ExtractRecordV1 {
+		return detector.Hash()
+	}
+	return detector.LegacyHash()
 }
 
 func (s *Stage) querier(env stage.Env) store.Querier {
@@ -72,7 +89,19 @@ func (s *Stage) lookupBuild(ctx context.Context, env stage.Env, q store.Querier,
 
 func itemKey(run stage.Run) string { return run.Country + "/" + run.Rel }
 
+func (s *Stage) detectorInputAuthority(snapshot stage.Snapshot) error {
+	for _, d := range s.cfg.Detectors {
+		if needsDetectorInputs(d.Spec().ID) {
+			return detectorInputAuthority(snapshot)
+		}
+	}
+	return nil
+}
+
 func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage.Item, error) {
+	if err := s.detectorInputAuthority(run.Snapshot); err != nil {
+		return nil, err
+	}
 	inputs, err := s.resolveInputs(ctx, env, run, true)
 	var refused *inputError
 	switch {
@@ -96,6 +125,9 @@ func itemFailure(err error) error {
 func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item stage.Item) (stage.Output, error) {
 	if item.Key != itemKey(run) {
 		return stage.Output{}, errors.New("evidence item identity mismatch")
+	}
+	if err := s.detectorInputAuthority(run.Snapshot); err != nil {
+		return stage.Output{}, itemFailure(err)
 	}
 	inputs, err := s.resolveInputs(ctx, env, run, false)
 	if err != nil {
@@ -147,6 +179,9 @@ func (s *Stage) detectorIDs() []string {
 }
 
 func (s *Stage) runDetectors(ctx context.Context, env stage.Env, run stage.Run, inputs frozenInputs, pool *pgxpool.Pool) ([]detectorRun, error) {
+	if err := s.detectorInputAuthority(run.Snapshot); err != nil {
+		return nil, err
+	}
 	if len(s.cfg.Detectors) == 0 {
 		return nil, nil
 	}
@@ -160,7 +195,8 @@ func (s *Stage) runDetectors(ctx context.Context, env stage.Env, run stage.Run, 
 		}
 		ids = append(ids, id)
 	}
-	in := Inputs{Run: run, BuildDir: inputs.buildDir, BuildSHA256: inputs.build.SHA256, ReportPath: inputs.reportPath, Release: pool, ArtifactDir: lazyArtifactDirs(ctx, func() store.Querier { return s.querier(env) }, env, run)}
+	in := Inputs{Run: run, BuildDir: inputs.buildDir, BuildSHA256: inputs.build.SHA256, ReportPath: inputs.reportPath, Release: pool, ArtifactDir: lazyArtifactDirs(ctx, func() store.Querier { return s.querier(env) }, env, run), detectorReader: s.detectorReader}
+	in = withDetectorInputs(ctx, in)
 	runs := make([]detectorRun, 0, len(detectors))
 	for _, d := range detectors {
 		observation, detectErr := d.Detect(ctx, in)

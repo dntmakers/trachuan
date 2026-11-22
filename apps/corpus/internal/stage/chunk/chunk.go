@@ -83,7 +83,7 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 			return stage.Output{}, err
 		}
 	}
-	if err = checkExtractLineage(env.Artifacts.Abs(in.ExtractPath), in.FetchSha256, in.ExtractInputHash); err != nil {
+	if err = checkExtractLineageForSnapshot(env.Artifacts.Abs(in.ExtractPath), in.FetchSha256, in.ExtractInputHash, run.Snapshot, in.ExtractRecipeHash); err != nil {
 		return stage.Output{}, fmt.Errorf("chunk input lineage: %w", err)
 	}
 
@@ -123,8 +123,4 @@ func chunkInputs(fetchDir, extractDir, key string) (File, Coverage, error) {
 		return File{}, Coverage{}, err
 	}
 	return Split(nodes, Meta{Key: key, Number: doc.Number, Title: doc.Title, DocType: doc.DocType, EffFrom: doc.EffFrom, IssueDate: doc.IssueDate}, Recipe2())
-}
-
-func checkExtractLineage(dir, fetchHash, inputHash string) error {
-	return fetch.CheckExtractLineage(dir, fetchHash, inputHash)
 }

@@ -17,9 +17,13 @@ type Snapshot struct {
 	SourceListHash                                   string
 	Stages                                           []string
 	Recipes                                          map[string]string
+	ExtractRecordContract                            string `json:"extract_record_contract,omitempty"`
 	TaxonomyVersion, WorkerVersion, PreviousManifest string
 	PreviousReport                                   *PreviousReport `json:",omitempty"`
 }
+
+const ExtractRecordLegacy = "legacy"
+const ExtractRecordV1 = "detector-inputs/1"
 
 const EvidenceStage = "evidence"
 
