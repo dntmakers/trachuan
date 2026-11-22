@@ -21,6 +21,24 @@ type tokenUsage struct {
 
 type batchPrice struct{ input, write, read, output int64 }
 
+type openAIPriceRow struct{ input, read, write30m, write12h, output int64 }
+
+const (
+	openAIBatchPriceVersion = "openai-batch-2026-11-22"
+	openAIBatchPriceSource  = "https://developers.openai.com/api/docs/pricing"
+)
+
+func openAIPriceForModel(model string) (openAIPriceRow, bool) {
+	switch model {
+	case "gpt-6.2-sol":
+		return openAIPriceRow{1000, 50, 1250, 2500, 5000}, true
+	case "gpt-6.2-astra":
+		return openAIPriceRow{4000, 200, 5000, 10000, 20000}, true
+	default:
+		return openAIPriceRow{}, false
+	}
+}
+
 func priceForModel(model string) (batchPrice, bool) {
 	switch model {
 	case "claude-haiku-5-5":

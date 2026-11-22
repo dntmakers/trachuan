@@ -68,6 +68,11 @@ use the long-context Standard rate for the full count
 estimate and the number of calls with unknown cost separately from Batch spend;
 neither enters a budget cap check.
 
+Before the first OpenAI count, provision the configured intent store under an
+existing durable parent. The adapter does not create the store root or its
+ancestors. It syncs the parent before dispatching a count or using a recovered
+count. An estimate for a missing store is zero and does not create the store.
+
 Before widening the trial, verify count-to-usage parity for both request shapes
 in the retained Batch results. A result outside the bound or supported price
 tier stops new admissions for the adapter and retains its usage and reserve for
