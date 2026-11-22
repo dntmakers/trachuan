@@ -11,7 +11,6 @@ from updater.deploy_corpus_database import Database
 from updater.deploy_corpus_kind import FRAMEWORKS, LAW
 from updater.deploy_corpus_lock import AdvisoryLock
 from updater.deploy_host import Host, activator_client
-from updater.deploy_io import CommandError
 from updater.deploy_release_catalog import law as law_catalog
 from updater.deploy_release_tables import PointerRefused
 from updater.deploy_store import Paths
@@ -57,8 +56,8 @@ class LawFixture(GuardAssertions):
     def runner(self, args, **kwargs):
         if args[:2] == ['podman', 'rm']:
             return b''
-        if args[:3] == ['podman', 'container', 'exists']:
-            raise CommandError('absent', returncode=1)
+        if args[:2] == ['podman', 'ps']:
+            return b''
         self.calls.append(args)
         text = sql_text(args, kwargs.get('input')).decode()
         self.scripts.append(text)

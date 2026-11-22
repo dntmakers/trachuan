@@ -74,8 +74,8 @@ class LawFixture:
         def runner(args, **kwargs):
             if args[:2] == ['podman', 'rm']:
                 return b''
-            if args[:3] == ['podman', 'container', 'exists']:
-                raise CommandError('absent', returncode=1)
+            if args[:2] == ['podman', 'ps']:
+                return b''
             name = classify(args, (kwargs.get('input') or b'').decode())
             self.calls.append((name, args, kwargs))
             if name in self.failures:

@@ -163,8 +163,8 @@ class FrameworksVerificationTest(unittest.TestCase):
             def runner(args, **kwargs):
                 if args[:2] == ['podman', 'rm']:
                     return b''
-                if args[:3] == ['podman', 'container', 'exists']:
-                    raise CommandError('absent', returncode=1)
+                if args[:2] == ['podman', 'ps']:
+                    return b''
                 calls.append(args)
                 return canonical(description(self.m))
             host = Host(Paths(Path(directory)), runner, user_prefix=[])
@@ -173,6 +173,7 @@ class FrameworksVerificationTest(unittest.TestCase):
             frameworks, law = calls
             self.assertNotEqual(frameworks[3], law[3])
             frameworks[3] = law[3]
+            frameworks[5] = law[5]
             self.assertEqual(frameworks, law + ['--kind', 'frameworks'])
             self.assertEqual(law[-2:], ['server-image', 'release-check'])
 

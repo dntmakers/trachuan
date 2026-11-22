@@ -254,16 +254,22 @@ def terminate(process):
     except PermissionError:
         if not (exited and sys.platform == 'darwin'):
             raise
-    process.wait()
+    try:
+        process.wait(timeout=0.2)
+    except subprocess.TimeoutExpired as error:
+        raise CommandError('process did not exit', detail='process did not exit') from error
 
 
 def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None, input_file=None, safe=None, cancel=False):
     if input is not None and input_file is not None:
         raise ValueError('conflicting command input')
-    cleanup_name = args[-1] if args else ''
-    container_cleanup = (re.fullmatch(r'trachuan-updater-smoke-[0-9a-f]{32}', cleanup_name) and
-                         (args[-6:-1] == ['podman', 'rm', '--force', '--time', '0'] or
-                          args[-4:-1] == ['podman', 'container', 'exists']))
+    cleanup_id = args[-1] if args else ''
+    cleanup_remove = (re.fullmatch(r'[0-9a-f]{64}', cleanup_id) and
+                      args[-6:-1] == ['podman', 'rm', '--force', '--time', '0'])
+    cleanup_query = (len(args) >= 8 and args[-8:-3] == ['podman', 'ps', '-a', '--no-trunc', '--filter'] and
+                     re.fullmatch(r'label=trachuan\.updater=[0-9a-f]{32}', args[-3]) and
+                     args[-2:] == ['--format', '{{.ID}}'])
+    container_cleanup = cleanup_remove or cleanup_query
     if cancel and ((args[-4:] != ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
                     and not container_cleanup) or timeout != 10 or input is not None or input_file is not None):
         raise ValueError('invalid cancellation command')
@@ -312,11 +318,13 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
                 finished = True
             finally:
                 if process is not None:
-                    if not finished:
-                        terminate(process)
-                    for stream in (process.stdin, process.stdout, process.stderr):
-                        if stream is not None:
-                            stream.close()
+                    try:
+                        if not finished:
+                            terminate(process)
+                    finally:
+                        for stream in (process.stdin, process.stdout, process.stderr):
+                            if stream is not None:
+                                stream.close()
     except subprocess.TimeoutExpired as error:
         raise CommandError('command timed out', reason='timeout',
                            detail=Path(args[0]).name + ': timeout') from error

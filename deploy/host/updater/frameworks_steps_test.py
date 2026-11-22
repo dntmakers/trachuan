@@ -81,8 +81,8 @@ class StepsFixture:
         def runner(args, **kwargs):
             if args[:2] == ['podman', 'rm']:
                 return b''
-            if args[:3] == ['podman', 'container', 'exists']:
-                raise CommandError('absent', returncode=1)
+            if args[:2] == ['podman', 'ps']:
+                return b''
             name = classify(args, (kwargs.get('input') or b'').decode())
             self.calls.append((name, args, kwargs))
             if name in self.failures:
@@ -253,7 +253,7 @@ class FrameworksRestoreTest(StepsFixture, unittest.TestCase):
         self.assert_activator(self.call('restored')[0], self.name)
         self.assert_guard_first(self.sql('restored'), "pg_catalog.to_regclass('public.release')")
         args, kwargs = self.call('schema')
-        self.assertEqual(args, ['podman', 'run', '--name', args[3], '--label', 'trachuan.updater=smoke', '--network=host', '--read-only', '--cap-drop=ALL',
+        self.assertEqual(args, ['podman', 'run', '--name', args[3], '--label', 'trachuan.updater=' + args[3].removeprefix('trachuan-updater-smoke-'), '--network=host', '--read-only', '--cap-drop=ALL',
                                 '--security-opt=no-new-privileges', '--env-file', str(self.paths.host / 'server.env'),
                                 'server-image', 'frameworks-schema', '--version', '1'])
         self.assertEqual(kwargs['timeout'], 150)
