@@ -46,8 +46,13 @@ class FrameworksPolicyTest(unittest.TestCase):
             return policy(path)
 
     def test_block_is_optional_and_validated_as_closed_shape(self):
-        self.assertNotIn('frameworks', self.load(json.loads(POLICY.read_bytes())))
+        expected = dict(repository='ghcr.io/dntmakers/trachuan-corpus-release',
+                        identity={'dntmakers/trachuan': '^https://github\\.com/dntmakers/trachuan/\\.github/workflows/frameworks-release\\.yml@refs/heads/main$'},
+                        namespace='axj58m4cpgbr', bucket='trachuan-frameworks-releases', min_release_floor=67)
+        self.assertEqual(self.load(json.loads(POLICY.read_bytes())).get('frameworks'), expected)
         base = json.loads(json.dumps(FIXTURE_POLICY))
+        base.pop('frameworks', None)
+        self.assertNotIn('frameworks', self.load(base))
         self.assertEqual(self.load(dict(base, frameworks=BLOCK))['frameworks'], BLOCK)
         changes = [dict(extra=1), dict(identity='.*'), dict(identity=base['corpus_identity']),
                    dict(identity='^(unclosed$'), dict(repository='docker.io/evil/release'),
