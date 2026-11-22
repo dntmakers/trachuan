@@ -25,8 +25,11 @@ scoring rules are not part of a request and never change a key.
 
 ## Attempts
 
-An attempt is one request inside a batch the provider accepted (the batch id is
-recorded). Each attempt's outcome is written once, immutably, to
+An attempt is one request actually sent in a batch the provider accepted (the
+batch id is recorded). Before dispatch, retain the set of submitted `custom_id`
+values with their original intent item indices. Replayed or skipped items are
+not sent, have no new attempt and are not part of settlement. Each attempt's
+outcome is written once, immutably, to
 `results/<key>/<submission id>-<item index>.json` in the intent log store before
 anything applies it: the outcome, the raw provider body, the usage counts by
 token kind, the cost in micro-USD and the price-table version used. Result
@@ -55,7 +58,7 @@ attempt and costs nothing.
 
 One rule closes every case where it is unclear whether a paid request ran or
 what it cost: a key is never resubmitted and a reserve is never released without
-stored provider evidence. Each item settles from one of these:
+stored provider evidence. Settle only submitted items, using one of these:
 
 - a returned result matched by `custom_id`: a model response with its usage
   counts, priced by token kind; or a result the provider marks as not run or not
@@ -89,9 +92,9 @@ settles nothing; in classification, `failed` and `abandoned` in
 [batch submissions](batch-submissions.md) release keys and reserves only on this
 evidence. When results can never be complete, the submission stays unsettled for
 good: its reserve stays in the ledger, labelled an estimate in every report, and
-each item without evidence becomes an `unknown` attempt. An `unknown` key is
-never submitted again by any run; it stays a gap until its key changes. An
-operator note may record reconciliation, but only provider evidence lets the
+each submitted item without evidence becomes an `unknown` attempt. An `unknown`
+key is never submitted again by any run; it stays a gap until its key changes.
+An operator note may record reconciliation, but only provider evidence lets the
 same key run again.
 
 Each settlement, with its evidence, is written to `submissions/<id>.settled` in
@@ -99,6 +102,14 @@ the intent log store, and `--rebuild` restores the ledger from those files. The
 pilot submissions, settled before this note, get their `.settled` files from the
 current workshop database once; they have no result records and are never
 replayed.
+
+Before starting the listing, hold the creator guard and check its quiet period.
+Wait 24 hours and 10 minutes from the recorded creator finish if it dispatched,
+from intent creation if a finished creator did not dispatch, or from the
+recorded observation of creator absence if there is no finish record. A listing
+cannot predate a recorded creator finish. OpenAI also uses the
+[dedicated project and input file receipt](classification-openai.md#submission-and-recovery)
+to identify the batch.
 
 Two invariants hold for the whole intent store. First, it is consistent: every
 file belongs to an intent, every dispatch trace and every receipt needs its
@@ -115,17 +126,19 @@ the moment `create` returns it, each result line as it is decoded, a partial
 download up to its last complete line. A later error changes state only, never
 what was written.
 
-Token counts are free and carry no money, so they are kept apart from intents:
+Store token counts separately from intents and count-call evidence:
 `counts/<key>.json` is written once when the count arrives, including in dry
 runs, needs no intent, and never touches the ledger, locks or reserves. Reserves
 and replay read it; a new count that disagrees with the stored one for the same
-key is an error.
+key is an error. The
+[OpenAI count journal](classification-openai.md#requests-counts-and-reserve)
+records the calls separately.
 
-One verification of the whole store gates both rebuild and every admission, and
-one path settles: a submission settles only from a stored download of its
-receipted batch that ended complete, in which every line carries a known
-`custom_id` of that submission and priced usage; the `.settled` file names that
-download and its hash. Attempts recovered from a partial download can be
+One verification of the whole store gates both rebuild and every admission. A
+receipted batch settles only from a complete stored results capture with exactly
+one priced outcome per submitted `custom_id`, or from explicit zero-work
+validation evidence for the submitted items. The `.settled` file names the
+stored evidence and its hash. Attempts recovered from a partial download can be
 replayed but never settle a submission, and a lost download never promotes them.
 
 ## Key locks and admission
@@ -135,34 +148,37 @@ any submission carrying it is unsettled, in any run or release. The lock check,
 the admission check and the `preparing` row are one transaction under the ledger
 lock, so two runs cannot submit the same key.
 
-The ledger is the sum of settled costs plus unsettled reserves. A reserve prices
-every input token at the highest input-side rate the price table lists for the
-model (the cache-write rate when it exceeds the input rate) and every request's
-maximum output tokens at the output rate. The ledger plus this batch's reserve
-must fit the named budget, or the batch is not submitted. The plan sets budget
-names and amounts; code accepts only those pairs and records them on the
-submission. Each key comes from its file under `~/.config`, is passed per
-command and is never printed.
+Each provider has a ledger of settled costs plus unsettled reserves across all
+its runs, releases and budget names. Admission checks only the ledger of the
+provider being submitted to. A reserve prices every input token at the highest
+input rate allowed by the recipe and every request's maximum output at its
+output rate. The provider ledger plus this batch's reserve must fit its named
+budget. The plan sets the allowed `(provider, name, amount)` tuples; record that
+tuple in the intent and reject other tuples before admission. A budget change
+does not reset a ledger, and no provider can draw on another's budget.
+
+Rebuild reproduces both ledgers from retained evidence. Existing intents,
+counts, price versions and charges belong to Anthropic under their existing
+format. Treat a missing provider as Anthropic only in that historical format; do
+not rewrite request keys, recipe hashes or immutable files, or lose pilot
+charges. New records identify their provider; the provider on a recipe, intent,
+price row and evidence must agree. Each key comes from its file under
+`~/.config`, is passed per command and is never printed.
 
 ## Caching
 
 Requests put the stable part first (instructions, then the menu or subtrees) and
 the document after it. Anthropic requests mark the prefix with `cache_control`
 ([prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching));
-OpenAI caches prefixes automatically
-([prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching)).
-Batch cache hits are best effort, so the reserve never assumes one.
+[OpenAI classification](classification-openai.md#cache-and-price) defines the
+OpenAI breakpoint and token kinds. Batch cache hits are best effort, so the
+reserve never assumes one.
 
 ## Providers and models
 
 The recipe names a provider: Anthropic Message Batches
 ([batch processing](https://platform.claude.com/docs/en/build-with-claude/batch-processing))
-or OpenAI Batch on `/v1/responses`
-([batch guide](https://developers.openai.com/api/docs/guides/batch)) with
-structured outputs and the recipe effort as reasoning effort (`none` is not
-allowed). OpenAI output order is not input order, so results match on
-`custom_id`, merged from the output and error files; both expire after 30 days
-by default, so they are downloaded and recorded as soon as the batch ends.
+or [OpenAI Batch on `/v1/responses`](classification-openai.md).
 
 One price table in code lists every allowed model with its Batch rates per token
 kind, its version and source page
@@ -176,3 +192,8 @@ the highest level-2 top-1 precision on the seeded non-fragment slice, then the
 highest level-2 recall on that slice, then the lowest price. Precision comes
 first because a wrong subject misleads an agent more than a missing one. The
 seeded slice comes from the package, so it ranks models of both providers alike.
+Use stored cost per scored article on the common trial population for the price
+tiebreaker, including reused results at their original cost. If the winner's
+provider cannot cover the estimated full run, pause without publishing LLM
+assignments. Resume only after the provider's usable credit and the approved
+budget cover the run. Never switch provider or pick the runner-up silently.
