@@ -2,6 +2,7 @@ package classify
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,6 +47,8 @@ func (m *memoryLedger) Restore(ctx context.Context, submissions []Submission) er
 
 type fakeClient struct {
 	batchCreated                     time.Time
+	now                              func() time.Time
+	created                          map[string]time.Time
 	counts, creates, gets, downloads int
 	input                            int64
 	createErr                        error
@@ -53,6 +56,8 @@ type fakeClient struct {
 	results                          []batchapi.Result
 	beforeCreate                     func([]batchapi.Request)
 }
+
+func (f *fakeClient) AccountFingerprint() string { return strings.Repeat("a", 32) }
 
 func (f *fakeClient) CountTokens(context.Context, anthropic.MessageNewParams) (int64, error) {
 	f.counts++
@@ -70,19 +75,67 @@ func (f *fakeClient) Create(_ context.Context, r []batchapi.Request) (anthropic.
 	if f.creates > 1 {
 		batchID = fmt.Sprintf("batch_synthetic_%d", f.creates)
 	}
-	return anthropic.MessageBatch{ID: batchID, CreatedAt: f.batchCreated}, nil
+	created := f.batchCreated
+	if created.IsZero() && f.now != nil {
+		created = f.now()
+	}
+	if f.created == nil {
+		f.created = map[string]time.Time{}
+	}
+	f.created[batchID] = created
+	return fakeProviderBatch(batchID, "in_progress", created), nil
 }
 func (f *fakeClient) Get(_ context.Context, id string) (anthropic.MessageBatch, error) {
 	f.gets++
-	b := anthropic.MessageBatch{ID: id}
+	status := "in_progress"
 	if f.ended {
-		b.ProcessingStatus = "ended"
+		status = "ended"
 	}
-	return b, nil
+	return fakeProviderBatch(id, status, f.created[id]), nil
 }
+func fakeProviderBatch(id, status string, created time.Time) anthropic.MessageBatch {
+	if created.IsZero() {
+		created = time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	b, _ := json.Marshal(struct {
+		ID      string    `json:"id"`
+		Status  string    `json:"processing_status"`
+		Created time.Time `json:"created_at"`
+	}{id, status, created})
+	var batch anthropic.MessageBatch
+	_ = json.Unmarshal(b, &batch)
+	return batch
+}
+
+func (f *fakeClient) CreateRaw(ctx context.Context, requests []batchapi.Request) ([]byte, int, error) {
+	response, err := f.Create(ctx, requests)
+	if err != nil {
+		return []byte(response.RawJSON()), 0, err
+	}
+	return []byte(response.RawJSON()), 200, nil
+}
+func (f *fakeClient) GetRaw(ctx context.Context, id string) ([]byte, int, error) {
+	response, err := f.Get(ctx, id)
+	if err != nil {
+		return []byte(response.RawJSON()), 0, err
+	}
+	return []byte(response.RawJSON()), 200, nil
+}
+
 func (f *fakeClient) StreamResults(_ context.Context, _ string, visit func(batchapi.Result) error) error {
 	f.downloads++
 	for _, v := range f.results {
+		if v.WireJSON == "" {
+			body, err := rawResult(v)
+			if err != nil {
+				return err
+			}
+			id, err := json.Marshal(v.CustomID)
+			if err != nil {
+				return err
+			}
+			v.WireJSON = `{"custom_id":` + string(id) + `,"result":` + body + `}`
+		}
 		if err := visit(v); err != nil {
 			return err
 		}
@@ -96,6 +149,7 @@ func screenFixture(t *testing.T) (*Runner, *memoryLedger, *fakeClient, Options) 
 	f := &fakeClient{input: 100, ended: true}
 	now := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 	r := &Runner{Repository: m, Client: f, IntentDir: filepath.Join(t.TempDir(), "intents"), Now: func() time.Time { return now }, Wait: func(context.Context, time.Duration) error { return errors.New("interrupted") }}
+	f.now = func() time.Time { return r.Now() }
 	recipe, _ := NewRecipe("claude-haiku-5-5", strings.Repeat("a", 64))
 	o := Options{RunID: 1, Country: "vn", Release: "20990101", Documents: 1, Seed: 7, Recipe: recipe, Budget: "pilot", BudgetMicroUSD: 15000000, Out: filepath.Join(t.TempDir(), "screen")}
 	f.beforeCreate = func(req []batchapi.Request) {
@@ -222,7 +276,7 @@ func TestScreen_TrialPricingAndSettlement(t *testing.T) {
 }
 
 func TestScreen_AdmissionCountsDurableUnsettledReserves(t *testing.T) {
-	for _, state := range []string{"submitted", "failed", "abandoned", "cancelling"} {
+	for _, state := range []string{"submitted", "failed", "cancelling"} {
 		t.Run(state, func(t *testing.T) {
 			r, m, f, o := screenFixture(t)
 			o.Recipe, _ = NewRecipe("claude-fable-5-2", o.Recipe.TaxonomyHash)
@@ -235,12 +289,7 @@ func TestScreen_AdmissionCountsDurableUnsettledReserves(t *testing.T) {
 				docs[i] = Document{Key: fmt.Sprintf("vn:vbpl:%d", i+2), Title: "Prior synthetic document"}
 			}
 			s := seedUndispatchedScreen(t, r, prior, docs)
-			if state == "abandoned" {
-				r.Now = func() time.Time { return s.CreatedAt.Add(25 * time.Hour) }
-				if err := r.writeAbandonment(&s); err != nil {
-					t.Fatal(err)
-				}
-			} else if err := r.recordBatch(&s, "batch_held"); err != nil {
+			if err := r.recordBatch(&s, "batch_held"); err != nil {
 				t.Fatal(err)
 			}
 			s.State = state

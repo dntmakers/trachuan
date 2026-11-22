@@ -299,6 +299,14 @@ func TestResultStore_RebuildKeepsAbandonedKeyLockedWhenReceiptAppears(t *testing
 		t.Fatal(err)
 	}
 	got := ledger.rows[0]
+	retained, err := r.verifyStore(ledger.rows, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	total, err := retained.ledgerCost()
+	if err != nil || total != s.ReserveMicroUSD || retained.retryAbandoned[s.ID] {
+		t.Fatalf("late receipt failed to hold reserve and key: total=%d error=%v", total, err)
+	}
 	if got.Settled || got.BatchID != "batch_late" || nonterminal(got.State) {
 		t.Fatalf("rebuilt late receipt cannot coexist with a replacement screen: %+v", got)
 	}

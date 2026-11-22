@@ -31,6 +31,9 @@ func ReadFields(dir, key, hash string) ([]string, error) {
 			Fields json.RawMessage `json:"documentFields"`
 		} `json:"data"`
 	}
+	if err = validateRetainedJSON(b, &envelope); err != nil {
+		return nil, fmt.Errorf("decode classification fetch detail: %w", err)
+	}
 	if err = json.Unmarshal(b, &envelope); err != nil {
 		return nil, fmt.Errorf("decode classification fetch detail: %w", err)
 	}
@@ -42,6 +45,9 @@ func ReadFields(dir, key, hash string) ([]string, error) {
 	}
 	var fields []struct {
 		Name string `json:"name"`
+	}
+	if err = validateNullableRetainedCollection(envelope.Data.Fields, &fields); err != nil {
+		return nil, fmt.Errorf("decode VBPL fields: %w", err)
 	}
 	if err = json.Unmarshal(envelope.Data.Fields, &fields); err != nil {
 		return nil, fmt.Errorf("decode VBPL fields: %w", err)

@@ -169,6 +169,9 @@ func (store retainedStore) ledgerCost() (int64, error) {
 	var total int64
 	for _, intent := range store.intents {
 		charge := intent.ReserveMicroUSD
+		if store.abandoned[intent.ID] && store.retryAbandoned[intent.ID] {
+			charge = 0
+		}
 		if settled, found := store.settlements[intent.ID]; found {
 			charge = settled.Cost
 		}

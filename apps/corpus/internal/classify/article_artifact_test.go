@@ -67,7 +67,7 @@ func TestArticleArtifact_BindsInputsAndRejectsTampering(t *testing.T) {
 	}
 }
 
-func TestFamilyArtifact_LegacyPromptRemainsRunnable(t *testing.T) {
+func TestFamilyArtifact_LegacyPromptReadableButNotRunnable(t *testing.T) {
 	r := articleRecipe(t).documentRecipe()
 	r.PromptVersion = 1
 	dir := t.TempDir()
@@ -78,15 +78,8 @@ func TestFamilyArtifact_LegacyPromptRemainsRunnable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	article, err := NewArticleRecipe(f.Recipe, hash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err = article.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = BuildArticleRequest(article, ArticleRequest{DocumentKey: "vn:vbpl:1", Articles: articleInputs(1, ""), Nodes: articleNodes()[1:4]}); err != nil {
-		t.Fatal(err)
+	if _, err = NewArticleRecipe(f.Recipe, hash); err == nil {
+		t.Fatal("historical document recipe accepted for new work")
 	}
 }
 

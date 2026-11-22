@@ -75,7 +75,45 @@ func TestRecipe_DocumentPromptVersion(t *testing.T) {
 	}
 	old := r
 	old.PromptVersion = 1
-	if r.PromptVersion != 2 || r.Hash() == old.Hash() || old.Validate() == nil {
+	if r.PromptVersion != 3 || r.Hash() == old.Hash() || old.Validate() == nil {
 		t.Fatalf("current %+v old %+v", r, old)
+	}
+}
+
+func TestRecipe_HistoricalHashesAndNewDefaults(t *testing.T) {
+	base, err := NewRecipe("claude-haiku-5-5", strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base.PromptVersion != 3 {
+		t.Fatalf("document prompt version %d", base.PromptVersion)
+	}
+	current, err := NewArticleRecipe(base, strings.Repeat("b", 64))
+	if err != nil || current.Article.PromptVersion != 5 {
+		t.Fatalf("article default %+v: %v", current.Article, err)
+	}
+
+	base.PromptVersion = 2
+	cases := []struct {
+		name    string
+		article *ArticleRecipe
+		hash    string
+	}{
+		{"document", nil, "ce48ace939c8a85bb3ef93c87f4ba0424627a14d6a1400f5838680e88a6aa7fa"},
+		{"article", &ArticleRecipe{SourceRecipeHash: "ce48ace939c8a85bb3ef93c87f4ba0424627a14d6a1400f5838680e88a6aa7fa", FamiliesHash: strings.Repeat("b", 64), PromptVersion: 1, SchemaVersion: 1, MaxTokens: 8192}, "36ac790077beae175ca3c5ec267afbd86ee9ed2c7f4a8c5c23454c66e5d809e8"},
+		{"step one", &ArticleRecipe{SourceRecipeHash: "ce48ace939c8a85bb3ef93c87f4ba0424627a14d6a1400f5838680e88a6aa7fa", FamiliesHash: strings.Repeat("b", 64), PromptVersion: 3, SchemaVersion: 1, MaxTokens: 8192, Step: 1}, "4d09cb44593e0d7adfa63f4de0a1a4424920e550e654244617687bd7d39203fc"},
+		{"step two", &ArticleRecipe{SourceRecipeHash: "ce48ace939c8a85bb3ef93c87f4ba0424627a14d6a1400f5838680e88a6aa7fa", FamiliesHash: strings.Repeat("b", 64), PromptVersion: 3, SchemaVersion: 1, MaxTokens: 8192, Step: 2, Step1Hash: strings.Repeat("c", 64)}, "0255258e3ea889511dca9f8d8d5f08eefd8a4b53f240fa8d4024102c60f022d7"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := base
+			r.Article = tc.article
+			if err := r.validate(true); err != nil {
+				t.Fatal(err)
+			}
+			if got := r.Hash(); got != tc.hash {
+				t.Fatalf("hash %s, want %s", got, tc.hash)
+			}
+		})
 	}
 }

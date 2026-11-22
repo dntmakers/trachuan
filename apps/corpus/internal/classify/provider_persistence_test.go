@@ -99,7 +99,9 @@ func TestProviderPersistence_ReconcileKeepsEarlierBatch(t *testing.T) {
 	fault := &providerFault{fakeClient: f}
 	r.Client = fault
 	fault.pages = func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
-		return visit([]anthropic.MessageBatch{{ID: known.BatchID, CreatedAt: known.CreatedAt, ProcessingStatus: "ended"}, {ID: "batch_later", CreatedAt: known.CreatedAt, ProcessingStatus: "ended"}}, `{"data":[],"has_more":false,"test_marker":"first page"}`)
+		data := []anthropic.MessageBatch{{ID: known.BatchID, CreatedAt: known.CreatedAt, ProcessingStatus: "ended"}, {ID: "batch_later", CreatedAt: known.CreatedAt, ProcessingStatus: "ended"}}
+		raw := strings.TrimSuffix(fakeListingRaw(data), "}") + `,"test_marker":"first page"}`
+		return visit(data, raw)
 	}
 	fault.stream = func(_ context.Context, id string, visit func(batchapi.Result) error) error {
 		if id == known.BatchID {
@@ -129,7 +131,10 @@ func TestProviderPersistence_ListFailureKeepsEarlierPage(t *testing.T) {
 	fault := &providerFault{fakeClient: f}
 	r.Client = fault
 	fault.pages = func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
-		if err := visit(nil, `{"data":[],"has_more":true,"test_marker":"earlier list page"}`); err != nil {
+		data := []anthropic.MessageBatch{{ID: "first", CreatedAt: ledger.rows[0].CreatedAt, ProcessingStatus: "ended"}}
+		raw := strings.Replace(fakeListingRaw(data), `"has_more":false`, `"has_more":true`, 1)
+		raw = strings.TrimSuffix(raw, "}") + `,"test_marker":"earlier list page"}`
+		if err := visit(data, raw); err != nil {
 			return err
 		}
 		if !hasCaptured(t, filepath.Join(r.IntentDir, "evidence"), "earlier list page") {
@@ -273,10 +278,11 @@ func TestProviderPersistence_MultipleCandidatesStayUnattached(t *testing.T) {
 	}
 	s := ledger.rows[0]
 	r.Client = &providerFault{fakeClient: f, pages: func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
-		return visit([]anthropic.MessageBatch{
+		data := []anthropic.MessageBatch{
 			{ID: "batch_first", CreatedAt: s.CreatedAt, ProcessingStatus: "ended"},
 			{ID: "batch_second", CreatedAt: s.CreatedAt, ProcessingStatus: "ended"},
-		}, "")
+		}
+		return visit(data, fakeListingRaw(data))
 	}, stream: func(_ context.Context, id string, visit func(batchapi.Result) error) error {
 		return visit(batchapi.Result{CustomID: customID(s.ID, 0), Type: "expired", RawJSON: `{"type":"expired","source":"` + id + `"}`})
 	}}

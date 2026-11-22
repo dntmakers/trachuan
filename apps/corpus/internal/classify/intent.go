@@ -108,7 +108,11 @@ func (r *Runner) writeBatch(s Submission) error {
 	if s.SubmittedAt == nil || s.DeadlineAt == nil || s.BatchID == "" {
 		return fmt.Errorf("missing provider batch identity")
 	}
-	b, err := json.Marshal(batchRecord{ID: s.BatchID, SubmittedAt: s.SubmittedAt.UTC(), DeadlineAt: s.DeadlineAt.UTC()})
+	record := batchRecord{ID: s.BatchID, SubmittedAt: s.SubmittedAt.UTC(), DeadlineAt: s.DeadlineAt.UTC()}
+	if _, _, _, _, err := verifyReceipt(s, &record, nil); err != nil {
+		return err
+	}
+	b, err := json.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("encode batch identity: %w", err)
 	}
@@ -135,24 +139,38 @@ func (r *Runner) recordBatch(s *Submission, id string) error {
 	return r.writeBatch(*s)
 }
 
-func (r *Runner) restoreReceipt(s *Submission) (bool, error) {
-	b, err := os.ReadFile(filepath.Join(r.IntentDir, "submissions", s.ID+".batch"))
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
+func (r *Runner) retainedReceipt(s Submission) (batchRecord, bool, string, bool, error) {
+	var empty batchRecord
+	var intent Submission
+	if err := readRetainedFile(filepath.Join(r.IntentDir, "submissions", s.ID+".json"), &intent); err != nil {
+		return empty, false, "", false, err
 	}
+	if intent.ID != s.ID || intent.ItemsHash != s.ItemsHash || !intent.CreatedAt.Equal(s.CreatedAt) {
+		return empty, false, "", false, fmt.Errorf("receipt intent differs from submission")
+	}
+	path := filepath.Join(r.IntentDir, "submissions", s.ID+".batch")
+	var saved *batchRecord
+	if _, err := os.Stat(path); err == nil {
+		saved = new(batchRecord)
+		if err = readRetainedFile(path, saved); err != nil {
+			return empty, false, "", false, err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return empty, false, "", false, fmt.Errorf("read provider batch identity: %w", err)
+	}
+	responses, err := readProviderResponses(filepath.Join(r.IntentDir, "evidence", s.ID, "responses"), s.ID)
 	if err != nil {
-		return false, fmt.Errorf("read provider batch identity: %w", err)
+		return empty, false, "", false, err
 	}
-	var record batchRecord
-	if err = json.Unmarshal(b, &record); err != nil {
-		return false, fmt.Errorf("decode provider batch identity: %w", err)
+	return verifyReceipt(intent, saved, responses)
+}
+
+func (r *Runner) restoreReceipt(s *Submission) (bool, error) {
+	receipt, found, _, _, err := r.retainedReceipt(*s)
+	if err != nil || !found {
+		return found, err
 	}
-	if !validReceipt(*s, record) {
-		return false, fmt.Errorf("invalid provider batch identity")
-	}
-	s.BatchID = record.ID
-	s.SubmittedAt = &record.SubmittedAt
-	s.DeadlineAt = &record.DeadlineAt
+	s.BatchID, s.SubmittedAt, s.DeadlineAt = receipt.ID, &receipt.SubmittedAt, &receipt.DeadlineAt
 	s.State = "submitted"
 	return true, nil
 }

@@ -25,9 +25,9 @@ func ReadStep1Artifact(path, taxonomyHash, familiesHash string) (ArticleArtifact
 		return a, "", fmt.Errorf("read step-1 artifact: %w", err)
 	}
 	if a.Recipe.Article == nil || a.Recipe.Article.Step != 1 || a.Recipe.Article.PromptVersion != 3 || !a.Settled || a.InputHash == "" {
-		return a, "", fmt.Errorf("step-1 artifact requires settled prompt-v3 family choices and input evidence")
+		return a, "", fmt.Errorf("step-1 artifact requires settled two-step family choices and input evidence")
 	}
-	if err = validateArticleArtifact(a, taxonomyHash, familiesHash, false); err != nil {
+	if err = validateArticleArtifact(a, taxonomyHash, familiesHash, true); err != nil {
 		return a, "", fmt.Errorf("validate step-1 artifact: %w", err)
 	}
 	return a, hash, nil

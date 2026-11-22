@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go/v2"
@@ -56,17 +57,37 @@ func (r *Runner) Reconcile(ctx context.Context, id string, abandon bool) error {
 	if !ok {
 		return fmt.Errorf("provider batch listing is unavailable")
 	}
-	before := r.Now().Add(time.Minute)
-	if minimum := target.CreatedAt.Add(10 * time.Minute); before.Before(minimum) {
-		before = minimum
+	var intent Submission
+	if err = readRetainedFile(filepath.Join(r.IntentDir, "submissions", target.ID+".json"), &intent); err != nil {
+		return err
 	}
-	batches, err := r.captureListing(ctx, lister, target.ID, target.CreatedAt.Add(-time.Minute), before)
+	if abandon {
+		identity, ok := r.Client.(interface{ AccountFingerprint() string })
+		if !ok || !validID(intent.AccountFingerprint) || identity.AccountFingerprint() != intent.AccountFingerprint {
+			return fmt.Errorf("listing account differs from intent")
+		}
+	}
+	if abandon {
+		creator, lockErr := r.lockCreator(id)
+		if lockErr != nil {
+			return lockErr
+		}
+		defer func() { _ = creator.close() }()
+		quietSince, quietErr := r.creatorQuietSince(target)
+		if quietErr != nil {
+			return quietErr
+		}
+		if r.Now().Before(quietSince.Add(creatorQuietWindow)) {
+			return fmt.Errorf("cannot start listing before the creator has been quiet for 24 hours plus ten minutes")
+		}
+	}
+	batches, proof, err := r.captureListing(ctx, lister, target.ID, target.CreatedAt.Add(-time.Minute))
 	if err != nil {
 		return err
 	}
 	allEnded := true
 	for _, batch := range batches {
-		if batch.ProcessingStatus != "ended" {
+		if batch.Status != "ended" {
 			allEnded = false
 			continue
 		}
@@ -86,11 +107,6 @@ func (r *Runner) Reconcile(ctx context.Context, id string, abandon bool) error {
 	if !allEnded || r.Now().Before(target.CreatedAt.Add(creatorQuietWindow)) {
 		return fmt.Errorf("cannot abandon before the 24-hour provider window plus ten-minute margin or while candidate batches remain active")
 	}
-	creator, lockErr := r.lockCreator(id)
-	if lockErr != nil {
-		return lockErr
-	}
-	defer func() { _ = creator.close() }()
 	_, err = r.transition(ctx, id, func(latest *Submission) (bool, error) {
 		if !sameReconciliationTarget(target, *latest) {
 			return false, fmt.Errorf("submission changed during reconciliation; retry from its current state")
@@ -105,7 +121,11 @@ func (r *Runner) Reconcile(ctx context.Context, id string, abandon bool) error {
 		if r.Now().Before(quietSince.Add(creatorQuietWindow)) {
 			return false, fmt.Errorf("cannot abandon before the creator has been quiet for 24 hours plus ten minutes")
 		}
-		if writeErr := r.writeAbandonment(latest); writeErr != nil {
+		record := abandonmentRecord{ID: latest.ID, ItemsHash: latest.ItemsHash, AbandonedAt: r.Now().UTC().Truncate(time.Microsecond), captureReference: proof}
+		if evidenceErr := r.verifyAbandonmentListing(intent, record); evidenceErr != nil {
+			return false, evidenceErr
+		}
+		if writeErr := r.writeAbandonment(latest, proof); writeErr != nil {
 			return false, writeErr
 		}
 		latest.State = "abandoned"
@@ -122,11 +142,11 @@ func (r *Runner) reconcileKnownBatch(ctx context.Context, target Submission, bat
 	if r.Client == nil {
 		return fmt.Errorf("reconciliation requires a provider client")
 	}
-	batch, err := r.Client.Get(ctx, batchID)
+	batch, err := r.providerGet(ctx, target.ID, batchID)
 	if err != nil {
 		return providerError(err)
 	}
-	if batch.ProcessingStatus != "ended" {
+	if batch.Status != "ended" {
 		return fmt.Errorf("classification provider batch has not ended")
 	}
 	if err = r.captureResults(ctx, target.ID, batchID, batch.CreatedAt); err != nil {
@@ -144,12 +164,12 @@ func (r *Runner) checkAbandonmentReceipt(s Submission) error {
 	if s.BatchID != "" {
 		return fmt.Errorf("cannot abandon a submission with a provider batch identity")
 	}
-	found, err := r.restoreReceipt(&s)
+	_, _, seenID, successfulCreate, err := r.retainedReceipt(s)
 	if err != nil {
 		return err
 	}
-	if found {
-		return fmt.Errorf("cannot abandon a submission with a retained provider receipt")
+	if seenID != "" || successfulCreate {
+		return fmt.Errorf("cannot abandon a submission with retained provider creation evidence")
 	}
 	return nil
 }

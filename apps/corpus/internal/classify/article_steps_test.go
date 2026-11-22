@@ -63,10 +63,10 @@ func TestArticleSteps_FamilyRequestAndValidation(t *testing.T) {
 func TestArticleSteps_RecipeSeparatesStepsAndLegacy(t *testing.T) {
 	legacy := articleRecipe(t)
 	first, second := stepRecipe(t, 1), stepRecipe(t, 2)
-	if err := first.Validate(); err != nil {
+	if err := first.validate(true); err != nil {
 		t.Fatal(err)
 	}
-	if err := second.Validate(); err != nil {
+	if err := second.validate(true); err != nil {
 		t.Fatal(err)
 	}
 	if first.Hash() == legacy.Hash() || second.Hash() == first.Hash() {
@@ -74,7 +74,7 @@ func TestArticleSteps_RecipeSeparatesStepsAndLegacy(t *testing.T) {
 	}
 	second.Model = "claude-sonnet-5-5"
 	second.Article.SourceRecipeHash = second.documentRecipe().Hash()
-	if second.Validate() == nil {
+	if second.validate(true) == nil {
 		t.Fatal("accepted a Sonnet trial")
 	}
 }
@@ -176,12 +176,12 @@ func TestArticleSteps_NodePlanUsesChosenFamilyAndChapter(t *testing.T) {
 	}
 }
 
-func TestArticleSteps_RefusesMissingStep1BeforeCounting(t *testing.T) {
+func TestArticleSteps_RefusesClosedStepBeforeCounting(t *testing.T) {
 	runner, ledger, client, o, families := runArticlesFixture(t)
 	o.Recipe = stepRecipe(t, 2)
 	o.DryRun = true
 	_, err := runner.Articles(context.Background(), o, "labels", articleInputs(1, ""), families, articleNodes())
-	if err == nil || !strings.Contains(err.Error(), "step-1 artifact") || client.counts != 0 || len(ledger.rows) != 0 {
+	if err == nil || client.counts != 0 || len(ledger.rows) != 0 {
 		t.Fatalf("error %v counts %d rows %d", err, client.counts, len(ledger.rows))
 	}
 }

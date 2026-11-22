@@ -62,7 +62,7 @@ Order: no new paid call runs before the result store lands, whatever its outcome
 
 - [x] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget (migration for the submission checks).
 - [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
-- [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
+- [ ] Trial `claude-fable-5-2` (cache-ordered prompts, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
 - [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
 - [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a trial of the newest Astra model on every slice.
 - [ ] Full run with the model chosen by classification-results.md "Providers and models", under the `full` budget set as above.

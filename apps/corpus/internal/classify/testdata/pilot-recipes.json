@@ -1,0 +1,389 @@
+[
+  {
+    "id": "0c41c27bfe82c86f7acf2ad74785a074",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "8cca82bf041bc33ae5964fd74deb0877dbacdbf061bcf8dfd1d7523cf14eeb80",
+        "prompt_version": 4,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "7824c78b46d9607297f76f3afe3cd0ba7ddd481e46fe877c594a0fb250f25906"
+  },
+  {
+    "id": "2b9cfa251c5a6e72bb0cf20f0b45c111",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "ed8cea5f3de42755e616e0f0ed533fbaecd38024b117a7da6546ddda462cae15",
+        "prompt_version": 4,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "09d354a242ec73440c5fc384e21af0cb43af1329aec55ee31113f00613981d16"
+  },
+  {
+    "id": "3ec47835319f9f5a9e3139db2032c6fd",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d"
+  },
+  {
+    "id": "4caad71cf55c7d20dc08bc88008fe4f0",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "8cca82bf041bc33ae5964fd74deb0877dbacdbf061bcf8dfd1d7523cf14eeb80",
+        "prompt_version": 3,
+        "schema_version": 1,
+        "max_tokens": 8192,
+        "step": 1
+      }
+    },
+    "hash": "180462165306b49ed4f72f90cab38bfd28eab7258995dfe013081ef4325807f5"
+  },
+  {
+    "id": "5e86e0e8c6e980614969471049272c3e",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d"
+  },
+  {
+    "id": "6e76f205f5ef3edd3f14547331116530",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554",
+        "families_sha256": "ede7a968c625a2a46e9a5b2e62ad0ed719bb81b946b108ef4a34f4fc48f30897",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 7643
+      }
+    },
+    "hash": "f0b7b960930da90cd130c5cb53bc79ede14d0a30b1d9edfa60803516605c845f"
+  },
+  {
+    "id": "706c582e9676beea38940ad31937c0ff",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554",
+        "families_sha256": "e45fd783ccb4f690e3e75c229cbc9df0bcc695f59340df7eaa7361be3bc2e734",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "37b4d425dfd35fe506f5c9e23b924935fc63dd720a2fd4a7379e4fec8e205083"
+  },
+  {
+    "id": "76d1384b1b9e1cfa4c330d1affeb4c1e",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 1,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "8f11122f5d1864008946cdb9966874c559f5f365612dfe31d186b1772d936c7a",
+        "families_sha256": "c5533522eb7627e096b0f3ef0ff007ce60d9f86b9a65594f0b99278fd608ef17",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "1d9cb91fd64af3e4bc0966e098333ad4f79930a38b4c7500a24b078ec35103c8"
+  },
+  {
+    "id": "894571ab8b9a3be803e87995fb6f099e",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "8cca82bf041bc33ae5964fd74deb0877dbacdbf061bcf8dfd1d7523cf14eeb80",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "39bbe4e39c27d2ba899eb000e5a5502a2acd6ead6d78737d13839378e82c8a89"
+  },
+  {
+    "id": "9721159f57188146aab72bc26d28c293",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554"
+  },
+  {
+    "id": "9c42d722710c32d34aac587b42b4d1a6",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "ed8cea5f3de42755e616e0f0ed533fbaecd38024b117a7da6546ddda462cae15",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "36926768a4420debc0c5e525c587814fd96288fe39f99737c67426a737317bed"
+  },
+  {
+    "id": "a695b493fe855f8f7b08483a93ef9b52",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554"
+  },
+  {
+    "id": "b5d5bec473d3cb8df4550aa02fe78804",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554",
+        "families_sha256": "5f6418b015cc95ed6444cee83d0e76fe5e425b4fdd14e48a9cc5b569f3b2ffa6",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "9e4cf90f3b5745188378562f46b9b9ac5a0193e807bb4801b7f8690817a519c5"
+  },
+  {
+    "id": "b60bbefcd5fa922ef267201f63702bae",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "1ae15910d06f175dce9cb9967eb87ed585afb4ef871cda80ec71ed25fea8f949",
+        "prompt_version": 1,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "dc6ee3f6f740f7c9704919646ab309c5953ca9498bb70e02aae8e19025bf2c98"
+  },
+  {
+    "id": "b98d75b58e0a470fc10906515017238b",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "1ae15910d06f175dce9cb9967eb87ed585afb4ef871cda80ec71ed25fea8f949",
+        "prompt_version": 4,
+        "schema_version": 1,
+        "max_tokens": 8192
+      }
+    },
+    "hash": "45851749a9ee47e3ba97b8ef57482d22ce8f3e36bd4f7f969b49e92430a30886"
+  },
+  {
+    "id": "d170fb45a35f887f21e94105033ef6b3",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 1,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "8f11122f5d1864008946cdb9966874c559f5f365612dfe31d186b1772d936c7a"
+  },
+  {
+    "id": "d882ae1dc1b6c2e37d74ace47bb71519",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 1,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "8f11122f5d1864008946cdb9966874c559f5f365612dfe31d186b1772d936c7a"
+  },
+  {
+    "id": "e14fa5286d9908d27fe22d733d4ae0f4",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5",
+      "article": {
+        "source_recipe_hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d",
+        "families_sha256": "8cca82bf041bc33ae5964fd74deb0877dbacdbf061bcf8dfd1d7523cf14eeb80",
+        "prompt_version": 3,
+        "schema_version": 1,
+        "max_tokens": 8192,
+        "step": 2,
+        "step_1_sha256": "8db4cfb52dcc87aef4c387424bbd6bd83af1800fe95cda8437b855999b5c297d"
+      }
+    },
+    "hash": "8f467601a6fb2d1aef1dc0b5f230ba4768f2e7db1c211c76f6f22a2f21bb3fee"
+  },
+  {
+    "id": "ea164a04089ea3bb7e7c0fdbf52b0a6f",
+    "recipe": {
+      "version": 1,
+      "model": "claude-sonnet-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "aef60388ea6db5f8b5d70460a154b6f1442a8d5e9cf26bca450d2e6d89af4554"
+  },
+  {
+    "id": "efaa4e12ba2cdf64939178469f9ac4c8",
+    "recipe": {
+      "version": 1,
+      "model": "claude-haiku-5-5",
+      "effort": "medium",
+      "max_tokens": 4096,
+      "input_bound": 90000,
+      "families": 5,
+      "prompt_version": 2,
+      "schema_version": 2,
+      "taxonomy_hash": "3a2b4908bdb87dfa7af61544e39d8d79b076f002c1d67133a5dbc51535ec5bf5"
+    },
+    "hash": "b8d7689a3e64ca76c1a6b4c6aa754a8fc85da4f99e49739a0a239e8fede2462d"
+  }
+]
