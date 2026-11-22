@@ -3,6 +3,7 @@ import json
 import re
 
 from corpus_fixture_history import REPOSITORY, FixtureHistory, git, unique_object
+from manifest import canonical
 
 
 FIELDS = {'entry_id', 'question', 'target', 'acting', 'relation_kind'}
@@ -10,7 +11,7 @@ KINDS = {'repeals', 'amends_supplements', 'replaces', 'suspends'}
 
 
 def handle(value, country, allow_ambiguous=False):
-    if not isinstance(value, str) or value.count('#') != 1:
+    if not isinstance(value, str) or value.count('#') != 1 or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in value):
         raise ValueError('invalid warning handle')
     key, anchor = value.split('#')
     if not key.startswith(country + ':') or len(key) <= len(country) + 1 or any(c.isspace() for c in key):
@@ -97,9 +98,25 @@ def validate_warnings(report, cases, country):
 WARNING_PATH = 'apps/corpus/internal/evaluation/testdata/vn/warning-cases.json'
 
 
-def validate_authorized(report, country, commit='refs/heads/main', resign=False, root=REPOSITORY):
+def validate_authorized(report, country, *, commit=None, verified_report_hash=None, report_bytes=None, root=REPOSITORY):
+    if (commit is None) == (verified_report_hash is None):
+        raise ValueError('select exactly one warning authorization')
+    if not isinstance(report, dict):
+        raise ValueError('invalid report')
+    if commit is not None and (not isinstance(commit, str) or not (commit == 'refs/heads/main' or re.fullmatch('[0-9a-f]{40}', commit))):
+        raise ValueError('invalid trusted commit')
+    if verified_report_hash is not None:
+        if (not isinstance(verified_report_hash, str) or not re.fullmatch('[0-9a-f]{64}', verified_report_hash) or
+                not isinstance(report_bytes, bytes) or hashlib.sha256(report_bytes).hexdigest() != verified_report_hash):
+            raise ValueError('report differs from verified signed report')
+        try:
+            decoded = json.loads(report_bytes, object_pairs_hook=unique_object)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError('invalid signed report') from exc
+        if canonical(decoded) != canonical(report):
+            raise ValueError('report differs from verified signed report bytes')
     version = report.get('version')
-    if resign and version in (1, 2, 3):
+    if verified_report_hash is not None and type(version) is int and version in (1, 2, 3):
         return
     if type(version) is not int or version != 4:
         raise ValueError('new release requires report version 4')
@@ -107,7 +124,7 @@ def validate_authorized(report, country, commit='refs/heads/main', resign=False,
     digest = hashes.get('Warnings') if isinstance(hashes, dict) else None
     if not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest):
         raise ValueError('missing warning fixture hash')
-    if resign:
+    if verified_report_hash is not None:
         data = FixtureHistory(root, WARNING_PATH).fixture(digest)
     else:
         data = git(root, 'show', f'{commit}:{WARNING_PATH}')

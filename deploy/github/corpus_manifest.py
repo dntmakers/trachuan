@@ -15,7 +15,8 @@ from corpus_evidence import RUN_FIELDS, SIDECARS, validate_evidence_field, valid
 from corpus_fixture_history import FixtureHistory
 from corpus_floors import check_floors
 from corpus_old_product import check_rejection_records
-from corpus_period import PERIOD, check_partition, check_period, check_record_fields, no_historical_policy
+from corpus_period import check_partition, check_period, check_record_fields, no_historical_policy
+from corpus_report_contract import check_comparisons, no_research_override, non_regression_contract
 from corpus_revision import validate_version_three
 from corpus_rules import DECISION_FIELDS, has_decision, older_shape_allowed, require_status_country
 from corpus_warning import validate_authorized
@@ -51,52 +52,6 @@ def release_files(row):
     if row['schema_version'] >= 8:
         names += ('build.json',)
     return names + SIDECARS if has_decision(row['run']) else names
-
-
-def no_research_override(value):
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if key in {'cap_override', 'article_cap_override', 'historical_policy', 'non_current_tail'} and child is not None:
-                raise ValueError('research override is not releasable')
-            if key == 'not_yet_eligible' and child is not False:
-                raise ValueError('research override is not releasable')
-            no_research_override(child)
-    elif isinstance(value, list):
-        for child in value:
-            no_research_override(child)
-    elif value == 'research_override':
-        raise ValueError('research override is not releasable')
-
-
-def non_regression_contract():
-    comparisons = [dict(mode=mode, arms='hybrid', limit=limit, name=name, gating=gating)
-                   for mode in ('exact', 'ann')
-                   for name, limit, gating in (('recall', 20, True), ('mrr', 8, True),
-                                               ('abstention_balanced_accuracy', 8, False))]
-    return {'legacy': [], 'old_product': comparisons, 'development': comparisons,
-            'development_period': [entry.copy() for entry in PERIOD]}
-
-
-def check_comparisons(records, expected):
-    if not isinstance(records, list):
-        raise ValueError('invalid non_regression')
-    seen = {}
-    for record in records:
-        if not isinstance(record, dict) or type(record.get('gating')) is not bool:
-            raise ValueError('invalid non_regression gating')
-        if any(not isinstance(record.get(field), str) for field in ('mode', 'arms', 'name')) or type(record.get('limit')) is not int:
-            raise ValueError('invalid non_regression identity')
-        key = tuple(record[field] for field in ('mode', 'arms', 'limit', 'name'))
-        if key in seen:
-            raise ValueError('duplicate non_regression entry')
-        seen[key] = record
-        if record['gating'] and record.get('status') != 'pass':
-            raise ValueError('gating non_regression did not pass')
-    for entry in expected:
-        if entry['gating']:
-            key = tuple(entry[field] for field in ('mode', 'arms', 'limit', 'name'))
-            if key not in seen or seen[key]['gating'] is not True or seen[key].get('status') != 'pass':
-                raise ValueError('required non_regression gate missing or not passing')
 
 
 def validate_report(report, country, rel, previous_report=None, release_row=None, history=None):
@@ -221,7 +176,7 @@ def validate_inputs(country, rel, directory, report_path, signing=False):
     return inputs.row, inputs.report
 
 
-def validated_inputs(country, rel, directory, report_path, signing=False):
+def validated_inputs(country, rel, directory, report_path, signing=False, commit='refs/heads/main', verified_report_hash=None):
     identity(country, rel)
     row_bytes = (directory / 'release.json').read_bytes()
     row = decode(row_bytes)
@@ -229,9 +184,8 @@ def validated_inputs(country, rel, directory, report_path, signing=False):
     report = decode(report_bytes)
     if not isinstance(row, dict) or row.get('country') != country or row.get('rel') != rel:
         raise ValueError('release row identity differs from inputs')
+    validate_authorized(report, country, commit=commit, verified_report_hash=verified_report_hash, report_bytes=report_bytes)
     validate_report(report, country, rel, release_row=row)
-    if report['version'] == 4:
-        validate_authorized(report, country, resign=True)
     run = row.get('run')
     if not isinstance(run, dict) or run.get('complete') is not True or run.get('incomplete_items') != 0 or run.get('unaccepted_gaps') != 0:
         raise ValueError('run must be complete with every gap accepted')
@@ -338,8 +292,11 @@ def read_manifest(data):
     return obj
 
 
-def manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report=None):
-    row, report, evidence, sidecars, expected, _ = validated_inputs(country, rel, directory, report_path, signing=True)
+def manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report=None,
+                    verified_report_hash=None):
+    row, report, evidence, sidecars, expected, _ = validated_inputs(
+        country, rel, directory, report_path, signing=True, commit=None if verified_report_hash is not None else commit,
+        verified_report_hash=verified_report_hash)
     if previous_report is not None:
         validate_report(report, country, rel, previous_report=previous_report, release_row=row)
     obj = dict(kind='trachuan.corpus-release', version=1, repository=repository,
@@ -359,8 +316,9 @@ def manifest_fields(repository, commit, sequence, country, rel, directory, repor
 
 
 def create(repository, commit, sequence, country, rel, directory, report_path, previous_report=None,
-           heading_reviews_path=None):
-    obj = manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report)
+           heading_reviews_path=None, verified_report_hash=None):
+    obj = manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report,
+                          verified_report_hash=verified_report_hash)
     review = heading_review(rel, heading_reviews_path)
     if review is not None:
         obj['heading_review'] = review
@@ -387,15 +345,22 @@ def main():
         if os.environ['GITHUB_REF'] != 'refs/heads/main':
             raise ValueError('dispatch corpus release from main')
         from corpus_previous import check_remote
-        row, report, _, sidecars, _, _ = validated_inputs(args.country, args.rel, args.directory, args.report, signing=True)
+        from corpus_registry import existing_release
+        repository = workflow()
+        signed = existing_release(repository, args.country, args.rel, args.directory / 'authorization')
+        verified_hash = signed['report']['sha256'] if signed is not None else None
+        commit = os.environ['GITHUB_SHA']
+        row, report, _, sidecars, _, _ = validated_inputs(
+            args.country, args.rel, args.directory, args.report, signing=True,
+            commit=None if verified_hash is not None else commit, verified_report_hash=verified_hash)
         if sidecars is not None:
             print('Open findings allowed: review {review}, info {info}'.format(**sidecars['open']))
             print('Findings against {rel}: new {new}, gone {gone}'.format(rel=sidecars['predecessor']['rel'], **sidecars['changed']))
-        repository = workflow()
         previous_report = check_remote(report, repository, release_row=row, sidecars=sidecars)
         (args.directory / 'manifest.json').write_bytes(create(
             repository, os.environ['GITHUB_SHA'], int(os.environ['GITHUB_RUN_NUMBER']),
-            args.country, args.rel, args.directory, args.report, previous_report=previous_report))
+            args.country, args.rel, args.directory, args.report, previous_report=previous_report,
+            verified_report_hash=verified_hash))
 
 
 if __name__ == '__main__':

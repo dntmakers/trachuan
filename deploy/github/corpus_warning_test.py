@@ -1,13 +1,18 @@
+from repositories_test_support import enable_dual_policy as setUpModule
+
 import copy
 import hashlib
 import json
+from pathlib import Path
+import tempfile
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import corpus_upload
 
-from corpus_warning import warning_cases
+from corpus_fixture_history import FixtureHistory, git as fixture_git
+from corpus_test_support import git, write_release_fixture
+from corpus_warning import WARNING_PATH, warning_cases
 import corpus_warning
 
 
@@ -58,22 +63,42 @@ class WarningFixtureTest(unittest.TestCase):
         validate = getattr(corpus_warning, 'validate_authorized', lambda *args, **kwargs: None)
         with patch('corpus_warning.git', create=True, return_value=current):
             with self.assertRaises(ValueError):
-                validate(report, 'vn')
+                validate(report, 'vn', commit='refs/heads/main')
             report['version'] = 3
             with self.assertRaises(ValueError):
-                validate(report, 'vn')
+                validate(report, 'vn', commit='refs/heads/main')
 
     def test_upload_rejects_stale_warning_fixture_before_upload(self):
-        old = dict(version=4, fixture_hashes={'Warnings': hashlib.sha256(b'[]').hexdigest()},
-                   warning_cases=[], not_run={'warning_cases': 'not_run'})
-        inputs = SimpleNamespace(row={}, report=old, sidecars=None)
-        with patch.dict('os.environ', {'OCI_S3_ENDPOINT': 'https://invalid.example'}), \
-                patch('corpus_upload.require_listed'), patch('corpus_upload.validated_inputs', return_value=inputs), \
-                patch('corpus_warning.git', return_value=json.dumps([CASE]).encode()), \
-                patch('corpus_upload.require_settled') as settled:
-            with self.assertRaisesRegex(ValueError, 'warning fixture differs'):
-                corpus_upload.upload('vn', '20990102_1', None, None, 'repo')
-            settled.assert_not_called()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory, repository = root / 'release', root / 'repository'
+            directory.mkdir()
+            _, old = write_release_fixture(directory, repository)
+            (repository / WARNING_PATH).write_text(json.dumps([CASE]))
+            git(repository, 'add', WARNING_PATH)
+            git(repository, 'commit', '--quiet', '-m', 'add warning case')
+            with patch.dict('os.environ', {'OCI_S3_ENDPOINT': 'https://invalid.example'}), \
+                    patch('corpus_upload.require_listed'), \
+                    patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(repository)), \
+                    patch('corpus_warning.git', side_effect=lambda root, *args: fixture_git(repository, *args)), \
+                    patch('corpus_upload.require_settled') as settled:
+                with self.assertRaisesRegex(ValueError, 'warning fixture differs'):
+                    corpus_upload.upload('vn', old['rel'], directory, directory / 'report.json', 'repo')
+                settled.assert_not_called()
+
+    def test_control_characters_are_rejected_in_fixture_and_carrier_handles(self):
+        for control in ('\x00', '\x7f', '\x85', '\x9f'):
+            for field in ('target', 'acting'):
+                for location in ('key', 'anchor'):
+                    bad = copy.deepcopy(CASE)
+                    bad[field] = bad[field].replace('#', control + '#', 1) if location == 'key' else bad[field] + control
+                    with self.subTest(control=repr(control), field=field, location=location), self.assertRaises(ValueError):
+                        warning_cases(json.dumps([bad]).encode(), 'vn')
+            for carrier in ('vn:vbpl:1' + control + '#dieu-5', 'vn:vbpl:1#dieu-5' + control):
+                match = dict(carrier=carrier, dir='in', kind='repeals', key='vn:vbpl:2',
+                             in_release=True, source=CASE['acting'], target=CASE['target'], exact=True)
+                with self.subTest(control=repr(control), carrier=repr(carrier)), self.assertRaises(ValueError):
+                    corpus_warning.validate_match(match, CASE, 'vn')
 
     def test_invalid_fixture(self):
         variants = [b'{}', b'[' + b' ' * 65536 + b']', b'[{"entry_id":"x","entry_id":"y"}]',

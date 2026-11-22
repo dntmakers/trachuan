@@ -32,6 +32,19 @@ func TestWarningRead_PagingExactUnit(t *testing.T) {
 	}
 }
 
+func TestWarningRead_FirstTargetPartIsAuthoritative(t *testing.T) {
+	c := WarningCase{EntryID: "effect-example", Target: "vn:vbpl:1#dieu-5", Acting: "vn:vbpl:2#dieu-30", RelationKind: "repeals"}
+	w := retrieval.Warning{Pointer: retrieval.Pointer{Dir: "in", Kind: c.RelationKind, Key: "vn:vbpl:2", InRelease: true}, Source: c.Acting, Target: c.Target, Exact: true}
+	reader := &warningPageReader{pages: []retrieval.ItemResult{
+		{Doc: "vn:vbpl:1", Units: []retrieval.Unit{{Kind: "provision", Anchor: "dieu-5", Part: 1, Parts: 2}}, Next: "next"},
+		{Doc: "vn:vbpl:1", Units: []retrieval.Unit{{Kind: "provision", Anchor: "dieu-5", Part: 2, Parts: 2, Warnings: []retrieval.Warning{w}}}},
+	}}
+	match, err := readWarning(context.Background(), reader, "20990101", c)
+	if err != nil || match != nil || len(reader.requests) != 1 {
+		t.Fatalf("match = %+v, pages = %d, error = %v", match, len(reader.requests), err)
+	}
+}
+
 func TestWarningSearch_PresentedScopeAndIdentity(t *testing.T) {
 	c := WarningCase{EntryID: "effect-example", Target: "vn:vbpl:1#dieu-5", Acting: "vn:vbpl:2#dieu-30", RelationKind: "repeals"}
 	w := retrieval.Warning{Pointer: retrieval.Pointer{Dir: "in", Kind: c.RelationKind, Key: "vn:vbpl:2", InRelease: true}, Source: c.Acting, Target: c.Target, Exact: true}

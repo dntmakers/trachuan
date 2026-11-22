@@ -2,7 +2,9 @@ package run
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -62,6 +64,15 @@ func TestDecide_VersionFourFrozenReportComparesInEval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	suite.WarningBytes = []byte(`[{"entry_id":"effect-example","question":"Quy định gì?","target":"vn:vbpl:1#dieu-5","acting":"vn:vbpl:2#dieu-30","relation_kind":"repeals"}]`)
+	suite.WarningHash = fmt.Sprintf("%x", sha256.Sum256(suite.WarningBytes))
+	cases, err := suite.PinnedWarningCases("vn")
+	if err != nil || len(cases) != 1 {
+		t.Fatalf("synthetic warning fixture: %v", err)
+	}
+	suite.WarningBytes = []byte("[]\n")
+	suite.WarningHash = fmt.Sprintf("%x", sha256.Sum256(suite.WarningBytes))
+	suite.WarningCases = nil
 	prior, _, err := evaluation.Run(ctx, engine, suite, evaluation.Options{EvaluationDate: date})
 	if err != nil {
 		t.Fatal(err)

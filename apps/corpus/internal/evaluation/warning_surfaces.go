@@ -29,9 +29,7 @@ func readWarning(ctx context.Context, reader warningReader, release string, c Wa
 		page := response.Items[0]
 		for _, unit := range page.Units {
 			if unit.Kind == "provision" && unit.Anchor == anchor {
-				if match := warningMatch(c, c.Target, unit.Warnings); match != nil {
-					return match, nil
-				}
+				return warningMatch(c, c.Target, unit.Warnings), nil
 			}
 		}
 		if page.Next == "" {

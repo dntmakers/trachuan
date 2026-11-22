@@ -180,7 +180,7 @@ class CorpusUploadTest(unittest.TestCase):
         history_patch = patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(repository))
         history_patch.start()
         self.addCleanup(history_patch.stop)
-        for target in ('corpus_manifest.validate_authorized', 'corpus_upload.validate_authorized'):
+        for target in ('corpus_manifest.validate_authorized',):
             authorization = patch(target, side_effect=lambda report, country, **kwargs: validate_authorized(
                 report, country, root=repository, **kwargs))
             authorization.start()
@@ -403,7 +403,8 @@ class CorpusUploadTest(unittest.TestCase):
     def signed_manifest(self, **changes):
         from manifest import canonical
         support.save_fixture(self.build, self.row, self.report)
-        signed = json.loads(create('dannyota/trachuan', 'c' * 40, 7, 'vn', REL, self.build, self.build / 'report.json'))
+        commit = support.git(self.script.parents[1], 'rev-parse', 'HEAD').decode().strip()
+        signed = json.loads(create('dannyota/trachuan', commit, 7, 'vn', REL, self.build, self.build / 'report.json'))
         signed.pop('evidence')
         save_older_shape(self.build, self.row)
         (self.build / 'signed-manifest.json').write_bytes(canonical(signed | changes))
@@ -631,9 +632,10 @@ class CorpusUploadTest(unittest.TestCase):
         from corpus_test_support import digest
         from manifest import canonical
 
-        self.env.update(GITHUB_REF='refs/heads/main', GITHUB_SHA='a' * 40, GITHUB_RUN_NUMBER='10', GITHUB_REPOSITORY='dannyota/trachuan')
+        self.env.update(GITHUB_REF='refs/heads/main', GITHUB_SHA=support.git(self.script.parents[1], 'rev-parse', 'HEAD').decode().strip(), GITHUB_RUN_NUMBER='10', GITHUB_REPOSITORY='dannyota/trachuan')
         for fault in ('empty development', 'version downgrade'):
             self.row, self.report = write_fixture(self.build, self.script.parents[1])
+            self.env['GITHUB_SHA'] = support.git(self.script.parents[1], 'rev-parse', 'HEAD').decode().strip()
             self.log.unlink(missing_ok=True)
             if fault == 'empty development':
                 self.report['cases'] = [row for row in self.report['cases'] if row['cohort'] != 'development']
@@ -668,7 +670,7 @@ class CorpusUploadTest(unittest.TestCase):
                     self.assertFalse(any('put-object' in call['args'] or call['name'] == 'gh' for call in self.calls()))
 
     def test_signing_cli_checks_previous_before_creating_manifest(self):
-        self.env.update(GITHUB_REF='refs/heads/main', GITHUB_SHA='a' * 40, GITHUB_RUN_NUMBER='10', GITHUB_REPOSITORY='dannyota/trachuan')
+        self.env.update(GITHUB_REF='refs/heads/main', GITHUB_SHA=support.git(self.script.parents[1], 'rev-parse', 'HEAD').decode().strip(), GITHUB_RUN_NUMBER='10', GITHUB_REPOSITORY='dannyota/trachuan')
         command = ['python3', str(self.repo_tool('corpus_manifest.py')), 'create', 'vn', '20990102_1',
                    str(self.build), str(self.build / 'report.json')]
         result = subprocess.run(command, env=self.env, capture_output=True, text=True)

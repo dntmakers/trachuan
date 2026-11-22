@@ -133,13 +133,25 @@ def write_fixture(path):
     (path / 'corpus.dump').write_bytes(dump)
     (path / 'MANIFEST.sha256').write_bytes(manifest)
     save_fixture(path, row, report)
-    manifest = json.loads(create('dannyota/trachuan', 'a' * 40, 1, 'vn', row['rel'], path, path / 'report.json'))
+    manifest = json.loads(create('dannyota/trachuan', 'a' * 40, 1, 'vn', row['rel'], path, path / 'report.json',
+                                 verified_report_hash=digest((path / 'report.json').read_bytes())))
     manifest.pop('evidence', None)
     manifest.update(rel='20990101_1', database='corpus_vn_20990101_1', previous='20981231_1')
     manifest['dump']['object'] = 'vn/20990101_1/corpus.dump'
     manifest['report']['sha256'] = digest(previous_data)
     (path / 'previous-manifest.json').write_bytes(canonical(manifest))
     return row, report
+
+
+def signed_create(repository, commit, sequence, country, rel, directory, report_path, **kwargs):
+    return create(repository, commit, sequence, country, rel, directory, report_path,
+                  verified_report_hash=digest(report_path.read_bytes()), **kwargs)
+
+
+def signed_inputs(country, rel, directory, report_path, **kwargs):
+    from corpus_manifest import validated_inputs
+    return validated_inputs(country, rel, directory, report_path, signing=True, commit=None,
+                            verified_report_hash=digest(report_path.read_bytes()), **kwargs)
 
 
 def release_fixture_history(repository):

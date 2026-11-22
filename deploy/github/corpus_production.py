@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -108,8 +109,12 @@ def shown(manifest, field):
 
 def resign_differences(country, rel, directory, temporary, repository):
     signed = signed_release(repository, country, rel, temporary)
+    local_hash = hashlib.sha256((directory / 'report.json').read_bytes()).hexdigest()
+    if local_hash != signed['report']['sha256']:
+        return signed, [('report_sha256', signed['report']['sha256'], local_hash)]
     rebuilt = validate_manifest(manifest_fields(repository, signed['commit'], signed['sequence'], country, rel,
-                                                directory, directory / 'report.json'))
+                                                directory, directory / 'report.json',
+                                                verified_report_hash=signed['report']['sha256']))
     return signed, [(field, shown(signed, field), shown(rebuilt, field)) for field in changed_fields(signed, rebuilt)]
 
 

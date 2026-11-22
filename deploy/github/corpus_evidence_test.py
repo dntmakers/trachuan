@@ -10,9 +10,10 @@ from unittest.mock import patch
 
 import corpus_evidence
 from corpus_evidence import CHANGES, FINDINGS, IDENTITY, SIDECARS, require_predecessor
-from corpus_manifest import create, release_files, validate_manifest, validated_inputs
+from corpus_manifest import release_files, validate_manifest
 from corpus_rules import DECISION_FIELDS
-from corpus_test_support import digest, evidence_bindings, findings_fixture, jsonl, write_evidence, write_fixture
+from corpus_test_support import (digest, evidence_bindings, findings_fixture, jsonl, signed_create as create,
+                                 signed_inputs as validated_inputs, write_evidence, write_fixture)
 
 REL = '20990102_1'
 

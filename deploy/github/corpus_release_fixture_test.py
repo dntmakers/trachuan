@@ -26,4 +26,4 @@ class ReleaseFixtureTest(unittest.TestCase):
             previous = json.loads((root / 'release' / 'previous-report.json').read_bytes())
             validate_report(report, 'vn', report['rel'], previous_report=previous, release_row=row,
                             history=FixtureHistory(root / 'repository'))
-            validate_authorized(report, 'vn', root=root / 'repository')
+            validate_authorized(report, 'vn', commit='refs/heads/main', root=root / 'repository')
