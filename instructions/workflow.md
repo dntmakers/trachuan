@@ -7,16 +7,16 @@ The primary session plans, writes and reviews designs, ADRs and documentation, m
 |Work|Role and model|
 |-|-|
 |Design, ADR, contract proposal, documentation, decisions|The primary, which reviews its own documentation and prose|
-|Independent review of an architecture design, ADR or routine code|`sol-reviewer` or Opus|
-|Routine implementation, troubleshooting with supplied evidence|`terra-implementer` or Sonnet|
+|Independent review of an architecture design, ADR or routine code|GPT Sol or Opus|
+|Routine implementation, troubleshooting with supplied evidence|GPT Terra or Sonnet|
 |Hard or complex implementation|Sol or Opus|
-|Hard independent review (security, concurrency, migration, or repeated failure)|`astra-reviewer` or Fable; neither implements code|
+|Hard independent review (security, concurrency, migration, or repeated failure)|GPT Astra or Fable; neither implements code|
 |Searches, summaries, mechanical reading|Claude `Explore` agent|
 |Optional second design draft|Codex CLI `designer`, docs only, at the primary's discretion|
 
-Prefer a fresh direct `Agent` with the named `subagent_type` and no `model` override. Give read-only reviewers the exact diff, worktree status, local checks and exact-commit CI evidence. State the route in the brief; choose a different model from the author and resume the same reviewer for confirmations.
+Dispatch every worker as a fresh `Agent` subagent. Claude models take `model` (`sonnet`, `opus`, `fable`); GPT models take `subagent_type` `terra`, `sol` or `astra`, the owner's user-level agents with the model in frontmatter, and no `model` override. Confirm the child's runtime model before relying on it. These agents have every tool, so each brief carries the role rules from `.codex/agents/implementer.toml` or `reviewer.toml`; a reviewer brief forbids edits, writing commands and Git. Give reviewers the exact diff, worktree status, local checks and exact-commit CI evidence. State the route in the brief; choose a different model from the author and resume the same reviewer for confirmations.
 
-If direct dispatch is unavailable, use `scripts/codex-agent.sh [--model <m>] [--effort <e>] [--search] [--resume <session-id>] <role> <worktree> <brief-file> <report-file>`. A CLI resume requires the model that started the worker, even when it differs from the role default.
+If direct dispatch fails or the runtime model cannot be confirmed, use `scripts/codex-agent.sh [--model <m>] [--effort <e>] [--search] [--resume <session-id>] <role> <worktree> <brief-file> <report-file>`. A CLI resume requires the model that started the worker, even when it differs from the role default.
 
 ## Flow
 
@@ -25,7 +25,7 @@ If direct dispatch is unavailable, use `scripts/codex-agent.sh [--model <m>] [--
 3. Brief one implementer per bounded task with exact owned paths. Failing test first, then the smallest fix. Adversarial cases for hostile input, authorization, races and bounds belong to the author.
 4. The primary runs `make pre-push` and the checks the brief names, inspects the diff and report, then dispatches the independent reviewer once after the last code task. One-line and test-only changes skip review.
 5. Return findings to the author; the same reviewer confirms the fixes.
-6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head. The owner merges with a signed merge; delete merged branches.
+6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head. The owner merges with a signed merge; delete merged branches. A change only to agent setup or working process (`.claude/`, `.codex/`, AGENTS.md, CLAUDE.md, `instructions/`) needs no independent review: the primary merges it after `make pre-push` with `gh pr merge --admin`, which the repository admin role may bypass on the `main` ruleset.
 7. When CI fails, the primary saves the failing job logs to the scratchpad and briefs `implementer` with them. Two red runs from the same cause means stop and repair the process.
 
 ## Reviews

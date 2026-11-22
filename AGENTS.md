@@ -2,7 +2,7 @@
 
 ## Scope and authority
 
-This file owns the shared rules for Claude Code and Codex in trachuan. `CLAUDE.md` imports it and adds Claude Code specifics. Component `AGENTS.md` files, added when a component exists, map local sources, boundaries and checks. Agent definitions in `.claude/agents/` and `.codex/agents/` are thin wrappers that name a duty and the instruction files that role reads.
+This file owns the shared rules for Claude Code and Codex in trachuan. `CLAUDE.md` imports it and adds Claude Code specifics. Component `AGENTS.md` files, added when a component exists, map local sources, boundaries and checks. Role definitions in `.codex/agents/` are thin wrappers that name a duty and the instruction files that role reads; Claude Code subagents get the same role rules in their brief.
 
 Direct owner instructions and platform safety rules come first.
 
