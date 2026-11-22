@@ -16,15 +16,35 @@ func Run(args []string, out io.Writer) error {
 	}
 	f, err := os.Open("sources/frameworks.yaml")
 	if err != nil {
-		return fmt.Errorf("open registry: %w", err)
+		return fmt.Errorf("frameworks command failed")
 	}
 	defer func() { _ = f.Close() }()
 	reg, err := registry.Parse(f)
 	if err != nil {
-		return fmt.Errorf("read registry: %w", err)
+		return fmt.Errorf("frameworks command failed")
 	}
 
 	if len(args) == 1 {
+		licensed := false
+		for _, v := range reg.Frameworks {
+			if v.Access != "licensed" {
+				continue
+			}
+			if v.Parser != "" {
+				licensed = true
+			}
+			for _, file := range v.Files {
+				if file.Role == "mapping workbook" {
+					licensed = true
+				}
+			}
+		}
+		if licensed {
+			if err := edgeStats(reg, io.Discard); err != nil {
+				return fmt.Errorf("frameworks command failed")
+			}
+			return nil
+		}
 		return edgeStats(reg, out)
 	}
 	targets := map[string]string{}
@@ -38,47 +58,59 @@ func Run(args []string, out io.Writer) error {
 		if v.Code != args[0] || v.Version != args[1] {
 			continue
 		}
-		for _, file := range v.Files {
-			if file.Role != "catalog" {
-				continue
+		file, err := v.SelectedSource()
+		if err != nil {
+			if v.Access == "licensed" {
+				return fmt.Errorf("frameworks command failed")
 			}
-			data, err := reg.Read(file.Path)
+			return err
+		}
+		data, err := reg.Read(file.Path)
+		if err != nil {
+			if v.Access == "licensed" {
+				return fmt.Errorf("frameworks command failed")
+			}
+			return fmt.Errorf("read catalog: %w", err)
+		}
+		result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
+		if v.Access == "licensed" {
 			if err != nil {
-				return fmt.Errorf("read catalog: %w", err)
+				return fmt.Errorf("frameworks command failed")
 			}
-			result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
-			if result != nil {
-				if reportErr := parse.Report(out, result, targets); reportErr != nil {
-					return fmt.Errorf("write statistics: %w", reportErr)
-				}
-			}
-			if err != nil {
-				return err
+			if _, writeErr := fmt.Fprintf(out, "controls: %d\n", *v.ExpectedControls); writeErr != nil {
+				return fmt.Errorf("frameworks command failed")
 			}
 			return nil
 		}
-		return fmt.Errorf("catalog not registered")
+		if result != nil {
+			if reportErr := parse.Report(out, result, targets); reportErr != nil {
+				return fmt.Errorf("write statistics: %w", reportErr)
+			}
+		}
+		return err
 	}
-	return fmt.Errorf("version not registered")
+	return fmt.Errorf("frameworks command failed")
 }
 
 func edgeStats(reg *registry.Registry, out io.Writer) error {
 	catalogs := map[string]*parse.Result{}
 	for _, v := range reg.Frameworks {
-		for _, file := range v.Files {
-			if file.Role != "catalog" || v.Parser == "" {
-				continue
-			}
-			data, err := reg.Read(file.Path)
-			if err != nil {
-				return fmt.Errorf("read catalog: %w", err)
-			}
-			result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
-			if err != nil {
-				return fmt.Errorf("parse catalog: %w", err)
-			}
-			catalogs[v.Code+":"+v.Version] = result
+		if v.Parser == "" {
+			continue
 		}
+		file, err := v.SelectedSource()
+		if err != nil {
+			return err
+		}
+		data, err := reg.Read(file.Path)
+		if err != nil {
+			return fmt.Errorf("read catalog: %w", err)
+		}
+		result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
+		if err != nil {
+			return fmt.Errorf("parse catalog: %w", err)
+		}
+		catalogs[v.Code+":"+v.Version] = result
 	}
 	var inputs []relate.Input
 	dropped := 0

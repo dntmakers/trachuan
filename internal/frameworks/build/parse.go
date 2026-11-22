@@ -75,16 +75,11 @@ func parseStep(ctx context.Context, base, dir string) error {
 }
 
 func parseVersion(snapshot string, v registry.Framework) (*parse.Result, error) {
-	var catalogs []registry.File
-	for _, file := range v.Files {
-		if file.Role == "catalog" {
-			catalogs = append(catalogs, file)
-		}
+	file, err := v.SelectedSource()
+	if err != nil {
+		return nil, err
 	}
-	if len(catalogs) != 1 {
-		return nil, fmt.Errorf("expected one catalog per release version")
-	}
-	data, err := readFile(filepath.Join(snapshot, "files", catalogs[0].Path))
+	data, err := readFile(filepath.Join(snapshot, "files", file.Path))
 	if err != nil {
 		return nil, err
 	}

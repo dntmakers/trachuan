@@ -37,6 +37,7 @@ type Framework struct {
 	Aliases          []string `yaml:"aliases"`
 	Files            []File   `yaml:"files"`
 	Parser           string   `yaml:"parser"`
+	ParseSource      string   `yaml:"parse_source"`
 	ExpectedControls *int     `yaml:"expected_controls"`
 }
 type File struct {
@@ -162,6 +163,11 @@ func (r *Registry) Validate() error {
 			}
 			paths[file.Path] = true
 			hashes[file.SHA256] = true
+		}
+		if f.ParseSource != "" || f.Parser == "csa-ccm-4-1-xlsx" {
+			if _, err := f.SelectedSource(); err != nil {
+				return fmt.Errorf("invalid parse source for %s", f.Code)
+			}
 		}
 	}
 	if len(r.Frameworks) == 0 {
