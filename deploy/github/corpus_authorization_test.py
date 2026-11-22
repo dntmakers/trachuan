@@ -43,6 +43,41 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         warning_git.start()
         self.addCleanup(warning_git.stop)
 
+    def test_lone_surrogates_fail_before_either_trust_source(self):
+        for location in ('carrier', 'metadata', 'key'):
+            report = dict(self.report)
+            if location == 'carrier':
+                report['warning_cases'] = [{'search': [{'match': {'carrier': 'vn:vbpl:1#dieu-\ud800'}}]}]
+            elif location == 'metadata':
+                report['metadata'] = ['synthetic-sensitive\udfff']
+            else:
+                report['\ud800'] = 'synthetic-sensitive'
+            data = json.dumps(report).encode()
+            report = json.loads(data)
+            signed_hash = hashlib.sha256(data).hexdigest()
+            for source in ({'commit': 'refs/heads/main'}, {'verified_report_hash': signed_hash, 'report_bytes': data}):
+                with self.subTest(location=location, source=list(source)):
+                    with patch('corpus_warning.FixtureHistory', side_effect=AssertionError('history read')), \
+                            patch('corpus_warning.git', side_effect=AssertionError('commit read')), \
+                            self.assertRaises(ValueError) as caught:
+                        validate_authorized(report, 'vn', **source)
+                    self.assertNotIsInstance(caught.exception, UnicodeEncodeError)
+                    self.assertNotIn('synthetic-sensitive', str(caught.exception))
+                    self.assertNotIn('d800', str(caught.exception))
+                    self.assertNotIn('dfff', str(caught.exception))
+
+    def test_supplementary_scalar_is_valid_for_both_trust_sources(self):
+        report = dict(self.report, metadata='\U0001f680')
+        report['fixture_hashes'] = dict(report['fixture_hashes'], Warnings=hashlib.sha256(b'[]').hexdigest())
+        data = json.dumps(report).encode()
+        self.assertIn(b'\\ud83d\\ude80', data)
+        for source in ({'commit': 'refs/heads/main'},
+                       {'verified_report_hash': hashlib.sha256(data).hexdigest(), 'report_bytes': data}):
+            with self.subTest(source=list(source)), patch('corpus_warning.git', return_value=b'[]'), \
+                    patch('corpus_warning.FixtureHistory') as history:
+                history.return_value.fixture.return_value = b'[]'
+                validate_authorized(report, 'vn', **source)
+
     def test_signed_report_object_must_match_json_types(self):
         data = self.report_path.read_bytes()
         altered = self.report | {'quality_pass': 1}

@@ -100,6 +100,30 @@ class WarningFixtureTest(unittest.TestCase):
                 with self.subTest(control=repr(control), carrier=repr(carrier)), self.assertRaises(ValueError):
                     corpus_warning.validate_match(match, CASE, 'vn')
 
+    def test_fixture_rejects_lone_surrogates_without_echoing_values(self):
+        for field in ('question', 'target', 'acting'):
+            case = dict(CASE)
+            case[field] += 'synthetic-sensitive\ud800'
+            data = json.dumps([case]).encode()
+            with self.subTest(field=field):
+                with self.assertRaises(ValueError) as caught:
+                    warning_cases(data, 'vn')
+                self.assertNotIsInstance(caught.exception, UnicodeEncodeError)
+                self.assertNotIn('synthetic-sensitive', str(caught.exception))
+                self.assertNotIn('d800', str(caught.exception))
+        case = dict(CASE, **{'\udfff': 'synthetic-sensitive'})
+        with self.assertRaises(ValueError) as caught:
+            warning_cases(json.dumps([case]).encode(), 'vn')
+        self.assertNotIsInstance(caught.exception, UnicodeEncodeError)
+        self.assertNotIn('synthetic-sensitive', str(caught.exception))
+        self.assertNotIn('dfff', str(caught.exception))
+
+    def test_fixture_accepts_paired_supplementary_character(self):
+        case = dict(CASE, question='Question \U0001f680', target='vn:vbpl:1#dieu-\U0001f680')
+        data = json.dumps([case]).encode()
+        self.assertIn(b'\\ud83d\\ude80', data)
+        self.assertEqual(warning_cases(data, 'vn'), [case])
+
     def test_invalid_fixture(self):
         variants = [b'{}', b'[' + b' ' * 65536 + b']', b'[{"entry_id":"x","entry_id":"y"}]',
                     json.dumps([CASE, CASE]).encode(), json.dumps([CASE | {'extra': 1}]).encode(),

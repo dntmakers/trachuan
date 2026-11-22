@@ -10,6 +10,13 @@ FIELDS = {'entry_id', 'question', 'target', 'acting', 'relation_kind'}
 KINDS = {'repeals', 'amends_supplements', 'replaces', 'suspends'}
 
 
+def scalar_json(value):
+    try:
+        return canonical(value)
+    except UnicodeEncodeError:
+        raise ValueError('invalid Unicode scalar') from None
+
+
 def handle(value, country, allow_ambiguous=False):
     if not isinstance(value, str) or value.count('#') != 1 or any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in value):
         raise ValueError('invalid warning handle')
@@ -33,6 +40,7 @@ def warning_cases(data, country):
                            parse_constant=lambda value: (_ for _ in ()).throw(ValueError('invalid JSON constant')))
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise ValueError('invalid warning fixture JSON') from exc
+    scalar_json(cases)
     if not isinstance(cases, list) or len(cases) > 20:
         raise ValueError('invalid warning fixture array')
     previous = ''
@@ -103,6 +111,7 @@ def validate_authorized(report, country, *, commit=None, verified_report_hash=No
         raise ValueError('select exactly one warning authorization')
     if not isinstance(report, dict):
         raise ValueError('invalid report')
+    report_json = scalar_json(report)
     if commit is not None and (not isinstance(commit, str) or not (commit == 'refs/heads/main' or re.fullmatch('[0-9a-f]{40}', commit))):
         raise ValueError('invalid trusted commit')
     if verified_report_hash is not None:
@@ -113,7 +122,7 @@ def validate_authorized(report, country, *, commit=None, verified_report_hash=No
             decoded = json.loads(report_bytes, object_pairs_hook=unique_object)
         except (UnicodeError, json.JSONDecodeError) as exc:
             raise ValueError('invalid signed report') from exc
-        if canonical(decoded) != canonical(report):
+        if scalar_json(decoded) != report_json:
             raise ValueError('report differs from verified signed report bytes')
     version = report.get('version')
     if verified_report_hash is not None and type(version) is int and version in (1, 2, 3):
