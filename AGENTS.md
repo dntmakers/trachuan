@@ -37,7 +37,7 @@ Precedence: an accepted ADR wins over design text; design wins over a plan. Code
 
 ## Agents
 
-The primary session (`manager`) owns designs, ADRs, documentation, decisions, briefs, verification, Git, tags and deploys. Workers implement bounded tasks and reviewers independently review architecture designs and code. `instructions/workflow.md` owns dispatch and model routing. No model reviews its own work.
+The primary session owns designs, ADRs, documentation, decisions, briefs, verification, Git, tags and deploys. Workers implement bounded tasks and reviewers independently review architecture designs and code. `instructions/workflow.md` owns dispatch and model routing. No model reviews its own work.
 
 |Lane|Owned paths|Never|
 |-|-|-|

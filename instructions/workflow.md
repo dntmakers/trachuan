@@ -1,12 +1,12 @@
 # Workflow
 
-The primary session (`manager`) plans, writes and reviews designs, ADRs and documentation, makes the decisions, briefs, verifies and owns Git. Workers implement and troubleshoot bounded tasks; a reviewer on a different model from the author reviews architecture designs and code independently. The primary asks the owner only for decisions the owner must make, one at a time, with a recommendation.
+The primary session plans, writes and reviews designs, ADRs and documentation, makes the decisions, briefs, verifies and owns Git. Workers implement and troubleshoot bounded tasks; a reviewer on a different model from the author reviews architecture designs and code independently. The primary asks the owner only for decisions the owner must make, one at a time, with a recommendation. It answers worker questions from the reviewed design, settles conflicts itself with the reviewer's input, and records approved contract changes in `docs/design/` or an ADR before work resumes.
 
 ## Routes
 
 |Work|Role and model|
 |-|-|
-|Design, ADR, contract proposal, documentation, decisions|The primary (`manager`), which reviews its own documentation and prose|
+|Design, ADR, contract proposal, documentation, decisions|The primary, which reviews its own documentation and prose|
 |Independent review of an architecture design, ADR or routine code|`sol-reviewer` or Opus|
 |Routine implementation, troubleshooting with supplied evidence|`terra-implementer` or Sonnet|
 |Hard or complex implementation|Sol or Opus|
