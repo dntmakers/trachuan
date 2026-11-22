@@ -43,7 +43,9 @@ kind only.
 Parse errors, a control-count mismatch, an invalid or duplicate citation and an
 invalid lineage fail the step; they are not gaps.
 
-See [licensed parsers](frameworks-parsers.md) for version and title rules.
+See [licensed parsers](frameworks-parsers.md) for selection, extraction and
+title rules, and [parser profiles](frameworks-parser-profiles.md) for edition
+boundaries and citation rules.
 
 **Relate** emits edges by business key with source and relation, and each
 evidence value with the set of licensed versions whose text it uses, computed

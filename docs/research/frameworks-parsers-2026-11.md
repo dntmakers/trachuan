@@ -1,26 +1,25 @@
 # Licensed framework parser measurements, November 2026
 
-The local files yield the totals below. None of the scoped registry entries sets
-`expected_controls` yet; the amendment has no separate entry. These are proposed
-registry values, not passing runtime count checks. The primary reviews measured
-totals before each parser PR enables its registry entry.
+The local probe yielded the provisional totals below. None of the scoped
+registry entries set `expected_controls` at the time, and the amendment had no
+separate entry. Each parser PR sets its own expected count only after the
+[private acceptance checks](../design/frameworks-parsers.md#private-acceptance-before-enabling-a-parser).
 
 ## Method
 
-On 2026-11-22, read the registered files from the private source directory.
-Verify byte size and SHA-256 before extracting. With local Poppler 26.11.0,
-compare extraction from stdin with extraction by file path. Output bytes match
-for every measured PDF. `-layout` preserves the rows in the prose documents; PCI
-requires physical block and column positions (`-bbox-layout`). Use the profiles
-in [licensed parsers](../design/frameworks-parsers.md) to count opening
-citations, exclude headings in other regions and check parent prefixes. Count
-the workbook's primary sheet directly. No PDF or workbook cell text was written
-to disk, printed or copied into a fixture.
+On 2026-11-22, an exploratory probe verified the byte size and SHA-256 of the
+local inputs. Poppler 26.11.0 `-layout` preserved rows in the prose PDFs; PCI
+used physical block and column positions (`-bbox-layout`). The probe used
+[edition profiles](../design/frameworks-parser-profiles.md) to count citation
+openings and check parent prefixes, and read the workbook's primary sheet. It
+produced no persisted or printed text. It did not use the pinned sandboxed build
+adapter, so it is not parser PR evidence. All qualifying PDF measurements and PR
+checks must use that adapter with only the verified bytes. The totals were not
+remeasured in this design review.
 
-The publisher links identify the editions and sources. The public pages were not
-fetched during this offline measurement. No public source was verified for these
-exact catalog totals, which include structural nodes; the count column is
-measured and needs primary approval.
+The publisher links identify editions; the pages were not fetched offline. No
+public source was verified for these exact totals, which include structural
+nodes.
 
 | Edition                                                                                                                        | Registry value                                             | Measured and proposed |
 | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | --------------------: |
