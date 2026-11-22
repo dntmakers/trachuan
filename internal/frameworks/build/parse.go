@@ -30,18 +30,28 @@ func parseStep(ctx context.Context, base, dir string) error {
 	var controls []Control
 	var catalogs []catalog
 	var gaps []Gap
-	for _, v := range releaseVersions(reg) {
-		if err := ctx.Err(); err != nil {
-			return err
+	versions := releaseVersions(reg)
+	titleCatalog := newTitleCatalog()
+	for _, v := range versions {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
 		}
-		result, err := parseVersion(snapshot, v)
-		if err != nil {
-			return err
+		result, parseErr := parseVersion(snapshot, v)
+		if parseErr != nil {
+			return parseErr
 		}
-		if err := validateLineage(result.Nodes); err != nil {
-			return err
+		if lineageErr := validateLineage(result.Nodes); lineageErr != nil {
+			return lineageErr
 		}
 		catalogs = append(catalogs, catalog{v.Code, v.Version, result.Nodes})
+		titleCatalog.add(v, result.Nodes)
+	}
+	titles, err = titleCatalog.validate(titles, false)
+	if err != nil {
+		return err
+	}
+	for i, v := range versions {
+		result := &parse.Result{Nodes: catalogs[i].Nodes}
 		var rows []Control
 		for _, n := range result.Nodes {
 			row := Control{Code: v.Code, Version: v.Version, Citation: n.Citation, CitationNorm: n.CitationNorm, Kind: n.Kind, Ordinal: n.Ordinal, Status: n.Status, TitleOriginal: n.PublisherTitle, Body: n.Body, Notes: []string{}, Tables: []string{}}
