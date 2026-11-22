@@ -61,5 +61,5 @@ nodes.
 The private seed join passes for CSA CCM, ISO 27002, ISO 27017 and COBIT. ISO
 27001 and its amendment, ISO 27018, PCI and TCVN 11930 need reviewed paraphrases
 for uncovered nodes. AICPA needs stale rows removed. No publisher heading or
-seed title is reproduced here. These checks establish the citation inventory,
-not production parser correctness or text completeness.
+seed title is reproduced here. These checks propose the citation inventory, not
+production parser correctness or text completeness.
