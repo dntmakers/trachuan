@@ -55,9 +55,13 @@ never reports zero findings.
 | `partial_without_provision_effect`  | document           | status class `partial` and no relation targets any of its provisions; coarse, never proof that a document is explained                                                                         | info                                                                        |
 | `raw_field_not_normalized`          | document and field | a stored `number` or `title` differs from its trimmed NFC form                                                                                                                                 | info                                                                        |
 | `ocr_label_item_outside_labels`     | OCR check item     | an item of kind `document_number` or `article_label` lies in an annex or tail scope                                                                                                            | review                                                                      |
+| `tree_transcription_divergence`     | document           | the source tree is still served and differs in text volume from its accepted HTML transcription                                                                                                | info                                                                        |
 | `waived_document_without_relations` | document           | a document with an OCR waiver yields no text relation                                                                                                                                          | info                                                                        |
 | `relation_kind_disagreement`        | relation pair      | a text relation and the source diagram name different kinds for one pair                                                                                                                       | review                                                                      |
 | `external_report`                   | intake record      | an intake record is present ([Intake](#intake))                                                                                                                                                | review                                                                      |
+
+[Text detector inputs](detector-inputs.md) defines the two text checks, their
+frozen extract records and their coverage rules.
 
 `unmatched_operative_claim` applies the grammar of
 [relations from text](relations-text.md) read-only; it writes no relation. A
