@@ -63,6 +63,10 @@ a store row; several candidates are `text_source_ambiguous`). The entry is the
 row of the first accepted engine id that exists. It is usable only when
 `ocr_check` has a row for the recipe's checker id.
 
+The input hashes and frozen row format below describe legacy extract recipes.
+[`detector-inputs/1`](detector-inputs.md#capture-the-check-before-choosing-what-to-serve)
+adds the fetch binding and preserves completed checks even when OCR is withheld.
+
 - Usable: the input hash freezes the fetch hash, `ocr`, the text SHA-256 and the
   check result SHA-256. `text.json` records the PDF name and SHA-256, engine id,
   text SHA-256, checker id, result SHA-256 and flagged count. One or more
