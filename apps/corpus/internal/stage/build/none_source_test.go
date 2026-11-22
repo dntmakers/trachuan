@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
+	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -54,9 +55,9 @@ func TestLoad_RejectsProvisionsForNoneSource(t *testing.T) {
 				t.Fatal(result.err)
 			}
 			tx := &noneTx{}
-			l := loader{tx: tx, inv: Inventory{Country: "vn", ExpectedKeys: []string{key}}, artifacts: store, verified: map[string]verifiedFetch{key: {document: result.detail, dir: result.dir, hash: f.SHA256}}, present: map[string]bool{key: true}, docs: map[string]*loadedDocument{}, items: map[string]map[string]InventoryItem{
+			l := loader{tx: tx, inv: Inventory{Country: "vn", ExtractSnapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}, ExpectedKeys: []string{key}}, artifacts: store, verified: map[string]verifiedFetch{key: {document: result.detail, dir: result.dir, hash: f.SHA256}}, present: map[string]bool{key: true}, docs: map[string]*loadedDocument{}, items: map[string]map[string]InventoryItem{
 				"fetch":   {key: {ItemKey: key, State: "done", Path: &f.Path, ArtifactSHA256: &f.SHA256}},
-				"extract": {key: {ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &input}},
+				"extract": {key: {ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &input, RecipeHash: &recipe}},
 			}}
 			err := l.loadDocuments(ctx)
 			if err == nil || !strings.Contains(err.Error(), "text source none") {

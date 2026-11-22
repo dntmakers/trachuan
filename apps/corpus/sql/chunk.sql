@@ -14,7 +14,7 @@ ORDER BY e.item_key;
 -- name: GetChunkInput :one
 SELECT fa.path AS fetch_path, fa.sha256 AS fetch_sha256,
        ea.path AS extract_path, ea.sha256 AS extract_sha256,
-       ea.input_hash AS extract_input_hash, fa.item_key AS fetch_key,
+       ea.input_hash AS extract_input_hash, ea.recipe_hash AS extract_recipe_hash, fa.item_key AS fetch_key,
        ea.item_key AS extract_key
 FROM run_item e
 JOIN artifact ea ON ea.id = e.artifact_id

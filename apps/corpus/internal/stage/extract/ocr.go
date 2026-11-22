@@ -44,6 +44,7 @@ func selectOCRFilesMode(ctx context.Context, dir, id string, files []fetch.Docum
 	}
 	selected.consulted = true
 	if source == nil {
+		selected.pdfNames = names
 		return selected, nil
 	}
 	entries, err := source.Lookup(ctx, hashes, engines, checker)
@@ -80,11 +81,11 @@ func selectOCRFilesMode(ctx context.Context, dir, id string, files []fetch.Docum
 		return selection{}, err
 	}
 	if result.Verdict == "rejected" {
-		return selection{source: "none", gap: "ocr_rejected", reason: "checker rejected OCR text", consulted: true}, nil
+		return selection{source: "none", gap: "ocr_rejected", reason: "checker rejected OCR text", hash: hash, entry: &entry, consulted: true}, nil
 	}
 	for _, item := range result.Items {
 		if !matched && slices.Contains([]string{"article_label", "document_number"}, item.Kind) {
-			return selection{source: "none", gap: "ocr_label_flagged", reason: "checker flagged an article label or document number", consulted: true}, nil
+			return selection{source: "none", gap: "ocr_label_flagged", reason: "checker flagged an article label or document number", hash: hash, entry: &entry, consulted: true}, nil
 		}
 	}
 	if result.Verdict != "clean" && result.Verdict != "flagged" {
@@ -103,9 +104,21 @@ func selectionInputHash(fetchHash string, selected selection) string {
 	return InputHash(fetchHash, selected.source)
 }
 
+func observationInputHash(fetchHash string, selected selection) string {
+	base := selectionInputHash(fetchHash, selected)
+	if selected.entry == nil || selected.entry.Check == nil {
+		return base
+	}
+	entry := selected.entry
+	return fetch.ExtractObservationInputHash(base, selected.hash, entry.Text.EngineID, entry.Text.TextSha256, entry.Check.CheckerID, entry.Check.ResultSha256)
+}
+
 func parseOCR(selected selection, data []byte) ([]provision, []stage.Gap, *textRecord) {
 	entry := selected.entry
-	paragraphs, err := textparse.ParagraphsFromText(string(data))
+	paragraphs, err := selected.ocrParagraphs, selected.ocrParseErr
+	if !selected.ocrParsed {
+		paragraphs, err = textparse.ParagraphsFromText(string(data))
+	}
 	flagged := entry.Check.Flagged
 	record := &textRecord{TextSource: "ocr", FileName: selected.name, SHA256: selected.hash, EngineID: entry.Text.EngineID, TextSHA256: entry.Text.TextSha256, CheckerID: entry.Check.CheckerID, ResultSHA256: entry.Check.ResultSha256, Flagged: &flagged, Paragraphs: paragraphs}
 	rows, gaps, record := parseParagraphs(paragraphs, err, record)

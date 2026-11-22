@@ -22,13 +22,28 @@ type absentOCR struct{}
 
 func (absentOCR) available(string) bool { return false }
 
+type treeTranscriptionObservation struct {
+	State                                                            string
+	TreeChars, TranscriptionChars                                    int
+	TreeTextSHA256, TranscriptionTextSHA256, TranscriptionFileSHA256 string
+	MainAccepted                                                     bool
+}
+
 type selection struct {
+	treeTranscription       treeTranscriptionObservation
+	ocrState                string
 	source, gap, name, hash string
 	reason                  string
 	extraGap, extraReason   string
 	data                    []byte
 	tooLarge, parseLimit    bool
-	consulted               bool
+	consulted, ocrReachable bool
+	ocrHeadingOnly          bool
+	ocrParsed               bool
+	ocrParagraphs           []textparse.Paragraph
+	ocrParseErr             error
+	verifiedCheck           *ocrstore.CheckResult
+	pdfNames                map[string]string
 	entry                   *ocrstore.Entry
 	tree                    *treeComparison
 }
@@ -114,6 +129,21 @@ func chooseWithOCR(ctx context.Context, dir, key string, ocr ocrReader, engines 
 }
 
 func chooseForCheck(ctx context.Context, dir, key string, ocr ocrReader, engines []string, checker string, unchecked bool, waivers ...*Waiver) (selection, []vbpl.Node, error) {
+	selected, nodes, err := chooseForCheckRaw(ctx, dir, key, ocr, engines, checker, unchecked, waivers...)
+	setTreeTranscriptionDefault(key, &selected)
+	return selected, nodes, err
+}
+
+func setTreeTranscriptionDefault(key string, selected *selection) {
+	if selected.treeTranscription.State == "" {
+		selected.treeTranscription.State = "no_pair"
+		if parts := strings.SplitN(key, ":", 3); len(parts) == 3 && parts[1] != "vbpl" {
+			selected.treeTranscription.State = "not_applicable"
+		}
+	}
+}
+
+func chooseForCheckRaw(ctx context.Context, dir, key string, ocr ocrReader, engines []string, checker string, unchecked bool, waivers ...*Waiver) (selection, []vbpl.Node, error) {
 	parts := strings.SplitN(key, ":", 3)
 	if len(parts) != 3 {
 		return selection{}, nil, fmt.Errorf("invalid document key")
@@ -177,9 +207,20 @@ func chooseForCheck(ctx context.Context, dir, key string, ocr ocrReader, engines
 					}
 				}
 				if selected.source != "none" && !selected.tooLarge && !selected.parseLimit {
+					if selected.source == "html_transcription" {
+						tree, text, accepted, usable := partialTreeTexts(rows, selected)
+						selected.treeTranscription = treeTranscriptionValue(tree, text, accepted, usable, selected)
+					}
 					return selected, nil, nil
 				}
-				return selection{source: "source_tree", gap: "tree_headings_only", consulted: selected.consulted || selected.source == "none"}, nodes, nil
+				state := "not_selected"
+				if selected.consulted {
+					state = "unavailable"
+				}
+				if selected.entry != nil && selected.entry.Check != nil {
+					state = "checked"
+				}
+				return selection{source: "source_tree", gap: "tree_headings_only", hash: selected.hash, entry: selected.entry, ocrState: state, consulted: selected.consulted || selected.source == "none", ocrReachable: selected.consulted, ocrHeadingOnly: true, pdfNames: selected.pdfNames}, nodes, nil
 			}
 			transcription, selectErr := selectFiles(dir, parts[2], doc.Files, absentOCR{})
 			if selectErr != nil {
@@ -189,6 +230,8 @@ func chooseForCheck(ctx context.Context, dir, key string, ocr ocrReader, engines
 			comparison.HeadingOnlyArticles = headingCount
 			if comparison.SetAside {
 				transcription.tree = comparison
+				tree, text, accepted, usable := partialTreeTexts(rows, transcription)
+				transcription.treeTranscription = treeTranscriptionValue(tree, text, accepted, usable, transcription)
 				return transcription, nil, nil
 			}
 			gap := "tree_headings_partial"
@@ -203,6 +246,7 @@ func chooseForCheck(ctx context.Context, dir, key string, ocr ocrReader, engines
 		return selection{}, nil, fmt.Errorf("read fetch document: %w", err)
 	}
 	s, err := selectOCRFilesMode(ctx, dir, parts[2], doc.Files, ocr, engines, checker, unchecked, waivers...)
+	s.ocrReachable = s.consulted
 	return s, nil, err
 }
 

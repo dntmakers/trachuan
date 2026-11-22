@@ -38,7 +38,8 @@ func TestRelationReaders_ValidatePair(t *testing.T) {
 	extract := InventoryItem{Stage: "extract", ItemKey: key, State: "gap"}
 	extractInput := stage.RecipeHash("extract-input", "1", f.SHA256, "none", "absent", "no_text_source")
 	e := publish("extract", map[string]string{"text.json": `{"text_source":"none","gap":"no_text_source"}`, "provisions.json": `[]`})
-	done := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &extractInput}
+	recipe := strings.Repeat("b", 64)
+	done := InventoryItem{Stage: "extract", ItemKey: key, State: "done", Path: &e.Path, ArtifactSHA256: &e.SHA256, InputHash: &extractInput, RecipeHash: &recipe, authority: testExtractAuthority(key, &extractInput, &recipe)}
 	pair := relate.PairInputHash(f.SHA256, "-")
 	donePair := relate.PairInputHash(f.SHA256, e.SHA256)
 	relation := InventoryItem{Stage: "relate", ItemKey: key, State: "done", Path: &r.Path, ArtifactSHA256: &r.SHA256, InputHash: &pair}
@@ -64,7 +65,7 @@ func TestRelationReaders_ValidatePair(t *testing.T) {
 			if err := l.loadRelations(ctx, nil); (err == nil) != tc.valid {
 				t.Errorf("loadRelations error = %v", err)
 			}
-			inv := Inventory{ExpectedKeys: []string{key}, Items: items}
+			inv := Inventory{ExtractSnapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}, ExpectedKeys: []string{key}, Items: items}
 			if _, err := IdentityInventory(inv, store, nil); (err == nil) != tc.valid {
 				t.Errorf("IdentityInventory error = %v", err)
 			}

@@ -65,13 +65,16 @@ WHERE c.checker_id = $1 AND t.pdf_sha256 = ANY(sqlc.arg(pdf_sha256s)::text[])
 ORDER BY t.pdf_sha256;
 
 -- name: InsertRunOCRSelection :exec
-INSERT INTO run_ocr_selection (run_id, item_key, gap, pdf_sha256, ocr_text_id, ocr_check_id)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO run_ocr_selection (run_id, item_key, gap, pdf_sha256, ocr_text_id, ocr_check_id,
+                               selection_version, selection_state, text_source, fetch_sha256)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (run_id, item_key) DO NOTHING;
 
 -- name: GetRunOCRSelection :one
 SELECT s.run_id, s.item_key, s.gap, s.pdf_sha256, s.ocr_text_id, s.ocr_check_id,
-       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged
+       s.selection_version, s.selection_state, s.text_source, s.fetch_sha256,
+       t.pdf_sha256 AS text_pdf_sha256, c.ocr_text_id AS check_ocr_text_id,
+       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged, c.result AS check_result
 FROM run_ocr_selection s
 LEFT JOIN ocr_text t ON t.id = s.ocr_text_id
 LEFT JOIN ocr_check c ON c.id = s.ocr_check_id
@@ -79,7 +82,9 @@ WHERE s.run_id = $1 AND s.item_key = $2;
 
 -- name: ListRunOCRSelections :many
 SELECT s.run_id, s.item_key, s.gap, s.pdf_sha256, s.ocr_text_id, s.ocr_check_id,
-       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged
+       s.selection_version, s.selection_state, s.text_source, s.fetch_sha256,
+       t.pdf_sha256 AS text_pdf_sha256, c.ocr_text_id AS check_ocr_text_id,
+       t.engine_id, t.text_sha256, c.checker_id, c.result_sha256, c.flagged, c.result AS check_result
 FROM run_ocr_selection s
 LEFT JOIN ocr_text t ON t.id = s.ocr_text_id
 LEFT JOIN ocr_check c ON c.id = s.ocr_check_id

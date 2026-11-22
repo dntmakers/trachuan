@@ -114,3 +114,5 @@ func hashOf(detectors []Detector) string {
 func Canonical() []byte { return canonical(registry) }
 
 func Hash() string { return hashOf(registry) }
+
+func LegacyHash() string { return "53c5f4b2ba02ce3ffa7c98ec15b4efa4ba9878047f8af85d9ed41bdfdd639534" }

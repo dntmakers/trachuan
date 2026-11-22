@@ -28,7 +28,7 @@ func validateDatabase(ctx context.Context, cfg Config, name string, record Build
 	}
 	defer func() { _ = db.Close(context.Background()) }()
 	var matches bool
-	err = db.QueryRow(ctx, `SELECT country=$1 AND rel=$2 AND schema_version=$3 AND taxonomy_version=$4 AND dense_recipe=$5::jsonb AND chunk_recipe=$6::jsonb AND lexical_recipe=$7::jsonb AND retrieval_recipe=$8::jsonb AND lexical_stats=$9::jsonb AND source_manifest_hash=$10 AND build_input_hash=$11 AND build_recipe_hash=$12 AND evaluation_summary=$14::jsonb AND built_at=$13 FROM release WHERE singleton`, record.Country, record.Rel, record.SchemaVersion, record.TaxonomyVersion, record.DenseRecipe, record.ChunkRecipe, record.LexicalRecipe, record.RetrievalRecipe, record.LexicalStats, record.SourceManifestHash, record.BuildInputHash, record.BuildRecipeHash, record.BuiltAt, initialEvaluationSummary()).Scan(&matches)
+	matches, err = matchReleaseRecord(ctx, db, record, true)
 	if err != nil {
 		return fmt.Errorf("read corpus release: %w", err)
 	}
@@ -79,4 +79,17 @@ func validateLocked(ctx context.Context, admin *pgx.Conn, cfg Config, name strin
 		return fmt.Errorf("build lock lost: %w", pingErr)
 	}
 	return err
+}
+
+func matchReleaseRecord(ctx context.Context, db detectorDatabaseQueryer, record BuildRecord, initialEvaluation bool) (bool, error) {
+	query := `SELECT country=$1 AND rel=$2 AND schema_version=$3 AND taxonomy_version=$4 AND dense_recipe=$5::jsonb AND chunk_recipe=$6::jsonb AND lexical_recipe=$7::jsonb AND retrieval_recipe=$8::jsonb AND lexical_stats=$9::jsonb AND source_manifest_hash=$10 AND build_input_hash=$11 AND build_recipe_hash=$12 AND built_at=$13`
+	args := []any{record.Country, record.Rel, record.SchemaVersion, record.TaxonomyVersion, record.DenseRecipe, record.ChunkRecipe, record.LexicalRecipe, record.RetrievalRecipe, record.LexicalStats, record.SourceManifestHash, record.BuildInputHash, record.BuildRecipeHash, record.BuiltAt}
+	if initialEvaluation {
+		query += ` AND evaluation_summary=$14::jsonb`
+		args = append(args, initialEvaluationSummary())
+	}
+	query += ` FROM release WHERE singleton`
+	var matches bool
+	err := db.QueryRow(ctx, query, args...).Scan(&matches)
+	return matches, err
 }

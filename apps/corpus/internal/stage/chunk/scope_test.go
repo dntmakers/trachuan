@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"danny.vn/trachuan/apps/corpus/internal/stage"
 )
 
 func TestChunk_VBPLArtifactBytesUnchanged(t *testing.T) {
@@ -94,7 +96,9 @@ func TestChunk_GeneratedProvisionsChunked(t *testing.T) {
 
 func TestChunk_MissingTextRecordIsAccepted(t *testing.T) {
 	fetchHash := strings.Repeat("a", 64)
-	if err := checkExtractLineage(t.TempDir(), fetchHash, fetchHash); err != nil {
+	recipe := strings.Repeat("b", 64)
+	snapshot := stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": recipe}}
+	if err := checkExtractLineageForSnapshot(t.TempDir(), fetchHash, fetchHash, snapshot, recipe); err != nil {
 		t.Fatalf("missing record: %v", err)
 	}
 }

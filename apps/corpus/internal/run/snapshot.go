@@ -1,4 +1,3 @@
-// Package run implements corpus run lifecycle operations.
 package run
 
 import (
@@ -91,4 +90,49 @@ func includedStages(stages []string, until string, previousCount int) []string {
 		count = len(stages)
 	}
 	return stages[:count]
+}
+
+func freezeStartSnapshot(snapshot stage.Snapshot, stages []string, existing bool, recipesFor func(stage.Snapshot) map[string]string) (stage.Snapshot, error) {
+	frozenRecipe, frozen := snapshot.Recipes["extract"]
+	if frozen {
+		if frozenRecipe == "" || !containsStage(snapshot.Stages, "extract") {
+			return stage.Snapshot{}, fmt.Errorf("invalid frozen extract recipe")
+		}
+		if snapshot.ExtractRecordContract != stage.ExtractRecordLegacy && snapshot.ExtractRecordContract != stage.ExtractRecordV1 {
+			return stage.Snapshot{}, fmt.Errorf("missing or unknown frozen extract record contract")
+		}
+	} else {
+		if snapshot.ExtractRecordContract != "" || (existing && containsStage(snapshot.Stages, "extract")) {
+			return stage.Snapshot{}, fmt.Errorf("extract record contract and recipe are not frozen together")
+		}
+		if containsStage(stages, "extract") {
+			snapshot.ExtractRecordContract = stage.ExtractRecordV1
+		}
+	}
+	if existing && snapshot.ExtractRecordContract == stage.ExtractRecordLegacy && snapshot.PreviousReport != nil && !containsStage(snapshot.Stages, stage.EvidenceStage) && containsStage(stages, stage.EvidenceStage) {
+		return stage.Snapshot{}, fmt.Errorf("cannot add evidence to a legacy extract run")
+	}
+	recipes := recipesFor(snapshot)
+	if containsStage(stages, "extract") && recipes["extract"] == "" {
+		return stage.Snapshot{}, fmt.Errorf("missing recipe for stage %q", "extract")
+	}
+	if existing {
+		updated, _, err := extendSnapshot(snapshot, stages, recipes)
+		if err != nil {
+			return stage.Snapshot{}, err
+		}
+		if updated.ExtractRecordContract != "" && (updated.Recipes["extract"] == "" || !containsStage(updated.Stages, "extract")) {
+			return stage.Snapshot{}, fmt.Errorf("extract record contract and recipe are not frozen together")
+		}
+		return updated, nil
+	}
+	snapshot.Recipes = make(map[string]string, len(snapshot.Stages))
+	for _, name := range snapshot.Stages {
+		recipe, ok := recipes[name]
+		if !ok {
+			return stage.Snapshot{}, fmt.Errorf("missing recipe for stage %q", name)
+		}
+		snapshot.Recipes[name] = recipe
+	}
+	return snapshot, nil
 }

@@ -52,7 +52,8 @@ func TestChunk_SecondaryDocumentNoTreeNoChunksIntegration(t *testing.T) {
 	}
 	insertChunkInput(t, ctx, db, runID, "vn:chinhphu:1", fetchArt, extractArt)
 	env := stage.Env{DB: db, Artifacts: artifacts}
-	out, err := New().Process(ctx, env, stage.Run{ID: runID}, stage.Item{Key: "vn:chinhphu:1", InputHash: inputHash("vn:chinhphu:1", fetchArt.SHA256, extractArt.SHA256)})
+	run := stage.Run{ID: runID, Snapshot: stage.Snapshot{ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": strings.Repeat("c", 64)}}}
+	out, err := New().Process(ctx, env, run, stage.Item{Key: "vn:chinhphu:1", InputHash: inputHash("vn:chinhphu:1", fetchArt.SHA256, extractArt.SHA256)})
 	if err != nil {
 		t.Fatal(err)
 	}

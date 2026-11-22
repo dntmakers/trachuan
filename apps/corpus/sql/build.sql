@@ -7,7 +7,9 @@ SELECT jsonb_build_object(
   'items', COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'stage', i.stage, 'item_key', i.item_key, 'state', i.state,
     'input_hash', i.input_hash, 'recipe_hash', i.recipe_hash,
-    'artifact_sha256', a.sha256, 'path', a.path))
+    'artifact_sha256', a.sha256, 'path', a.path,
+    'artifact_stage', a.stage, 'artifact_item_key', a.item_key,
+    'artifact_input_hash', a.input_hash, 'artifact_recipe_hash', a.recipe_hash))
     FROM run_item i LEFT JOIN artifact a ON a.id = i.artifact_id
     WHERE i.run_id = sqlc.arg(run_id)), '[]'::jsonb),
   'gaps', COALESCE((SELECT jsonb_agg(jsonb_build_object(
@@ -24,7 +26,9 @@ SELECT jsonb_build_object(
   'items', COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'stage', i.stage, 'item_key', i.item_key, 'state', i.state,
     'input_hash', i.input_hash, 'recipe_hash', i.recipe_hash,
-    'artifact_sha256', a.sha256, 'path', a.path))
+    'artifact_sha256', a.sha256, 'path', a.path,
+    'artifact_stage', a.stage, 'artifact_item_key', a.item_key,
+    'artifact_input_hash', a.input_hash, 'artifact_recipe_hash', a.recipe_hash))
     FROM run_item i LEFT JOIN artifact a ON a.id = i.artifact_id
     WHERE i.run_id = sqlc.arg(run_id)), '[]'::jsonb),
   'gaps', COALESCE((SELECT jsonb_agg(jsonb_build_object(

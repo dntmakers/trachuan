@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"unicode/utf8"
@@ -10,7 +11,10 @@ import (
 )
 
 func partialTreeSelection(rows []provision, nodes []vbpl.Node, transcription, kept selection) (selection, []vbpl.Node, error) {
-	treeChars, transcriptionChars, accepted, usable := partialTreeLengths(rows, transcription)
+	treeText, transcriptionText, accepted, usable := partialTreeTexts(rows, transcription)
+	treeChars, transcriptionChars := utf8.RuneCountInString(treeText), utf8.RuneCountInString(transcriptionText)
+	observation := treeTranscriptionValue(treeText, transcriptionText, accepted, usable, transcription)
+	kept.treeTranscription, transcription.treeTranscription = observation, observation
 	if !usable || treeChars*2 >= transcriptionChars {
 		return kept, nodes, nil
 	}
@@ -28,8 +32,13 @@ func partialTreeSelection(rows []provision, nodes []vbpl.Node, transcription, ke
 }
 
 func partialTreeLengths(rows []provision, transcription selection) (int, int, bool, bool) {
+	tree, text, accepted, usable := partialTreeTexts(rows, transcription)
+	return utf8.RuneCountInString(tree), utf8.RuneCountInString(text), accepted, usable
+}
+
+func partialTreeTexts(rows []provision, transcription selection) (string, string, bool, bool) {
 	if !validTreeIdentity(rows) {
-		return 0, 0, false, false
+		return "", "", false, false
 	}
 	rendered := renderTreeText(rows)
 	var texts []string
@@ -38,19 +47,19 @@ func partialTreeLengths(rows []provision, transcription selection) (int, int, bo
 			texts = append(texts, rendered[row.NodeID])
 		}
 	}
-	treeChars := utf8.RuneCountInString(collapse(strings.Join(texts, " ")))
+	tree := collapse(strings.Join(texts, " "))
 	if transcription.source != "html_transcription" || transcription.tooLarge || transcription.parseLimit {
-		return treeChars, 0, false, false
+		return tree, "", false, false
 	}
 	paragraphs, err := textparse.ParagraphsFromHTML(transcription.data)
 	if err != nil {
-		return treeChars, 0, false, false
+		return tree, "", false, false
 	}
 	texts = nil
 	for _, p := range paragraphs {
 		texts = append(texts, p.Text)
 	}
-	transcriptionChars := utf8.RuneCountInString(collapse(strings.Join(texts, " ")))
+	text := collapse(strings.Join(texts, " "))
 	result := textparse.Parse(paragraphs)
 	accepted := false
 	for _, scope := range result.Scopes {
@@ -58,5 +67,17 @@ func partialTreeLengths(rows []provision, transcription selection) (int, int, bo
 			accepted = true
 		}
 	}
-	return treeChars, transcriptionChars, accepted, true
+	return tree, text, accepted, true
+}
+
+func treeTranscriptionValue(tree, text string, accepted, usable bool, transcription selection) treeTranscriptionObservation {
+	result := treeTranscriptionObservation{State: "no_pair"}
+	if !usable || tree == "" || text == "" || !validSelectionHash(transcription.hash) || fmt.Sprintf("%x", sha256.Sum256(transcription.data)) != transcription.hash {
+		return result
+	}
+	return treeTranscriptionObservation{
+		State: "measured", TreeChars: utf8.RuneCountInString(tree), TranscriptionChars: utf8.RuneCountInString(text),
+		TreeTextSHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(tree))), TranscriptionTextSHA256: fmt.Sprintf("%x", sha256.Sum256([]byte(text))),
+		TranscriptionFileSHA256: transcription.hash, MainAccepted: accepted,
+	}
 }

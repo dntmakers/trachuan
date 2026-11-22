@@ -13,7 +13,7 @@ import (
 const getChunkInput = `-- name: GetChunkInput :one
 SELECT fa.path AS fetch_path, fa.sha256 AS fetch_sha256,
        ea.path AS extract_path, ea.sha256 AS extract_sha256,
-       ea.input_hash AS extract_input_hash, fa.item_key AS fetch_key,
+       ea.input_hash AS extract_input_hash, ea.recipe_hash AS extract_recipe_hash, fa.item_key AS fetch_key,
        ea.item_key AS extract_key
 FROM run_item e
 JOIN artifact ea ON ea.id = e.artifact_id
@@ -29,13 +29,14 @@ type GetChunkInputParams struct {
 }
 
 type GetChunkInputRow struct {
-	FetchPath        string
-	FetchSha256      string
-	ExtractPath      string
-	ExtractSha256    string
-	ExtractInputHash string
-	FetchKey         string
-	ExtractKey       string
+	FetchPath         string
+	FetchSha256       string
+	ExtractPath       string
+	ExtractSha256     string
+	ExtractInputHash  string
+	ExtractRecipeHash string
+	FetchKey          string
+	ExtractKey        string
 }
 
 func (q *Queries) GetChunkInput(ctx context.Context, arg GetChunkInputParams) (GetChunkInputRow, error) {
@@ -47,6 +48,7 @@ func (q *Queries) GetChunkInput(ctx context.Context, arg GetChunkInputParams) (G
 		&i.ExtractPath,
 		&i.ExtractSha256,
 		&i.ExtractInputHash,
+		&i.ExtractRecipeHash,
 		&i.FetchKey,
 		&i.ExtractKey,
 	)

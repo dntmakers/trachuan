@@ -57,7 +57,7 @@ func fixture(t *testing.T) *loadFixture {
 	if err = w.QueryRow(ctx, `INSERT INTO run(country,rel,state,snapshot) VALUES('vn',$1,'paused','{}') RETURNING id`, rel).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
-	return &loadFixture{workshop: w, corpus: c, artifacts: artifact.Store{Root: t.TempDir()}, run: stage.Run{ID: id, Country: "vn", Rel: rel, Snapshot: stage.Snapshot{SourceListHash: strings.Repeat("a", 64)}}, recipes: Recipes{Dense: embedding.DocumentRecipe1(), Lexical: lexical.Recipe1()}}
+	return &loadFixture{workshop: w, corpus: c, artifacts: artifact.Store{Root: t.TempDir()}, run: stage.Run{ID: id, Country: "vn", Rel: rel, Snapshot: stage.Snapshot{SourceListHash: strings.Repeat("a", 64), ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": strings.Repeat("a", 64)}}}, recipes: Recipes{Dense: embedding.DocumentRecipe1(), Lexical: lexical.Recipe1()}}
 }
 func (f *loadFixture) addArtifact(t *testing.T, name, key string, files map[string]any, inputs ...string) artifact.Result {
 	t.Helper()

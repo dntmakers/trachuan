@@ -125,22 +125,15 @@ func loadInventoryV2(ctx context.Context, q store.Querier, run stage.Run, limit 
 	if err != nil {
 		return Inventory{}, err
 	}
-	i := Inventory{Version: 2, Country: run.Country, SourceListHash: run.Snapshot.SourceListHash, FinalMembershipHash: hash, Membership: snap, ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}, Failures: p.Failures, PausedSources: p.PausedSources}
+	i := Inventory{Version: 2, ExtractSnapshot: run.Snapshot, Country: run.Country, SourceListHash: run.Snapshot.SourceListHash, FinalMembershipHash: hash, Membership: snap, ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}, Failures: p.Failures, PausedSources: p.PausedSources}
 	for _, e := range append(append([]membership.Entry{}, snap.Active...), snap.RetainedRemovals...) {
 		i.ExpectedKeys = append(i.ExpectedKeys, e.DocumentKey)
 	}
 	for _, data := range p.Items {
-		var item InventoryItem
-		var path struct {
-			Path *string `json:"path"`
+		item, err := decodeInventoryItem(data, run.Snapshot)
+		if err != nil {
+			return Inventory{}, err
 		}
-		if err = json.Unmarshal(data, &item); err != nil {
-			return Inventory{}, fmt.Errorf("decode item: %w", err)
-		}
-		if err = json.Unmarshal(data, &path); err != nil {
-			return Inventory{}, fmt.Errorf("decode path: %w", err)
-		}
-		item.Path = path.Path
 		if stageOrder(item.Stage) <= limit {
 			i.Items = append(i.Items, item)
 		}
