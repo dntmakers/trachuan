@@ -1,13 +1,24 @@
 import re
 import sys
+import time
 from uuid import uuid4
 
 from .deploy_io import CommandError
 
 
-def candidates(host, label):
-    output = host.user('podman', 'ps', '-a', '--no-trunc', '--filter', 'label=' + label,
-                       '--format', '{{.ID}}', timeout=10, cancel=True, stdout_limit=65)
+def cleanup_command(host, deadline, *args, **options):
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise CommandError('smoke container cleanup deadline exceeded')
+    result = host.user(*args, timeout=remaining, cancel=True, **options)
+    if time.monotonic() >= deadline:
+        raise CommandError('smoke container cleanup deadline exceeded')
+    return result
+
+
+def candidates(host, label, deadline):
+    output = cleanup_command(host, deadline, 'podman', 'ps', '-a', '--no-trunc', '--filter', 'label=' + label,
+                             '--format', '{{.ID}}', stdout_limit=65)
     if output == b'':
         return None
     if re.fullmatch(rb'[0-9a-f]{64}\n', output):
@@ -24,14 +35,15 @@ def run(host, args, **options):
     finally:
         failures = []
         original = sys.exc_info()[1]
+        deadline = time.monotonic() + 10
         try:
-            container = candidates(host, label)
+            container = candidates(host, label, deadline)
             if container is not None:
                 try:
-                    host.user('podman', 'rm', '--force', '--time', '0', container, timeout=10, cancel=True)
+                    cleanup_command(host, deadline, 'podman', 'rm', '--force', '--time', '0', container)
                 except Exception as error:
                     failures.append(error)
-                if candidates(host, label) is not None:
+                if candidates(host, label, deadline) is not None:
                     failures.append(None)
         except Exception as error:
             failures.append(error)

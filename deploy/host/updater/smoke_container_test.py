@@ -55,7 +55,8 @@ class SmokeContainerTest(unittest.TestCase):
         self.assertEqual(confirm[0], query[0])
         for _, kwargs in calls[1:]:
             self.assertTrue(kwargs['cancel'])
-            self.assertEqual(kwargs['timeout'], 10)
+            self.assertGreater(kwargs['timeout'], 0)
+            self.assertLessEqual(kwargs['timeout'], 10)
 
     def test_stop_cleans_up_and_confirms(self):
         calls, result = self.run_server(StopRequested('interrupted'))
@@ -117,6 +118,47 @@ class SmokeContainerTest(unittest.TestCase):
             self.assertEqual(popen.call_count, 2)
             with self.assertRaises(ValueError):
                 command(['podman', 'rm', '--force', '--time', '0', 'other'], timeout=10, cancel=True)
+
+    def test_cleanup_uses_one_deadline(self):
+        for durations, expected, failed in (([4, 3, 0], [10, 6, 3], False),
+                                            ([10], [10], True), ([4, 6], [10, 6], True),
+                                            ([4, 3, 3], [10, 6, 3], True)):
+            with self.subTest(durations=durations):
+                current = [0]
+                calls = []
+                elapsed = iter(durations)
+                def runner(args, **kwargs):
+                    if args[:2] == ['podman', 'run']:
+                        return b'{}'
+                    calls.append(kwargs['timeout'])
+                    current[0] += next(elapsed)
+                    return ID.encode() + b'\n' if len(calls) == 1 else b''
+                host = Host(SimpleNamespace(host=Path('/host')), runner, user_prefix=[])
+                db = Database(host, {}, LAW)
+                clock = SimpleNamespace(monotonic=lambda: current[0])
+                with mock.patch('updater.deploy_smoke_container.time', clock, create=True):
+                    if failed:
+                        with self.assertRaisesRegex(CommandError, 'smoke container teardown failed'):
+                            db.server('image', 'release-check')
+                    else:
+                        self.assertEqual(db.server('image', 'release-check'), b'{}')
+                self.assertEqual(calls, expected)
+
+    def test_cleanup_allows_only_finite_positive_remaining_timeout(self):
+        label = 'label=trachuan.updater=' + 'a' * 32
+        query = ['podman', 'ps', '-a', '--no-trunc', '--filter', label, '--format', '{{.ID}}']
+        caddy = ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
+        with mock.patch('updater.deploy_io.subprocess.Popen', side_effect=OSError('synthetic')) as popen:
+            for timeout in (0.1, 5, 10):
+                with self.assertRaises(CommandError):
+                    command(query, timeout=timeout, cancel=True)
+            self.assertEqual(popen.call_count, 3)
+            for timeout in (0, -1, 10.1, float('nan'), float('inf'), True):
+                with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                    command(query, timeout=timeout, cancel=True)
+            for timeout in (1, 9.9):
+                with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                    command(caddy, timeout=timeout, cancel=True)
 
     def test_terminate_wait_after_kill_is_bounded_and_reported(self):
         process = mock.Mock(pid=123, returncode=None)

@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from contextlib import ExitStack
 import fcntl
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -270,8 +271,10 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
                      re.fullmatch(r'label=trachuan\.updater=[0-9a-f]{32}', args[-3]) and
                      args[-2:] == ['--format', '{{.ID}}'])
     container_cleanup = cleanup_remove or cleanup_query
-    if cancel and ((args[-4:] != ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
-                    and not container_cleanup) or timeout != 10 or input is not None or input_file is not None):
+    caddy_cleanup = args[-4:] == ['systemctl', '--user', 'stop', 'trachuan-caddy.service'] and timeout == 10
+    container_timeout = type(timeout) in (int, float) and 0 < timeout <= 10 and math.isfinite(timeout)
+    if cancel and (not (caddy_cleanup or (container_cleanup and container_timeout))
+                   or input is not None or input_file is not None):
         raise ValueError('invalid cancellation command')
     check = (lambda: None) if cancel else check_stop
     check()
