@@ -10,6 +10,22 @@ import (
 type TokenCounter func(context.Context, anthropic.MessageNewParams) (int64, error)
 
 func BuildArticlePlan(ctx context.Context, r Recipe, articles []Article, families map[string]Outcome, nodes []Node, count TokenCounter) (ArticlePlan, error) {
+	return buildArticlePlan(ctx, r, articles, families, nodes, func(ctx context.Context, req ArticleRequest) (int64, error) {
+		p, err := BuildArticleRequest(r, req)
+		if err != nil {
+			return 0, err
+		}
+		n, err := countTokens(ctx, p, count)
+		if err != nil {
+			return 0, providerError(err)
+		}
+		return n, nil
+	})
+}
+
+type articleCounter func(context.Context, ArticleRequest) (int64, error)
+
+func buildArticlePlan(ctx context.Context, r Recipe, articles []Article, families map[string]Outcome, nodes []Node, count articleCounter) (ArticlePlan, error) {
 	var plan ArticlePlan
 	if err := r.validate(true); err != nil {
 		return plan, err
@@ -99,7 +115,7 @@ func allowedNodes(codes []string, nodes []Node) ([]Node, error) {
 	return menu, nil
 }
 
-func splitArticles(ctx context.Context, r Recipe, group []Article, menu []Node, count TokenCounter, plan *ArticlePlan) error {
+func splitArticles(ctx context.Context, r Recipe, group []Article, menu []Node, count articleCounter, plan *ArticlePlan) error {
 	var current *ArticleRequest
 	for _, a := range group {
 		candidate := ArticleRequest{DocumentKey: a.DocumentKey, Articles: []Article{a}, Nodes: menu}
@@ -114,7 +130,7 @@ func splitArticles(ctx context.Context, r Recipe, group []Article, menu []Node, 
 		if current != nil {
 			candidate.Articles = append(append([]Article(nil), current.Articles...), a)
 		}
-		n, err := countArticle(ctx, r, candidate, count)
+		n, err := countArticle(ctx, candidate, count)
 		if err != nil {
 			return err
 		}
@@ -122,7 +138,7 @@ func splitArticles(ctx context.Context, r Recipe, group []Article, menu []Node, 
 			plan.Requests = append(plan.Requests, *current)
 			current = nil
 			candidate.Articles = []Article{a}
-			n, err = countArticle(ctx, r, candidate, count)
+			n, err = countArticle(ctx, candidate, count)
 			if err != nil {
 				return err
 			}
@@ -140,14 +156,10 @@ func splitArticles(ctx context.Context, r Recipe, group []Article, menu []Node, 
 	return nil
 }
 
-func countArticle(ctx context.Context, r Recipe, req ArticleRequest, count TokenCounter) (int64, error) {
-	p, err := BuildArticleRequest(r, req)
+func countArticle(ctx context.Context, req ArticleRequest, count articleCounter) (int64, error) {
+	n, err := count(ctx, req)
 	if err != nil {
 		return 0, err
-	}
-	n, err := countTokens(ctx, p, count)
-	if err != nil {
-		return 0, providerError(err)
 	}
 	if n < 1 {
 		return 0, fmt.Errorf("article token count must be positive")

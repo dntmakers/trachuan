@@ -155,15 +155,37 @@ func (r *Runner) holdKey(prior keyDisposition, s Submission, priced bool) keyDis
 }
 
 func (r *Runner) selectBatch(prepared *screenBatch, rows []Submission, retained retainedStore) (Submission, []batchapi.Request, Summary, error) {
-	s := prepared.submission
+	s, indexes, summary, err := r.selectItems(prepared.submission, len(prepared.requests), func(i int) (int, error) {
+		body, encodeErr := prepared.requests[i].Encode()
+		return len(body) + len(`{"custom_id":"","params":}`) + 39, encodeErr
+	}, selectionLimits{initial: len(`{"requests":[]}`), separator: 1, items: 100000, bytes: 256000000}, rows, retained)
+	if err != nil {
+		return s, nil, summary, err
+	}
+	var requests []batchapi.Request
+	for _, i := range indexes {
+		requests = append(requests, prepared.requests[i])
+	}
+	return s, requests, summary, nil
+}
+
+type selectionLimits struct {
+	initial, separator, items, bytes int
+}
+
+func (r *Runner) selectItems(input Submission, count int, sizeOf func(int) (int, error), limits selectionLimits, rows []Submission, retained retainedStore) (Submission, []int, Summary, error) {
+	s := input
 	s.Items = append([]Item(nil), s.Items...)
 	var summary Summary
-	var requests []batchapi.Request
-	size := len(`{"requests":[]}`)
+	var indexes []int
+	if count < 0 || count > len(s.Items) || sizeOf == nil || limits.initial < 0 || limits.separator < 0 || limits.items < 1 || limits.bytes < 1 {
+		return s, nil, summary, fmt.Errorf("invalid classification payload count")
+	}
+	size := limits.initial
 	s.Results = map[string]Outcome{}
 	h := indexingHistory(rows, retained)
-	keys := make(map[string]bool, len(prepared.requests))
-	for i, req := range prepared.requests {
+	keys := make(map[string]bool, count)
+	for i := 0; i < count; i++ {
 		item := &s.Items[i]
 		if keys[item.RequestHash] {
 			return s, nil, summary, fmt.Errorf("duplicate classification request key")
@@ -184,24 +206,27 @@ func (r *Runner) selectBatch(prepared *screenBatch, rows []Submission, retained 
 		if err != nil {
 			return s, nil, summary, err
 		}
-		body, err := req.Encode()
+		n, err := sizeOf(i)
 		if err != nil {
 			return s, nil, summary, err
 		}
-		if len(requests) > 0 {
-			size++
+		if n < 0 {
+			return s, nil, summary, fmt.Errorf("invalid classification payload size")
 		}
-		size += len(body) + len(`{"custom_id":"","params":}`) + 39
-		requests = append(requests, req)
+		if len(indexes) > 0 {
+			size += limits.separator
+		}
+		size += n
+		indexes = append(indexes, i)
 		s.ReserveMicroUSD += reserve
 		summary.InputTokens += item.InputTokens
 	}
-	if len(s.Items) > 100000 || size > 256000000 {
+	if len(s.Items) > limits.items || size > limits.bytes {
 		return s, nil, summary, fmt.Errorf("classification batch exceeds provider limit")
 	}
-	summary.Requests = len(requests)
+	summary.Requests = len(indexes)
 	summary.ReserveMicroUSD = s.ReserveMicroUSD
-	return s, requests, summary, nil
+	return s, indexes, summary, nil
 }
 
 func (r *Runner) countRequestTokens(ctx context.Context, p anthropic.MessageNewParams) (int64, error) {
