@@ -3,6 +3,13 @@
 Hosting cost, host memory, alarms and disk for the serving host. Request,
 pipeline, indexing, retrieval and Temporal limits are in [budgets](budgets.md).
 
+## Updater stop budget
+
+The updater service allows 30 seconds to stop. Lookup, removal and confirmation
+of a helper container share a 10-second deadline. The remaining time leaves room
+for terminating child processes, stopping ingress if needed and writing the
+result.
+
 ## Hosting cost, monthly, ap-singapore-1
 
 USD list prices read 2026-11-09; 730 hours/month, before tax. Estimate assumes

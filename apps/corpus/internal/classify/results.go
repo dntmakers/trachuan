@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"time"
 
+	"danny.vn/trachuan/apps/corpus/internal/batchapi"
 	"github.com/anthropics/anthropic-sdk-go/v2"
 )
 
@@ -29,8 +30,9 @@ func providerError(err error) error {
 	}
 	var api *anthropic.Error
 	if errors.As(err, &api) {
+		typ, code := rawProviderError(api.RawJSON())
 		return fmt.Errorf("classification provider request failed: status=%d type=%s code=%s request_id=%s", api.StatusCode,
-			providerField(string(api.Type()), providerToken, "unknown"), providerField(string(api.ErrorCode()), providerToken, "none"),
+			providerField(typ, providerToken, "unknown"), providerField(code, providerToken, "none"),
 			providerField(api.RequestID, providerRequestID, "unknown"))
 	}
 	if errors.Is(err, context.Canceled) {
@@ -40,6 +42,27 @@ func providerError(err error) error {
 		return fmt.Errorf("classification provider request timed out: %w", context.DeadlineExceeded)
 	}
 	return fmt.Errorf("classification provider request failed")
+}
+
+func rawProviderError(raw string) (string, string) {
+	envelope, err := batchapi.DecodeEvidenceObject([]byte(raw), "type", "error", "request_id")
+	if err != nil {
+		return "", ""
+	}
+	nested, err := batchapi.DecodeEvidenceObject(envelope["error"], "type", "details", "message")
+	if err != nil {
+		return "", ""
+	}
+	typ, _ := evidenceString(nested["type"])
+	var code string
+	if details := nested["details"]; details != nil {
+		fields, detailErr := batchapi.DecodeEvidenceObject(details, "error_code")
+		if detailErr != nil {
+			return "", ""
+		}
+		code, _ = evidenceString(fields["error_code"])
+	}
+	return typ, code
 }
 
 func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
@@ -85,11 +108,11 @@ func (r *Runner) poll(ctx context.Context, s *Submission, out string) error {
 		if r.Client == nil {
 			return fmt.Errorf("classification polling requires a provider client")
 		}
-		b, err := r.Client.Get(ctx, current.BatchID)
+		b, err := r.providerGet(ctx, current.ID, current.BatchID)
 		if err != nil {
 			return providerError(err)
 		}
-		if b.ProcessingStatus == "ended" {
+		if b.Status == "ended" {
 			if resultErr := r.captureResults(ctx, current.ID, current.BatchID, b.CreatedAt); resultErr != nil {
 				return resultErr
 			}

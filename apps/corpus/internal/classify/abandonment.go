@@ -13,14 +13,15 @@ type abandonmentRecord struct {
 	ID          string    `json:"id"`
 	ItemsHash   string    `json:"items_hash"`
 	AbandonedAt time.Time `json:"abandoned_at"`
+	captureReference
 }
 
-func (r *Runner) writeAbandonment(s *Submission) error {
+func (r *Runner) writeAbandonment(s *Submission, proof captureReference) error {
 	known, err := r.restoreAbandonment(s)
 	if err != nil || known {
 		return err
 	}
-	b, err := json.Marshal(abandonmentRecord{ID: s.ID, ItemsHash: s.ItemsHash, AbandonedAt: r.Now().UTC().Truncate(time.Microsecond)})
+	b, err := json.Marshal(abandonmentRecord{ID: s.ID, ItemsHash: s.ItemsHash, AbandonedAt: r.Now().UTC().Truncate(time.Microsecond), captureReference: proof})
 	if err != nil {
 		return fmt.Errorf("encode submission abandonment: %w", err)
 	}
@@ -36,6 +37,9 @@ func (r *Runner) restoreAbandonment(s *Submission) (bool, error) {
 		return false, fmt.Errorf("read submission abandonment: %w", err)
 	}
 	var record abandonmentRecord
+	if err = validateRetainedJSON(b, &record); err != nil {
+		return false, fmt.Errorf("decode submission abandonment: %w", err)
+	}
 	if err = json.Unmarshal(b, &record); err != nil {
 		return false, fmt.Errorf("decode submission abandonment: %w", err)
 	}

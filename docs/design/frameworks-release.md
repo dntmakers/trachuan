@@ -239,7 +239,8 @@ is unaffected, and once B has raised the floor that rollback is refused.
    loses nothing. The updater that installs A reconciles nothing new; A's own
    updater fetches the secret.
 3. Image B raises the release floor to A's sequence, adds the `frameworks` block
-   with `min_release_floor` A's sequence, and adds the key mount and the
+   with `min_release_floor` at or above A's sequence (the policy uses the floor
+   already in force, 67, which is above A), and adds the key mount and the
    `server.env` lines with the flag off. A's updater installs it only once the
    secret exists; until then each run fails with `secret missing`.
 4. The first frameworks release is uploaded and signed; the host activates it.

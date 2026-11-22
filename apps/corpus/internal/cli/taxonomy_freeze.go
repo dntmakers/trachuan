@@ -12,19 +12,26 @@ import (
 
 func runTaxonomyFreeze(args []string, stderr io.Writer) int {
 	fail := func(code int, err error) int { _, _ = fmt.Fprintln(stderr, err); return code }
-	opts, err := options(args, map[string]bool{"--packet": true, "--labels": true, "--labeler": true, "--out": true})
+	opts, err := options(args, map[string]bool{"--packet": true, "--labels": true, "--labeler": true, "--out": true, "--provider": true})
 	if err != nil {
 		return fail(2, err)
 	}
 	if opts["--packet"] == "" || opts["--labels"] == "" || opts["--labeler"] == "" || opts["--out"] == "" {
 		return fail(2, fmt.Errorf("--packet, --labels, --labeler and --out are required"))
 	}
+	if provider, provided := opts["--provider"]; provided && provider != "anthropic" {
+		return fail(2, fmt.Errorf("provider must be anthropic"))
+	}
 	var packet taxonomy.Packet
 	if err = readTaxonomyJSON(opts["--packet"], &packet); err != nil {
 		return fail(1, err)
 	}
-	if filepath.Base(opts["--out"]) != "taxonomy-"+packet.Slice+".json" {
-		return fail(2, fmt.Errorf("output must be named taxonomy-%s.json", packet.Slice))
+	name := "taxonomy-" + packet.Slice
+	if opts["--provider"] != "" {
+		name += "-" + opts["--provider"]
+	}
+	if filepath.Base(opts["--out"]) != name+".json" {
+		return fail(2, fmt.Errorf("output must be named %s.json", name))
 	}
 	var labels struct {
 		Articles []taxonomy.LabelArticle `json:"articles"`
@@ -32,7 +39,7 @@ func runTaxonomyFreeze(args []string, stderr io.Writer) int {
 	if err = readTaxonomyJSON(opts["--labels"], &labels); err != nil {
 		return fail(1, err)
 	}
-	frozen, err := taxonomy.FreezePacket(packet, labels.Articles, opts["--labeler"])
+	frozen, err := taxonomy.FreezeProviderPacket(packet, labels.Articles, opts["--provider"], opts["--labeler"])
 	if err != nil {
 		return fail(1, err)
 	}

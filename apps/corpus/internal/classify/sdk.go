@@ -15,5 +15,5 @@ func NewClient() (batchapi.SDK, error) {
 	if key == "" {
 		return batchapi.SDK{}, fmt.Errorf("ANTHROPIC_API_KEY is required")
 	}
-	return batchapi.SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey(key), option.WithMaxRetries(0), option.WithRequestTimeout(10*time.Minute))}, nil
+	return batchapi.SDK{Fingerprint: digest([]byte(key))[:32], Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey(key), option.WithMaxRetries(0), option.WithRequestTimeout(10*time.Minute))}, nil
 }

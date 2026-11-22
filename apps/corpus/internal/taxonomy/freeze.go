@@ -6,8 +6,20 @@ import (
 )
 
 func FreezePacket(packet Packet, labels []LabelArticle, labeler string) (FrozenLabels, error) {
+	return freezePacket(packet, labels, "", labeler)
+}
+
+func FreezeProviderPacket(packet Packet, labels []LabelArticle, provider, labeler string) (FrozenLabels, error) {
+	return freezePacket(packet, labels, provider, labeler)
+}
+
+func freezePacket(packet Packet, labels []LabelArticle, provider, labeler string) (FrozenLabels, error) {
 	var out FrozenLabels
-	if labeler != "gpt-6-astra" {
+	approved := map[string]bool{"claude-fable-5-2": true, "claude-opus-5-5": true}
+	if provider != "" && (provider != "anthropic" || !approved[labeler] || packet.LabelerFragments != 0) {
+		return out, fmt.Errorf("invalid provider or labeler")
+	}
+	if provider == "" && labeler != "gpt-6-astra" {
 		return out, fmt.Errorf("labeler must be gpt-6-astra")
 	}
 	if packet.Country == "" || packet.Release == "" || packet.DrawRule == "" || (packet.Slice != "multi-family" && packet.Slice != "post-2023" && packet.Slice != "inheritance") {
@@ -67,5 +79,13 @@ func FreezePacket(packet Packet, labels []LabelArticle, labeler string) (FrozenL
 		return FrozenLabels{}, fmt.Errorf("extra or missing article labels")
 	}
 	sortArticles(out.Articles)
+	if provider != "" {
+		out.Provider = provider
+		hash, err := SourceListSHA256(out.Articles)
+		if err != nil {
+			return FrozenLabels{}, err
+		}
+		out.SourceListSHA256 = hash
+	}
 	return out, nil
 }

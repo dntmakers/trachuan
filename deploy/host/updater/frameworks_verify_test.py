@@ -46,8 +46,13 @@ class FrameworksPolicyTest(unittest.TestCase):
             return policy(path)
 
     def test_block_is_optional_and_validated_as_closed_shape(self):
-        self.assertNotIn('frameworks', self.load(json.loads(POLICY.read_bytes())))
+        expected = dict(repository='ghcr.io/dntmakers/trachuan-corpus-release',
+                        identity={'dntmakers/trachuan': '^https://github\\.com/dntmakers/trachuan/\\.github/workflows/frameworks-release\\.yml@refs/heads/main$'},
+                        namespace='axj58m4cpgbr', bucket='trachuan-frameworks-releases', min_release_floor=67)
+        self.assertEqual(self.load(json.loads(POLICY.read_bytes())).get('frameworks'), expected)
         base = json.loads(json.dumps(FIXTURE_POLICY))
+        base.pop('frameworks', None)
+        self.assertNotIn('frameworks', self.load(base))
         self.assertEqual(self.load(dict(base, frameworks=BLOCK))['frameworks'], BLOCK)
         changes = [dict(extra=1), dict(identity='.*'), dict(identity=base['corpus_identity']),
                    dict(identity='^(unclosed$'), dict(repository='docker.io/evil/release'),
@@ -156,12 +161,19 @@ class FrameworksVerificationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             calls = []
             def runner(args, **kwargs):
+                if args[:2] == ['podman', 'rm']:
+                    return b''
+                if args[:2] == ['podman', 'ps']:
+                    return b''
                 calls.append(args)
                 return canonical(description(self.m))
             host = Host(Paths(Path(directory)), runner, user_prefix=[])
             self.assertEqual(Database(host, self.rules, FRAMEWORKS).describe('server-image'), description(self.m))
             Database(host, self.rules, LAW).describe('server-image')
             frameworks, law = calls
+            self.assertNotEqual(frameworks[3], law[3])
+            frameworks[3] = law[3]
+            frameworks[5] = law[5]
             self.assertEqual(frameworks, law + ['--kind', 'frameworks'])
             self.assertEqual(law[-2:], ['server-image', 'release-check'])
 

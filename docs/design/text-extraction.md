@@ -217,14 +217,15 @@ numbered outline (`I.`, `1.`) when one exists. Text under 300 characters is
 
 ## What is recorded
 
-- The extract artifact of a document without a source tree gains `text.json`:
+- For a document without a source tree, legacy extract writes `text.json`:
   `text_source`, the file name and SHA-256 read, for OCR the engine, the store
   entry's hash and its cross-check result, the paragraphs with locators, the
-  scopes with their checks, and counts. The artifact of a source-tree document
-  is unchanged in every file and in its manifest, so its chunk and embed
-  artifacts are reused, except for trees with heading-only articles, which
-  [heading-only trees](heading-only-trees.md) reads again; a compatibility test
-  pins the fetch, extract, chunk and embed hashes of recorded documents.
+  scopes with their checks, and counts. Legacy extract recipes leave the
+  source-tree artifact unchanged unless the
+  [heading-only tree rules](heading-only-trees.md) apply. A compatibility test
+  pins the legacy fetch, extract, chunk and embed hashes.
+  [`detector-inputs/1`](detector-inputs.md#freeze-and-verify-once) requires
+  `text.json` in every done extract, including retained trees.
 - Generated node ids are `tx:` plus the first 16 hex characters of the SHA-256
   of the scope index, the anchor and the provision text joined by newlines. The
   id therefore names one text at one anchor in one scope: if text moves to
@@ -245,15 +246,17 @@ numbered outline (`I.`, `1.`) when one exists. Text under 300 characters is
 
 ## Inputs and reuse
 
-A source-tree document's extract input stays its fetch artifact hash. For any
-other document, planning selects the text source and freezes it into the input
-hash: the fetch hash, the source name, and for OCR the store entry's hash and
-its cross-check record's hash, or the literal `absent` when the store has no
-checked entry. Adding OCR text or a cross-check to the store therefore changes
-the input and reruns extract on the next run; a frozen run never changes. The
-store keeps one entry per PDF hash and engine id and one check record per entry
-and checker id; both are immutable, and the engine and checker ids are part of
-the extract recipe.
+Under legacy recipes, a source-tree document's extract input is its fetch
+artifact hash. For any other document, planning selects the text source and
+freezes it into the input hash: the fetch hash, the source name, and for OCR the
+store entry's hash and its cross-check record's hash, or the literal `absent`
+when the store has no checked entry. Adding OCR text or a cross-check to the
+store therefore changes the input and reruns extract on the next run; a frozen
+run never changes. The store keeps one entry per PDF hash and engine id and one
+check record per entry and checker id; both are immutable, and the engine and
+checker ids are part of the extract recipe.
+[`detector-inputs/1`](detector-inputs.md#capture-the-check-before-choosing-what-to-serve)
+also binds a completed OCR check even when its text is not served.
 
 ## Validity rules
 

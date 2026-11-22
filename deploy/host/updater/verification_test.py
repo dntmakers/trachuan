@@ -16,7 +16,8 @@ from updater.deploy_io import canonical, CommandError
 
 FIXTURES = Path(__file__).with_name('fixtures')
 POLICY = Path(__file__).parents[1] / 'deploy-policy.json'
-FIXTURE_POLICY = {key: value for key, value in json.loads(POLICY.read_bytes()).items() if key != 'release_floor'}
+FIXTURE_POLICY = {key: value for key, value in json.loads(POLICY.read_bytes()).items()
+                  if key not in ('release_floor', 'frameworks')}
 FIXTURE_POLICY['repositories'] = ['dannyota/trachuan', 'dntmakers/trachuan']
 for key in ('release_identity', 'build_identity', 'rollback_identity', 'corpus_identity', 'images'):
     value = FIXTURE_POLICY[key]['dntmakers/trachuan']

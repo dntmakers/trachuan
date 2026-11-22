@@ -3,7 +3,7 @@ package classify
 import "fmt"
 
 func validateRecovery(s Submission, id string) error {
-	if s.ID != id || s.ItemsHash != itemsHash(s.Items) || s.Recipe.validate(s.KeyVersion == 0) != nil || s.ReserveMicroUSD < 0 || len(s.Items) == 0 || len(s.Items) > 100000 {
+	if (s.AccountFingerprint != "" && !validID(s.AccountFingerprint)) || s.ID != id || s.ItemsHash != itemsHash(s.Items) || s.Recipe.validate(true) != nil || s.ReserveMicroUSD < 0 || len(s.Items) == 0 || len(s.Items) > 100000 {
 		return fmt.Errorf("invalid submission intent identity or ordered item hash")
 	}
 	legacy := s.KeyVersion == 0 && s.PriceVersion == ""

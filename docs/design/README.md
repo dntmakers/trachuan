@@ -10,6 +10,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [data](data.md)                                                                  | Corpus and auth data models                                                                                      |
 | [workshop data](workshop-data.md)                                                | Workshop tables, scope contracts, relation support and expand observations                                       |
 | [findings and reviewed knowledge](knowledge-loop.md)                             | Detectors, findings, the reviewed-knowledge contract, intake                                                     |
+| [text detector inputs](detector-inputs.md)                                       | Frozen OCR item locations and tree volume, coverage and cutover                                                  |
 | [knowledge entries](knowledge-entries.md)                                        | File format of reviewed knowledge, provision dependencies, validator outcomes                                    |
 | [release evidence](release-evidence.md)                                          | `findings.json`, `identity.jsonl` and `changes.jsonl`: shapes, bindings and the release gate                     |
 | [retrieval](retrieval.md)                                                        | Query validation, ranking, validity, subject filter, release pinning, MCP tools, web API                         |
@@ -49,6 +50,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [control frameworks: restore](frameworks-release-restore.md)                     | What a frameworks dump may do on the host, log settings, restore steps and smoke                                 |
 | [control frameworks: release](frameworks-release.md)                             | Bucket, upload, signing workflow, host phase, schema, key and flag, and order for frameworks releases            |
 | [control frameworks: build](frameworks-build.md)                                 | Offline build command: steps, artifacts, resume, gaps and signing evidence                                       |
+| [control frameworks: licensed parsers](frameworks-parsers.md)                    | PDF and workbook parsers, version profiles, title import and coverage                                            |
 | [account mail](account-mail.md)                                                  | Mail outbox: classes, sender, content                                                                            |
 | [web API](web-api.md)                                                            | Google login flow, web sessions, CSRF, `/api/v1` routes, OpenAPI contract                                        |
 | [OAuth](oauth.md)                                                                | MCP authorization server: clients, consent, codes, tokens, aboutme import gaps                                   |

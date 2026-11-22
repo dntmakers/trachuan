@@ -28,6 +28,12 @@ func (r *Runner) inspectCaptures(intents map[string]Submission, store *retainedS
 		}
 		for _, scope := range scopes {
 			path := filepath.Join(dir, scope.Name())
+			if scope.IsDir() && scope.Name() == "responses" {
+				if err := inspectProviderResponses(path, owner.Name()); err != nil {
+					return err
+				}
+				continue
+			}
 			if !scope.IsDir() || (scope.Name() != "list" && !validKey(scope.Name())) {
 				return fmt.Errorf("invalid classification evidence scope %s", path)
 			}
@@ -93,9 +99,13 @@ func inspectCapture(root, dir, owner, scope, id string, intents map[string]Submi
 				if err = readRetainedFile(path, &item); err != nil {
 					return err
 				}
+				if _, err = verifyCapturedLine(item); err != nil {
+					return fmt.Errorf("invalid captured result %s: %w", path, err)
+				}
 				claim, _, _ := strings.Cut(item.CustomID, "-")
 				if _, ok := intents[claim]; ok {
 					store.retryAbandoned[claim] = false
+					store.claimed[claim] = true
 				}
 			}
 		}

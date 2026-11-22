@@ -51,6 +51,9 @@ func readArtifact(path string, dst any) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read classification artifact: %w", err)
 	}
+	if err = validateRetainedJSON(b, dst); err != nil {
+		return "", fmt.Errorf("decode classification artifact: %w", err)
+	}
 	if err = json.Unmarshal(b, dst); err != nil {
 		return "", fmt.Errorf("decode classification artifact: %w", err)
 	}

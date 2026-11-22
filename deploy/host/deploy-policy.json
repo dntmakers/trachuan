@@ -46,5 +46,14 @@
     "dntmakers/trachuan": "^https://github\\.com/dntmakers/trachuan/\\.github/workflows/corpus-release\\.yml@refs/heads/main$"
   },
   "release_namespace": "axj58m4cpgbr",
-  "release_bucket": "trachuan-releases"
+  "release_bucket": "trachuan-releases",
+  "frameworks": {
+    "repository": "ghcr.io/dntmakers/trachuan-corpus-release",
+    "identity": {
+      "dntmakers/trachuan": "^https://github\\.com/dntmakers/trachuan/\\.github/workflows/frameworks-release\\.yml@refs/heads/main$"
+    },
+    "namespace": "axj58m4cpgbr",
+    "bucket": "trachuan-frameworks-releases",
+    "min_release_floor": 67
+  }
 }
