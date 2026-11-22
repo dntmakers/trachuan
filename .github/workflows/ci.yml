@@ -131,6 +131,8 @@ jobs:
           skip-save-cache: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
       - run: sudo apt-get update && sudo apt-get install -y shellcheck
       - run: make pre-push
+      - run: go install "github.com/sqlc-dev/sqlc/cmd/sqlc@v$(awk '$1 == "sqlc" { print $2; exit }' .tool-versions)"
+      - run: make sqlc-check
       - run: go mod tidy -diff
       - run: make test
       - run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s deploy/host -p '*_test.py'
