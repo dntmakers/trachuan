@@ -35,6 +35,24 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 	if _, err := json.Marshal(o.CapOverride); err != nil {
 		return Report{}, Cache{}, fmt.Errorf("invalid cap override: %w", err)
 	}
+	if suite.WarningHash != "" {
+		var err error
+		suite.WarningCases, err = suite.PinnedWarningCases(engine.Release().Country)
+		if err != nil {
+			return Report{}, Cache{}, err
+		}
+	}
+	if len(suite.WarningCases) != len(o.WarningResults) {
+		return Report{}, Cache{}, fmt.Errorf("warning case binding unavailable")
+	}
+	for i, result := range o.WarningResults {
+		if result.EntryID != suite.WarningCases[i].EntryID {
+			return Report{}, Cache{}, fmt.Errorf("warning case binding differs from fixture")
+		}
+		if result.Outcome != "missing" && result.Outcome != "stale" && result.Outcome != "applied" && result.Outcome != "redundant" {
+			return Report{}, Cache{}, fmt.Errorf("invalid warning case outcome")
+		}
+	}
 	if err := validateSuite(suite); err != nil {
 		return Report{}, Cache{}, err
 	}
@@ -61,7 +79,7 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 	if recipeErr != nil {
 		return Report{}, Cache{}, fmt.Errorf("encode retrieval recipe: %w", recipeErr)
 	}
-	r := Report{Version: 3, RetrievalRecipe: recipeJSON, Scorer: ScorerVersion, Status: "complete", Country: rel.Country, Rel: rel.Rel, BuildArtifactSHA256: o.BuildArtifactSHA256, DumpSHA256: o.DumpSHA256, FixtureHashes: suite.Hashes, IdentityMapSHA256: suite.Hashes.IdentityMap, Recipes: o.Recipes, EvaluationDate: date, DatabaseInstanceKind: o.DatabaseInstanceKind, Software: o.Software, Calibration: o.Calibration, Cohorts: map[string]Cohort{"legacy": {}, "old_product": {}}, TimingsMS: map[string]any{}, CacheManifest: map[string]any{}, PreviousDiff: map[string]any{"reason": "no previous report"}, NotRun: map[string]string{"taxonomy": "out_of_scope", "filtered": "out_of_scope"}, Limitations: []string{"Small sample size; calibration fits the scored product cohorts.", "Legacy results use the product recipe and are not a reproduction of the legacy engine."}}
+	r := Report{Version: 4, RetrievalRecipe: recipeJSON, Scorer: ScorerVersion, Status: "complete", Country: rel.Country, Rel: rel.Rel, BuildArtifactSHA256: o.BuildArtifactSHA256, DumpSHA256: o.DumpSHA256, FixtureHashes: suite.EvalHashes(), IdentityMapSHA256: suite.Hashes.IdentityMap, Recipes: o.Recipes, EvaluationDate: date, DatabaseInstanceKind: o.DatabaseInstanceKind, Software: o.Software, Calibration: o.Calibration, Cohorts: map[string]Cohort{"legacy": {}, "old_product": {}}, TimingsMS: map[string]any{}, CacheManifest: map[string]any{}, PreviousDiff: map[string]any{"reason": "no previous report"}, NotRun: map[string]string{"taxonomy": "out_of_scope", "filtered": "out_of_scope"}, Limitations: []string{"Small sample size; calibration fits the scored product cohorts.", "Legacy results use the product recipe and are not a reproduction of the legacy engine."}}
 	if recipe.Version != 2 {
 		r.RetrievalRecipeVersion = recipe.Version
 	}
@@ -310,6 +328,17 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 	if err := finishQuality(&r, previous); err != nil {
 		return Report{}, Cache{}, err
 	}
+	warningModes := make([]retrieval.Mode, 0, len(modes))
+	for _, mode := range []retrieval.Mode{"exact", "ann"} {
+		if seenModes[mode] {
+			warningModes = append(warningModes, mode)
+		}
+	}
+	warnings, warningErr := evaluateWarnings(ctx, engine, suite.WarningCases, o.WarningResults, warningModes, o)
+	if warningErr != nil {
+		return Report{}, Cache{}, warningErr
+	}
+	finishWarnings(&r, warnings, warningModes)
 	filter.finish(modes)
 	r.FilterGate = filter.gate
 	if filter.active {
@@ -347,7 +376,7 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 		}
 		r.PreviousDiff = diff
 	}
-	r.CacheManifest = map[string]any{"arm_rows": len(cache.Arms), "query_rows": len(cache.Vectors), "query_index_entries": len(cache.Index), "cache_key": cacheKey(cache, o, suite.Hashes)}
+	r.CacheManifest = map[string]any{"arm_rows": len(cache.Arms), "query_rows": len(cache.Vectors), "query_index_entries": len(cache.Index), "cache_key": cacheKey(cache, o, suite.EvalHashes())}
 	return r, cache, nil
 }
 func annMeasure(id, cohort string, exact, raw, effective []retrieval.Candidate, fallback bool, depth int) ANNMeasure {

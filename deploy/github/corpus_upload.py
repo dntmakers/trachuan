@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 from corpus_dispatch import dispatch_command
-from corpus_manifest import identity, release_files, sha256, validated_inputs
+from corpus_manifest import identity, release_files, validated_inputs
 from corpus_previous import verified_previous
 from corpus_production import require_settled
 from manifest import positive
@@ -121,7 +121,8 @@ def upload(country, rel, directory, report, repository):
 
 def print_dispatch(country, rel, directory, report, repository):
     identity(country, rel)
-    print(' '.join(dispatch_command(repository, country, rel, sha256(report), sha256(directory / 'release.json'))))
+    inputs = validated_inputs(country, rel, directory, report)
+    print(' '.join(dispatch_command(repository, country, rel, inputs.expected['report.json'][0], inputs.expected['release.json'][0])))
 
 
 def main():

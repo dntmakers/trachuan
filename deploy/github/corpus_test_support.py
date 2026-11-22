@@ -133,12 +133,60 @@ def write_fixture(path):
     (path / 'corpus.dump').write_bytes(dump)
     (path / 'MANIFEST.sha256').write_bytes(manifest)
     save_fixture(path, row, report)
-    manifest = json.loads(create('dannyota/trachuan', 'a' * 40, 1, 'vn', row['rel'], path, path / 'report.json'))
+    manifest = json.loads(create('dannyota/trachuan', 'a' * 40, 1, 'vn', row['rel'], path, path / 'report.json',
+                                 verified_report_hash=digest((path / 'report.json').read_bytes())))
     manifest.pop('evidence', None)
     manifest.update(rel='20990101_1', database='corpus_vn_20990101_1', previous='20981231_1')
     manifest['dump']['object'] = 'vn/20990101_1/corpus.dump'
     manifest['report']['sha256'] = digest(previous_data)
     (path / 'previous-manifest.json').write_bytes(canonical(manifest))
+    return row, report
+
+
+def signed_create(repository, commit, sequence, country, rel, directory, report_path, **kwargs):
+    return create(repository, commit, sequence, country, rel, directory, report_path,
+                  verified_report_hash=digest(report_path.read_bytes()), **kwargs)
+
+
+def signed_inputs(country, rel, directory, report_path, **kwargs):
+    from corpus_manifest import validated_inputs
+    return validated_inputs(country, rel, directory, report_path, signing=True, commit=None,
+                            verified_report_hash=digest(report_path.read_bytes()), **kwargs)
+
+
+def release_fixture_history(repository):
+    from corpus_revision_support import CURRENT_CASES, encode, history_for
+    from corpus_warning import WARNING_PATH
+
+    fixture = encode(CURRENT_CASES)
+    history = history_for(repository, fixture)
+    warning_path = history.root / WARNING_PATH
+    warning_path.parent.mkdir(parents=True, exist_ok=True)
+    warning_path.write_bytes(b'[]\n')
+    git(history.root, 'add', WARNING_PATH)
+    git(history.root, 'commit', '--quiet', '--allow-empty', '-m', 'warning fixture')
+    return history
+
+
+def write_release_fixture(path, repository):
+    from corpus_revision_support import (CANDIDATE_REL, CURRENT_CASES, CURRENT_RANKS, PREVIOUS_REL,
+                                         build_report, encode, link_period)
+
+    row, old = write_fixture(path)
+    fixture = encode(CURRENT_CASES)
+    release_fixture_history(repository)
+    previous = build_report(3, PREVIOUS_REL, fixture, CURRENT_RANKS)
+    report = build_report(4, CANDIDATE_REL, fixture, CURRENT_RANKS)
+    link_period(report, previous)
+    previous_data = json.dumps(previous).encode()
+    (path / 'previous-report.json').write_bytes(previous_data)
+    report['previous_diff']['previous']['report_sha256'] = digest(previous_data)
+    report['dump_sha256'] = old['dump_sha256']
+    report['build_artifact_sha256'] = old['build_artifact_sha256']
+    save_fixture(path, row, report)
+    previous_manifest = json.loads((path / 'previous-manifest.json').read_bytes())
+    previous_manifest['report']['sha256'] = digest(previous_data)
+    (path / 'previous-manifest.json').write_bytes(canonical(previous_manifest))
     return row, report
 
 

@@ -6,15 +6,24 @@ import (
 )
 
 func decodePreviousReport(data []byte) (Report, error) {
-	var legacy any
-	if err := json.Unmarshal(data, &legacy); err != nil {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
 		return Report{}, fmt.Errorf("decode previous report: %w", err)
 	}
-	if err := visitObjects(legacy, rejectRemovedOverrides); err != nil {
+	delete(fields, "warning_cases")
+	clean, err := json.Marshal(fields)
+	if err != nil {
+		return Report{}, fmt.Errorf("encode previous report: %w", err)
+	}
+	var legacy any
+	if err = json.Unmarshal(clean, &legacy); err != nil {
+		return Report{}, fmt.Errorf("decode previous report: %w", err)
+	}
+	if err = visitObjects(legacy, rejectRemovedOverrides); err != nil {
 		return Report{}, err
 	}
 	var report Report
-	if err := json.Unmarshal(data, &report); err != nil {
+	if err = json.Unmarshal(clean, &report); err != nil {
 		return Report{}, fmt.Errorf("decode previous report: %w", err)
 	}
 	if report.Version >= 2 {

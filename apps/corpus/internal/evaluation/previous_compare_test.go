@@ -2,7 +2,9 @@ package evaluation
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,6 +35,50 @@ func encodeObject(t *testing.T, object map[string]any) []byte {
 	return data
 }
 
+func TestRun_PreviousWarningRecordsIgnored(t *testing.T) {
+	date := retrieval.Date{Year: 2099, Month: 1, Day: 2}
+	baseline, _, err := Run(context.Background(), &recordedEngine{fakeEngine: fakeEngine{date: date}}, developmentSuite(), Options{EvaluationDate: date})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		value any
+	}{
+		{"wrong top-level shape", "not an array"},
+		{"extreme numeric shape", json.RawMessage(`1e10000`)},
+		{"wrong record shape", []any{42}},
+		{"removed overrides inside record", []any{map[string]any{"historical_policy": "agent", "merge_siblings": true}}},
+		{"malformed nested match", []any{map[string]any{"search": "not an array"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			object := reportObject(t, baseline)
+			object["warning_cases"] = tc.value
+			data := encodeObject(t, object)
+			path := filepath.Join(t.TempDir(), "previous.json")
+			if writeErr := os.WriteFile(path, data, 0600); writeErr != nil {
+				t.Fatal(writeErr)
+			}
+			current, _, runErr := Run(context.Background(), &recordedEngine{fakeEngine: fakeEngine{date: date}}, developmentSuite(), Options{EvaluationDate: date, PreviousReport: path})
+			if runErr != nil {
+				t.Fatal(runErr)
+			}
+			previous, compareErr := current.ComparedRelease()
+			if compareErr != nil || previous == nil || previous.ReportSHA256 != fmt.Sprintf("%x", sha256.Sum256(data)) {
+				t.Fatalf("previous = %+v, error %v", previous, compareErr)
+			}
+			if len(current.NonRegression) == 0 || current.NonRegression[0].Status == "no_previous" {
+				t.Fatal("comparison not run")
+			}
+		})
+	}
+	object := reportObject(t, baseline)
+	object["outside"] = map[string]any{"historical_policy": "agent"}
+	if _, err = decodePreviousReport(encodeObject(t, object)); err == nil {
+		t.Fatal("outside removed override accepted")
+	}
+}
+
 func TestRun_RefusesIncompatiblePreviousReport(t *testing.T) {
 	date := retrieval.Date{Year: 2099, Month: 1, Day: 2}
 	baseline, _, err := Run(context.Background(), &recordedEngine{fakeEngine: fakeEngine{date: date}}, developmentSuite(), Options{EvaluationDate: date})
@@ -45,7 +91,7 @@ func TestRun_RefusesIncompatiblePreviousReport(t *testing.T) {
 	}{
 		{"compatible", func(map[string]any) {}},
 		{"version zero", func(o map[string]any) { o["version"] = 0 }},
-		{"version four", func(o map[string]any) { o["version"] = 4 }},
+		{"version five", func(o map[string]any) { o["version"] = 5 }},
 		{"unknown scorer", func(o map[string]any) { o["scorer"] = "agent-eval/7" }},
 		{"legacy fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["Legacy"] = "other" }},
 		{"old product fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["OldProduct"] = "other" }},

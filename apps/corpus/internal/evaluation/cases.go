@@ -38,7 +38,15 @@ type FixtureHashes struct {
 	Development   string
 }
 
+type EvalFixtureHashes struct {
+	FixtureHashes
+	Warnings string `json:",omitempty"`
+}
+
 type Suite struct {
+	WarningCases        []WarningCase
+	WarningBytes        []byte
+	WarningHash         string
 	Legacy              []Case
 	Development         []Case
 	PreviousDevelopment map[string][]byte
@@ -48,6 +56,10 @@ type Suite struct {
 	MapBytes            []byte
 	Rejections          []string
 	Hashes              FixtureHashes
+}
+
+func (s Suite) EvalHashes() EvalFixtureHashes {
+	return EvalFixtureHashes{FixtureHashes: s.Hashes, Warnings: s.WarningHash}
 }
 
 // LoadLegacy decodes and validates the authored cases.

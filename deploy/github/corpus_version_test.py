@@ -29,11 +29,20 @@ class VersionThreeTest(unittest.TestCase):
     def test_version_three_needs_scorer_six_and_the_full_recipe(self):
         _, candidate, _, _ = revision_pair()
         versions(candidate)
-        for version, scorer in ((3, 'agent-eval/5'), (2, 'agent-eval/6'), (4, 'agent-eval/6')):
+        versions(candidate | dict(version=4, scorer='agent-eval/6'))
+        for version, scorer in ((3, 'agent-eval/5'), (2, 'agent-eval/6'), (4, 'agent-eval/5')):
             with self.subTest(version=version, scorer=scorer), self.assertRaises(ValueError):
                 versions(candidate | dict(version=version, scorer=scorer))
         with self.assertRaisesRegex(ValueError, 'version 3 requires the full retrieval recipe'):
             versions({key: value for key, value in candidate.items() if key != 'retrieval_recipe'})
+
+    def test_version_four_fixture_builder_includes_empty_warning_gate(self):
+        fixture = encode(CURRENT_CASES)
+        report = build_report(4, CANDIDATE_REL, fixture, CURRENT_RANKS)
+        self.assertEqual(report['version'], 4)
+        self.assertEqual(report['scorer'], 'agent-eval/6')
+        self.assertEqual(report['warning_cases'], [])
+        self.assertEqual(report['not_run']['warning_cases'], 'not_run')
 
     def test_scorer_pairs(self):
         self.assertTrue(compatible('agent-eval/5', 'agent-eval/6'))

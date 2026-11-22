@@ -39,7 +39,7 @@ func TestSuite_RejectsMissingMapBytes(t *testing.T) {
 func suiteFiles(t *testing.T) fstest.MapFS {
 	t.Helper()
 	files := fstest.MapFS{}
-	for _, name := range []string{"legacy.json", "old-product.json", "identity-map.json", "fixtures.json", "validity-cases.json", "development.json"} {
+	for _, name := range []string{"legacy.json", "old-product.json", "identity-map.json", "fixtures.json", "validity-cases.json", "development.json", "warning-cases.json"} {
 		data, err := vnFixtures.ReadFile("testdata/vn/" + name)
 		if err != nil {
 			t.Fatal(err)

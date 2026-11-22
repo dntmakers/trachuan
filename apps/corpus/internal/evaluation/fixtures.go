@@ -81,6 +81,14 @@ func LoadSuiteFS(fsys fs.FS, dir string) (Suite, error) {
 	if err != nil {
 		return Suite{}, err
 	}
+	warnings, err := read("warning-cases.json")
+	if err != nil {
+		return Suite{}, err
+	}
+	warningCases, err := LoadWarningCases(warnings, "vn")
+	if err != nil {
+		return Suite{}, fmt.Errorf("decode warning cases: %w", err)
+	}
 	fixture, err := read("fixtures.json")
 	if err != nil {
 		return Suite{}, err
@@ -129,7 +137,7 @@ func LoadSuiteFS(fsys fs.FS, dir string) (Suite, error) {
 	if err = validateValidityCases(validityCases); err != nil {
 		return Suite{}, err
 	}
-	s := Suite{Development: developmentCases, PreviousDevelopment: previousDevelopment, ValidityCases: validityCases, ValidityBytes: append([]byte(nil), validity...), Legacy: cases, Map: m, MapBytes: append([]byte(nil), mapping...), Rejections: old.Rejections, Hashes: FixtureHashes{Development: hash(development), Legacy: hash(legacy), OldProduct: hash(product), IdentityMap: hash(mapping), ValidityCases: hash(validity)}}
+	s := Suite{WarningCases: warningCases, WarningBytes: append([]byte(nil), warnings...), WarningHash: hash(warnings), Development: developmentCases, PreviousDevelopment: previousDevelopment, ValidityCases: validityCases, ValidityBytes: append([]byte(nil), validity...), Legacy: cases, Map: m, MapBytes: append([]byte(nil), mapping...), Rejections: old.Rejections, Hashes: FixtureHashes{Development: hash(development), Legacy: hash(legacy), OldProduct: hash(product), IdentityMap: hash(mapping), ValidityCases: hash(validity)}}
 	if err = validateSuite(s); err != nil {
 		return Suite{}, fmt.Errorf("validate suite: %w", err)
 	}

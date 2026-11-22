@@ -31,7 +31,7 @@ func TestInputHash_OmitsInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := stage.RecipeHash("eval-input", "2", "build", "legacy", "product", "map", "validity", "", "", "2099-01-01", "exact,ann")
+	want := stage.RecipeHash("eval-input", "2", "build", "legacy", "product", "map", "validity", "", "", "", "2099-01-01", "exact,ann")
 	if got != want {
 		t.Fatalf("input hash = %s, want %s", got, want)
 	}
@@ -39,7 +39,7 @@ func TestInputHash_OmitsInventory(t *testing.T) {
 
 func TestRecipe_IncludesCompact(t *testing.T) {
 	s := New(Config{})
-	want := stage.RecipeHash("eval", evaluation.ScorerVersion, "legacy-matcher/2", "product-matcher/1", "recall,mrr,current-law-precision,abstention,evidence,ann/1", "", "diacritics_required:Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.", "cache/1:200:100", "nearest-rank", "gates:0.99;targets:recall20=0.90,mrr8=0.66,recall8=0.90,abstention-balanced=0.85;nonregression:recall20,mrr8,abstention-balanced", "compact/1", "corpus-text-counts/1", "filter-gate/1", "inheritance-gate/2")
+	want := stage.RecipeHash("eval", evaluation.ScorerVersion, "legacy-matcher/2", "product-matcher/1", "recall,mrr,current-law-precision,abstention,evidence,ann/1", "", "diacritics_required:Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.", "cache/1:200:100", "nearest-rank", "gates:0.99;targets:recall20=0.90,mrr8=0.66,recall8=0.90,abstention-balanced=0.85;nonregression:recall20,mrr8,abstention-balanced", "compact/1", "corpus-text-counts/1", "filter-gate/1", "inheritance-gate/2", "warning-cases/1")
 	if got := s.Recipe(stage.Snapshot{}); got != want {
 		t.Fatalf("recipe = %s, want %s", got, want)
 	}

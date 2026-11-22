@@ -205,9 +205,10 @@ func TestReleaseValidator_AcceptsRevisedVersionThreeReports(t *testing.T) {
 		if runErr != nil {
 			t.Fatal(runErr)
 		}
-		if r.Version != 3 || !r.QualityPass {
+		if r.Version != 4 || !r.QualityPass {
 			t.Fatalf("%s: version %d quality %v", run.name, r.Version, r.QualityPass)
 		}
+		r.Version = 3
 		if err = r.WriteFiles(filepath.Join(dir, run.name)); err != nil {
 			t.Fatal(err)
 		}

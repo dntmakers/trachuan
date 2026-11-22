@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -9,6 +10,7 @@ from corpus_dispatch import dispatch_command
 from corpus_manifest import decode, identity, manifest_fields, validate_manifest
 from corpus_registry import existing_release, production
 from corpus_rules import first_signing_allowed, require_status_country
+from corpus_warning import validate_authorized
 from manifest import canonical
 from repositories import workflow
 
@@ -84,6 +86,7 @@ def require_signable(manifest, report, run, directory, repository, resign=False)
             raise ValueError(f'an empty release SHA-256 signs only an already signed {country}-{rel}')
         if not first_signing_allowed(country, rel, run):
             raise ValueError('a release without a decision below the cutoff needs a signed manifest')
+        validate_authorized(report, country, commit=manifest['commit'])
     else:
         changed = changed_fields(existing, manifest)
         if changed:
@@ -106,8 +109,12 @@ def shown(manifest, field):
 
 def resign_differences(country, rel, directory, temporary, repository):
     signed = signed_release(repository, country, rel, temporary)
+    local_hash = hashlib.sha256((directory / 'report.json').read_bytes()).hexdigest()
+    if local_hash != signed['report']['sha256']:
+        return signed, [('report_sha256', signed['report']['sha256'], local_hash)]
     rebuilt = validate_manifest(manifest_fields(repository, signed['commit'], signed['sequence'], country, rel,
-                                                directory, directory / 'report.json'))
+                                                directory, directory / 'report.json',
+                                                verified_report_hash=signed['report']['sha256']))
     return signed, [(field, shown(signed, field), shown(rebuilt, field)) for field in changed_fields(signed, rebuilt)]
 
 

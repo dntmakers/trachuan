@@ -7,8 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from corpus_manifest import create
-from corpus_test_support import write_fixture
+from corpus_test_support import signed_create as create, write_fixture
 
 
 class CorpusRegistryTest(unittest.TestCase):

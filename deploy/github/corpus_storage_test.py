@@ -15,8 +15,7 @@ from unittest.mock import patch
 
 from corpus_evidence import LIMITS, SIDECARS
 from corpus_upload_test import FAKE
-from corpus_manifest import create
-from corpus_test_support import add_heading_build, digest, save_fixture, save_older_shape, write_fixture
+from corpus_test_support import add_heading_build, digest, save_fixture, save_older_shape, signed_create as create, write_fixture
 
 
 class CorpusStorageTest(unittest.TestCase):

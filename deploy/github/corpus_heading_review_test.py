@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-from corpus_test_support import write_fixture
+from corpus_test_support import digest, write_fixture
 
 
 class HeadingReviewTest(unittest.TestCase):
@@ -25,7 +25,8 @@ class HeadingReviewTest(unittest.TestCase):
 
     def create(self):
         return json.loads(self.module.create('dannyota/trachuan', 'a' * 40, 1, 'vn', '20990102_1', self.path,
-                                            self.path / 'report.json', heading_reviews_path=self.reviews))
+                                            self.path / 'report.json', heading_reviews_path=self.reviews,
+                                            verified_report_hash=digest((self.path / 'report.json').read_bytes())))
 
     def test_copy_and_omission(self):
         for data in ('', '[]', json.dumps([dict(self.entry, release='20990103_1')])):
@@ -73,7 +74,8 @@ class HeadingReviewTest(unittest.TestCase):
     def test_existing_manifest_reader_needs_only_standard_library(self):
         self.reviews.write_text('[]')
         data = self.module.create('dntmakers/trachuan', 'a' * 40, 1, 'vn', '20990102_1', self.path,
-                                  self.path / 'report.json', heading_reviews_path=self.reviews)
+                                  self.path / 'report.json', heading_reviews_path=self.reviews,
+                                  verified_report_hash=digest((self.path / 'report.json').read_bytes()))
         script = 'import sys; sys.path.insert(0, sys.argv[1]); from corpus_manifest import read_manifest; read_manifest(sys.stdin.buffer.read())'
         result = subprocess.run([sys.executable, '-S', '-c', script, str(Path(__file__).parent)],
                                 input=data, capture_output=True, check=False)

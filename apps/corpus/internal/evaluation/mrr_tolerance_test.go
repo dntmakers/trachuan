@@ -11,7 +11,7 @@ import (
 
 func toleranceReport(t *testing.T, value float64) Report {
 	t.Helper()
-	r := Report{Version: 3, EvaluationDate: retrieval.Date{Year: 2099, Month: 1, Day: 2}, Scorer: "agent-eval/6", Recipes: map[string]string{"query": "q", "document": "d", "chunk": "c", "lexical": "l", "retrieval": "r"}, FixtureHashes: FixtureHashes{Legacy: "a", OldProduct: "b", Development: "c"}, Cohorts: map[string]Cohort{}, Rejections: []Rejection{{CaseID: "r1", Passed: true}, {CaseID: "r2", Passed: true}, {CaseID: "r3", Passed: true}}}
+	r := Report{Version: 3, EvaluationDate: retrieval.Date{Year: 2099, Month: 1, Day: 2}, Scorer: "agent-eval/6", Recipes: map[string]string{"query": "q", "document": "d", "chunk": "c", "lexical": "l", "retrieval": "r"}, FixtureHashes: EvalFixtureHashes{FixtureHashes: FixtureHashes{Legacy: "a", OldProduct: "b", Development: "c"}}, Cohorts: map[string]Cohort{}, Rejections: []Rejection{{CaseID: "r1", Passed: true}, {CaseID: "r2", Passed: true}, {CaseID: "r3", Passed: true}}}
 	for _, name := range []string{"old_product", "development"} {
 		c := Cohort{CaseCount: 1, PositiveCount: 1, ExpectedCitations: 1}
 		if name == "old_product" {

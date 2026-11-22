@@ -133,6 +133,7 @@ func (h *harness) indexSetup() {
 	})
 	write("old-product.json", map[string]any{"legacy_sha256": hash, "rejection_ids": []string{"reject1", "reject2", "reject3"}})
 	write("identity-map.json", m)
+	write("warning-cases.json", []any{})
 	write("validity-cases.json", []map[string]any{{"number": "1/2099/TT-TEST", "issue_date": "2099-01-01", "current": true, "anchor": "Điều 1", "quote": "test"}})
 	if err = os.WriteFile(filepath.Join(dir, "inventory.sha256"), []byte(invHash), 0600); err != nil {
 		h.t.Fatal(err)

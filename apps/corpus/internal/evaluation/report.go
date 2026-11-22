@@ -1,6 +1,7 @@
 package evaluation
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,6 +29,8 @@ type Options struct {
 	DatabaseInstanceKind string
 	Recipes              map[string]string
 	Software             map[string]string
+	WarningScope         func(context.Context, string, string) (bool, error)
+	WarningResults       []WarningResult
 	Calibration          any
 }
 
@@ -189,7 +192,7 @@ type Report struct {
 	Rel                           string                        `json:"rel"`
 	BuildArtifactSHA256           string                        `json:"build_artifact_sha256"`
 	DumpSHA256                    string                        `json:"dump_sha256"`
-	FixtureHashes                 FixtureHashes                 `json:"fixture_hashes"`
+	FixtureHashes                 EvalFixtureHashes             `json:"fixture_hashes"`
 	IdentityMapSHA256             string                        `json:"identity_map_sha256"`
 	Recipes                       map[string]string             `json:"recipes"`
 	EvaluationDate                retrieval.Date                `json:"evaluation_date"`
@@ -214,6 +217,7 @@ type Report struct {
 	PreviousDiff                  any                           `json:"previous_diff"`
 	NotRun                        map[string]string             `json:"not_run"`
 	Limitations                   []string                      `json:"limitations"`
+	WarningCases                  []WarningResult               `json:"warning_cases"`
 	Cases                         []CaseResult                  `json:"cases"`
 	revision                      *developmentRevision
 }

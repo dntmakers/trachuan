@@ -92,8 +92,8 @@ func TestRun_EmptiedPreviousCohortReturnsNoReport(t *testing.T) {
 		t.Fatal(err)
 	}
 	current, _, err := Run(context.Background(), &fakeEngine{date: date}, suite, Options{EvaluationDate: date, PreviousReport: path})
-	if err != nil || current.Version != 3 {
-		t.Fatalf("version three successor: version %d, error %v", current.Version, err)
+	if err != nil || current.Version != 4 {
+		t.Fatalf("version four successor: version %d, error %v", current.Version, err)
 	}
 	suite.Development = nil
 	current, _, err = Run(context.Background(), &fakeEngine{date: date}, suite, Options{EvaluationDate: date, PreviousReport: path})

@@ -10,9 +10,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from corpus_manifest import create, main, validate_inputs
+from corpus_manifest import create, main, validate_inputs, validated_inputs
 from corpus_upload import upload
-from corpus_test_support import digest, save_fixture, save_older_shape, write_evidence, write_fixture
+from corpus_test_support import digest, git, save_fixture, save_older_shape, write_evidence, write_release_fixture
 
 REL = '20990102_1'
 
@@ -22,13 +22,32 @@ class SelectedReportTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.path = Path(temporary.name)
-        self.row, self.report = write_fixture(self.path)
+        self.repository = self.path / 'repository'
+        self.row, self.report = write_release_fixture(self.path, self.repository)
+        self.commit = git(self.repository, 'rev-parse', 'HEAD').decode().strip()
+        from corpus_fixture_history import FixtureHistory, git as fixture_git
+        history = patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(self.repository))
+        history.start()
+        self.addCleanup(history.stop)
+        warning_git = patch('corpus_warning.git', side_effect=lambda root, *args: fixture_git(self.repository, *args))
+        warning_git.start()
+        self.addCleanup(warning_git.stop)
 
     def upload(self):
         return validate_inputs('vn', REL, self.path, self.path / 'report.json')
 
     def sign(self):
-        return create('dannyota/trachuan', 'a' * 40, 2, 'vn', REL, self.path, self.path / 'report.json')
+        return create('dannyota/trachuan', self.commit, 2, 'vn', REL, self.path, self.path / 'report.json')
+
+    def signed_validate(self):
+        path = self.path / 'report.json'
+        return validated_inputs('vn', REL, self.path, path, signing=True, commit=None,
+                                verified_report_hash=digest(path.read_bytes()))
+
+    def signed_sign(self):
+        path = self.path / 'report.json'
+        return create('dannyota/trachuan', self.commit, 2, 'vn', REL, self.path, path,
+                      verified_report_hash=digest(path.read_bytes()))
 
     def save_run(self, **fields):
         row = copy.deepcopy(self.row)
@@ -40,6 +59,49 @@ class SelectedReportTest(unittest.TestCase):
             self.upload()
         with self.assertRaisesRegex(ValueError, message):
             self.sign()
+
+    def test_version_four_requires_warning_records_against_historical_fixture(self):
+        self.report.update(version=4, fixture_hashes={'Warnings': digest(b'[]')})
+        self.report.pop('warning_cases')
+        save_fixture(self.path, self.row, self.report)
+        with patch('corpus_manifest.validate_report'), \
+                patch('corpus_warning.FixtureHistory') as history:
+            history.return_value.fixture.return_value = b'[]'
+            with self.assertRaisesRegex(ValueError, 'warning cases'):
+                self.signed_validate()
+
+    def test_version_four_historical_fixture_and_adversarial_records(self):
+        case = dict(entry_id='effect-example', question='Question?', target='vn:vbpl:1#dieu-5',
+                    acting='vn:vbpl:2#dieu-2', relation_kind='repeals')
+        match = dict(carrier=case['target'], dir='in', kind='repeals', key='vn:vbpl:2',
+                     in_release=True, source=case['acting'], target=case['target'], exact=True)
+        search = [dict(mode=mode, limit=limit, detail=detail, match=copy.deepcopy(match))
+                  for mode in ('exact', 'ann') for limit in (8, 20) for detail in ('compact', 'full')]
+        fixture = json.dumps([case]).encode()
+        record = dict(entry_id=case['entry_id'], outcome='applied', search=search, read=match)
+        self.report.update(version=4, fixture_hashes={'Warnings': digest(fixture)},
+                           warning_cases=[record], not_run={})
+        with patch('corpus_manifest.validate_report'), patch('corpus_warning.FixtureHistory') as history:
+            history.return_value.fixture.return_value = fixture
+            save_fixture(self.path, self.row, self.report)
+            self.signed_validate()
+            self.signed_sign()
+            for change in ('kind', 'key', 'target', 'carrier', 'stale', 'order', 'duplicate', 'missing'):
+                bad = copy.deepcopy(self.report)
+                row = bad['warning_cases'][0]
+                if change in ('kind', 'key', 'target', 'carrier'):
+                    row['search'][0]['match'][change] = 'vn:vbpl:999#dieu-1'
+                elif change == 'stale':
+                    row.update(outcome='stale', reason='changed', search=[], read=None)
+                elif change == 'order':
+                    row['search'][0], row['search'][1] = row['search'][1], row['search'][0]
+                elif change == 'duplicate':
+                    bad['warning_cases'].append(copy.deepcopy(row))
+                else:
+                    del bad['warning_cases']
+                save_fixture(self.path, self.row, bad)
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    self.signed_validate()
 
     def test_matching_hashes_pass_upload_and_signing(self):
         self.upload()
@@ -102,10 +164,11 @@ class SelectedReportTest(unittest.TestCase):
         self.assert_both_refuse()
 
     def run_cli(self, command, country='vn', list_files=False, check=True):
-        environment = dict(GITHUB_REF='refs/heads/main', GITHUB_SHA='a' * 40, GITHUB_RUN_NUMBER='2', GITHUB_REPOSITORY='dannyota/trachuan')
+        environment = dict(GITHUB_REF='refs/heads/main', GITHUB_SHA=self.commit, GITHUB_RUN_NUMBER='2', GITHUB_REPOSITORY='dannyota/trachuan')
         argv = ['corpus_manifest.py', command, country, REL, str(self.path), str(self.path / 'report.json')]
         argv += ['--list-files'] if list_files else []
-        with patch.dict(os.environ, environment), patch('sys.argv', argv):
+        with patch.dict(os.environ, environment), patch('sys.argv', argv), \
+                patch('corpus_registry.existing_release', return_value=None):
             if not check:
                 main()
                 return
@@ -135,7 +198,13 @@ class SelectedReportTest(unittest.TestCase):
         findings = json.loads((self.path / 'findings.json').read_bytes())
         findings['detectors']['unmatched_operative_claim']['complete'] = False
         write_evidence(self.path, self.row, self.report, findings=findings)
+        from corpus_warning import WARNING_PATH
+        from subprocess import run as git_run
+        from types import SimpleNamespace
+        fixture = git(self.repository, 'show', f'refs/heads/main:{WARNING_PATH}')
         with patch.dict(os.environ, OCI_S3_ENDPOINT='https://synthetic.invalid'), \
+                patch('corpus_fixture_history.subprocess', SimpleNamespace(run=git_run)), \
+                patch('corpus_warning.git', return_value=fixture), \
                 patch('corpus_upload.require_settled') as settled, \
                 patch('corpus_upload.subprocess.run') as run, \
                 self.assertRaisesRegex(ValueError, 'detector not complete'):

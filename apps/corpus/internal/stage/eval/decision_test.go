@@ -73,7 +73,7 @@ func TestInputHash_FrozenDecisionReplacesConfiguredReport(t *testing.T) {
 	if first == second || first == none || none == legacy {
 		t.Fatalf("hashes collide: %s %s %s %s", first, second, none, legacy)
 	}
-	want := stage.RecipeHash("eval-input", "2", "build", "", "", "", "", "", strings.Repeat("a", 64), "2099-01-02", "exact,ann")
+	want := stage.RecipeHash("eval-input", "2", "build", "", "", "", "", "", "", strings.Repeat("a", 64), "2099-01-02", "exact,ann")
 	if first != want {
 		t.Fatalf("input hash = %s, want %s", first, want)
 	}
@@ -89,7 +89,7 @@ func TestInputHash_RunWithoutDecisionStillReadsConfiguredReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := stage.RecipeHash("eval-input", "2", "build", "", "", "", "", "", hex.EncodeToString(sum[:]), "2099-01-01", "exact,ann"); got != want {
+	if want := stage.RecipeHash("eval-input", "2", "build", "", "", "", "", "", "", hex.EncodeToString(sum[:]), "2099-01-01", "exact,ann"); got != want {
 		t.Fatalf("input hash = %s, want %s", got, want)
 	}
 }

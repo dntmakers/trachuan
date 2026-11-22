@@ -6,8 +6,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from corpus_manifest import create, validate_manifest
-from corpus_test_support import add_heading_build, digest, save_fixture, write_fixture
+from corpus_manifest import validate_manifest
+from corpus_test_support import add_heading_build, digest, save_fixture, signed_create as create, write_fixture
 
 
 class HeadingEvidenceTest(unittest.TestCase):

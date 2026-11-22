@@ -20,10 +20,13 @@ class CorpusManifestTest(unittest.TestCase):
         self.row, self.report = write_fixture(self.path)
 
     def validate(self):
-        return self.module.validate_inputs('vn', '20990102_1', self.path, self.path / 'report.json')
+        inputs = self.module.validated_inputs('vn', '20990102_1', self.path, self.path / 'report.json', signing=True,
+                                              commit=None, verified_report_hash=digest((self.path / 'report.json').read_bytes()))
+        return inputs.row, inputs.report
 
     def test_canonical_manifest_has_exact_contract_and_no_clock(self):
-        obj = self.module.create('dannyota/trachuan', 'a' * 40, 57, 'vn', '20990102_1', self.path, self.path / 'report.json')
+        obj = self.module.create('dannyota/trachuan', 'a' * 40, 57, 'vn', '20990102_1', self.path, self.path / 'report.json',
+                                 verified_report_hash=digest((self.path / 'report.json').read_bytes()))
         expected = dict(kind='trachuan.corpus-release', version=1, repository='dannyota/trachuan',
                         commit='a' * 40, country='vn', rel='20990102_1', database='corpus_vn_20990102_1',
                         sequence=57, previous='20990101_1',
@@ -161,7 +164,8 @@ class CorpusManifestTest(unittest.TestCase):
         self.validate()
         previous = json.loads((self.path / 'previous-report.json').read_bytes())
         self.module.create('dannyota/trachuan', 'a' * 40, 1, 'vn', self.row['rel'], self.path,
-                           self.path / 'report.json', previous_report=previous)
+                           self.path / 'report.json', previous_report=previous,
+                           verified_report_hash=digest((self.path / 'report.json').read_bytes()))
 
     def test_version_two_recipe_object_must_match_release_metadata(self):
         self.report['retrieval_recipe']['non_current_tail'] = 3

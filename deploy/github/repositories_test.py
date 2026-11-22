@@ -10,7 +10,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import patch
 
 from corpus_manifest import create, read_manifest as read_corpus, sha256
-from corpus_test_support import write_fixture
+from corpus_test_support import git, signed_create, write_fixture, write_release_fixture
 import manifest
 import repositories
 
@@ -315,11 +315,11 @@ class CorpusRepositoryTest(DualPolicyTest):
 
     def test_corpus_manifest_from_each_owner_is_accepted_and_others_refused(self):
         for name in (OLD, NEW):
-            data = create(name, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
+            data = signed_create(name, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
             with self.subTest(name=name):
                 self.assertEqual(read_corpus(data)['repository'], name)
         with self.assertRaises(ValueError):
-            create('attacker/trachuan', 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
+            signed_create('attacker/trachuan', 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
 
     def test_earlier_corpus_manifest_is_verified_with_its_own_repository_from_the_workflow_channel(self):
         registry = importlib.import_module('corpus_registry')
@@ -327,7 +327,7 @@ class CorpusRepositoryTest(DualPolicyTest):
                         layers=[dict(digest='sha256:' + 'b' * 64, size=20, annotations={'org.opencontainers.image.title': name})
                                 for name in ('manifest.json', 'manifest.sigstore.json')])
         for workflow, signer in ((OLD, NEW), (NEW, OLD)):
-            data = create(signer, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
+            data = signed_create(signer, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json')
             responses = [b'{"tags":["vn-production"]}', ('sha256:' + 'c' * 64).encode(), json.dumps(artifact).encode()]
             with self.subTest(workflow=workflow), patch('corpus_registry.command', side_effect=responses) as command, \
                     patch('corpus_registry.fetch_blob', side_effect=[data, b'signature']) as fetch, \
@@ -340,15 +340,26 @@ class CorpusRepositoryTest(DualPolicyTest):
             self.assertEqual({call.args[0] for call in fetch.call_args_list}, {channel})
 
     def test_corpus_publish_uses_the_workflow_owners_channel(self):
+        from corpus_fixture_history import FixtureHistory
+        from corpus_warning import WARNING_PATH, validate_authorized
+
         publish = importlib.import_module('corpus_publish')
-        (self.path / 'manifest.json').write_bytes(
-            create(NEW, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json'))
+        repository = self.path / 'repository'
+        write_release_fixture(self.path, repository)
+        commit = git(repository, 'rev-parse', 'HEAD').decode().strip()
+        fixture = git(repository, 'show', f'{commit}:{WARNING_PATH}')
+        authorized = lambda report, country, **kwargs: validate_authorized(report, country, root=repository, **kwargs)
+        with patch('corpus_manifest.FixtureHistory', side_effect=lambda: FixtureHistory(repository)), \
+                patch('corpus_manifest.validate_authorized', side_effect=authorized):
+            (self.path / 'manifest.json').write_bytes(
+                create(NEW, commit, 7, 'vn', '20990102_1', self.path, self.path / 'report.json'))
         current = json.loads((self.path / 'previous-manifest.json').read_bytes()) | {'sequence': 3}
         with patch('corpus_publish.sign') as sign, patch('corpus_production.production', return_value=current) as production, \
                 patch('corpus_production.existing_release', return_value=None) as existing, \
-                patch('publish.subprocess.run') as run:
+                patch('corpus_production.validate_authorized', side_effect=authorized), \
+                patch('corpus_warning.git', return_value=fixture), patch('publish.subprocess.run') as run:
             publish.publish(sha256(self.path / 'report.json'), sha256(self.path / 'release.json'), self.path,
-                            'refs/heads/main', 'a' * 40, NEW)
+                            'refs/heads/main', commit, NEW)
         self.assertEqual((production.call_args.args[0], existing.call_args.args[0]), (NEW, NEW))
         self.assertEqual(sign.call_args.args[2], NEW)
         push = run.call_args_list[0].args[0]
@@ -360,7 +371,7 @@ class CorpusRepositoryTest(DualPolicyTest):
     def test_corpus_publish_refuses_a_manifest_from_another_repository(self):
         publish = importlib.import_module('corpus_publish')
         (self.path / 'manifest.json').write_bytes(
-            create(OLD, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json'))
+            signed_create(OLD, 'a' * 40, 7, 'vn', '20990102_1', self.path, self.path / 'report.json'))
         with patch('corpus_publish.sign') as sign, patch('corpus_publish.require_signable', return_value={'sequence': 1}) as signable, \
                 patch('publish.subprocess.run') as run, self.assertRaisesRegex(ValueError, 'workflow source'):
             publish.publish(sha256(self.path / 'report.json'), sha256(self.path / 'release.json'), self.path,
