@@ -12,6 +12,16 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
 )
 
+const classifyBudgetFlags = "(--budget pilot --budget-usd 15 | --budget trial --budget-usd 200)"
+
+func parseClassifyBudget(name, dollars string) (int64, error) {
+	amount := classify.BudgetMicroUSD(name)
+	if (name != "pilot" && name != "trial") || dollars != strconv.FormatInt(amount/1000000, 10) {
+		return 0, fmt.Errorf("classification requires %s", classifyBudgetFlags)
+	}
+	return amount, nil
+}
+
 func parseScreenOptions(cc, rel string, args []string) (classify.Options, error) {
 	o := classify.Options{Country: cc, Release: rel}
 	if _, err := build.DatabaseName(cc, rel); err != nil {
@@ -51,10 +61,10 @@ func parseScreenOptions(cc, rel string, args []string) (classify.Options, error)
 		return o, fmt.Errorf("--out is required")
 	}
 	o.Budget = opts["--budget"]
-	if o.Budget != "pilot" || opts["--budget-usd"] != "15" {
-		return o, fmt.Errorf("screening requires --budget pilot --budget-usd 15")
+	o.BudgetMicroUSD, err = parseClassifyBudget(o.Budget, opts["--budget-usd"])
+	if err != nil {
+		return o, err
 	}
-	o.BudgetMicroUSD = 15000000
 	o.DryRun = opts["--dry-run"] == "true"
 	return o, nil
 }
@@ -69,7 +79,7 @@ func runClassify(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		}
 	}
 	if len(args) < 3 || args[0] != "screen" {
-		_, _ = fmt.Fprintln(stderr, "usage: corpus classify screen <cc> <rel> (--select labels:FILE | --documents N --seed S) --recipe MODEL --out DIR --budget pilot --budget-usd 15 [--dry-run]")
+		_, _ = fmt.Fprintln(stderr, "usage: corpus classify screen <cc> <rel> (--select labels:FILE | --documents N --seed S) --recipe MODEL --out DIR "+classifyBudgetFlags+" [--dry-run]")
 		return 2
 	}
 	o, err := parseScreenOptions(args[1], args[2], args[3:])

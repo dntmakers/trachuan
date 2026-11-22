@@ -93,6 +93,10 @@ type Summary struct {
 	SubmissionID    string `json:"submission_id,omitempty"`
 }
 
+func BudgetMicroUSD(name string) int64 {
+	return map[string]int64{"pilot": 15000000, "full": 100000000, "cap": 150000000, "trial": 200000000}[name]
+}
+
 func (o Options) validate() error {
 	if o.RunID < 1 || o.Country != "vn" || o.Release == "" || o.Out == "" {
 		return fmt.Errorf("invalid screening options: require release, output and 1 to 400 documents")
@@ -107,9 +111,9 @@ func (o Options) validate() error {
 	} else if o.Documents < 1 || o.Documents > 400 || o.LabelsFile != "" {
 		return fmt.Errorf("screening requires a document selection or a draw of 1 to 400 documents")
 	}
-	amounts := map[string]int64{"pilot": 15000000, "full": 100000000, "cap": 150000000}
-	if amounts[o.Budget] == 0 || amounts[o.Budget] != o.BudgetMicroUSD {
-		return fmt.Errorf("budget name and amount must match pilot 15 USD, full 100 USD or cap 150 USD")
+	amount := BudgetMicroUSD(o.Budget)
+	if amount == 0 || amount != o.BudgetMicroUSD {
+		return fmt.Errorf("budget name and amount must match pilot 15 USD, full 100 USD, cap 150 USD or trial 200 USD")
 	}
 	return o.Recipe.Validate()
 }

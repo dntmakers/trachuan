@@ -153,8 +153,12 @@ func apply(s *Submission, results []batchapi.Result) error {
 		}
 		outcomes[item.Key] = out
 	}
+	cost, err := s.Recipe.cost(input, output)
+	if err != nil {
+		return fmt.Errorf("price classification usage; reservation retained: %w", err)
+	}
 	s.Results = outcomes
-	s.CostMicroUSD = s.Recipe.cost(input, output)
+	s.CostMicroUSD = cost
 	s.Settled = true
 	if s.State == "cancelling" {
 		s.State = "cancelled"
