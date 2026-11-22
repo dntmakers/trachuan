@@ -85,6 +85,28 @@ class StopRequested(Exception):
     pass
 
 
+class StopState:
+    def __init__(self):
+        self.flag = False
+
+    def request(self):
+        self.flag = True
+
+    def requested(self):
+        return self.flag
+
+    def clear(self):
+        self.flag = False
+
+
+stop = StopState()
+
+
+def check_stop():
+    if stop.requested():
+        raise StopRequested('updater interrupted')
+
+
 class CommandError(Exception):
     def __init__(self, message, reason='failed', returncode=None, detail=None, code=None, safe=None):
         super().__init__(message)
@@ -165,10 +187,12 @@ def bounded_output(process, limit, timeout, input=None):
             else:
                 finish_input()
         while selector.get_map():
+            check_stop()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise subprocess.TimeoutExpired('host command', timeout)
-            ready = selector.select(remaining)
+            ready = selector.select(min(remaining, 0.2))
+            check_stop()
             if not ready:
                 continue
             for key, _ in ready:
@@ -192,22 +216,68 @@ def bounded_output(process, limit, timeout, input=None):
                         raise CommandError('command output exceeds byte limit')
                 else:
                     errors.extend(chunk[:max(0, 65536 - len(errors))])
-        process.wait(timeout=max(0, deadline - time.monotonic()))
+        while True:
+            check_stop()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired('host command', timeout)
+            try:
+                process.wait(timeout=min(remaining, 0.2))
+                check_stop()
+                if time.monotonic() > deadline:
+                    raise subprocess.TimeoutExpired('host command', timeout)
+                break
+            except subprocess.TimeoutExpired:
+                continue
     return bytes(output), bytes(errors)
+
+
+def terminate(process):
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=0.2)
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
 
 
 def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None, input_file=None, safe=None):
     if input is not None and input_file is not None:
         raise ValueError('conflicting command input')
+    check_stop()
+    process = None
+    finished = False
     try:
         with ExitStack() as stack:
             source = stack.enter_context(open(input_file, 'rb')) if input_file is not None else None
-            process = stack.enter_context(subprocess.Popen(
-                args, stdin=source if source is not None else subprocess.PIPE if input is not None else subprocess.DEVNULL,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True))
             try:
+                process = subprocess.Popen(
+                    args, stdin=source if source is not None else subprocess.PIPE if input is not None else subprocess.DEVNULL,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+                check_stop()
                 if stdout_limit is None:
-                    output, errors = process.communicate(input=input, timeout=timeout)
+                    deadline = time.monotonic() + timeout
+                    pending = input
+                    while True:
+                        check_stop()
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise subprocess.TimeoutExpired(args[0], timeout)
+                        try:
+                            output, errors = process.communicate(input=pending, timeout=min(remaining, 0.2))
+                            check_stop()
+                            if time.monotonic() > deadline:
+                                raise subprocess.TimeoutExpired(args[0], timeout)
+                            break
+                        except subprocess.TimeoutExpired:
+                            pending = None
                 else:
                     if type(stdout_limit) is not int or stdout_limit < 0:
                         raise ValueError('invalid streaming command limits')
@@ -217,17 +287,19 @@ def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None,
                     if error_prefix:
                         found = re.fullmatch(re.escape(error_prefix.encode()) + rb'([A-Za-z][A-Za-z0-9_]{0,79})\n', errors)
                         code = found[1].decode() if found else 'SDKError'
+                    finished = True
                     raise CommandError('command failed', reason=failure_reason(args, errors),
                                        returncode=process.returncode, code=code,
                                        detail=describe(args, errors, process.returncode),
                                        safe=safe_line(safe, errors))
-            except BaseException:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                process.communicate()
-                raise
+                finished = True
+            finally:
+                if process is not None:
+                    if not finished:
+                        terminate(process)
+                    for stream in (process.stdin, process.stdout, process.stderr):
+                        if stream is not None:
+                            stream.close()
     except subprocess.TimeoutExpired as error:
         raise CommandError('command timed out', reason='timeout',
                            detail=Path(args[0]).name + ': timeout') from error

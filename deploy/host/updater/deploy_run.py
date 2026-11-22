@@ -9,7 +9,7 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import StopRequested, atomic, Busy, command, CommandError, Lock, remove, Result
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, interrupted, Lock, remove, Result
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
 from .deploy_secrets_state import raw_pending, SecretsState
@@ -179,7 +179,7 @@ class Updater:
     def failure(self, result, state, error):
         status = None
         recovery_message = None
-        if state and self.step != 'recovery' and not self.secret_pending():
+        if state and not interrupted(error) and self.step != 'recovery' and not self.secret_pending():
             try:
                 activator = Activator(state, self.store, self.host)
                 status = activator.recover()
@@ -230,7 +230,9 @@ class Updater:
             failed = False
             with tempfile.TemporaryDirectory(prefix='run-', dir=self.paths.state) as directory:
                 for phase in self.phases:
+                    check_stop()
                     outcome = getattr(self, phase)(state, Path(directory), mode, result)
+                    check_stop()
                     if outcome == INTERRUPTED:
                         return 1
                     if outcome is False:

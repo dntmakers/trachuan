@@ -108,6 +108,11 @@ class IOTest(unittest.TestCase):
         self.assertEqual(failure_reason(['/usr/local/libexec/trachuan/bin/oras', 'resolve'], stderr), 'denied')
         self.assertEqual(failure_reason(['/usr/local/libexec/trachuan/bin/oras', 'manifest', 'fetch'], stderr), 'failed')
 class ProcessControlTest(unittest.TestCase):
+    def setUp(self):
+        from updater.deploy_io import stop
+        stop.clear()
+        self.addCleanup(stop.clear)
+
     def test_signal_interrupts_child_wait(self):
         import os
         import signal

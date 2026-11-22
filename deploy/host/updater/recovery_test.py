@@ -8,7 +8,7 @@ import unittest
 from unittest import mock
 
 from updater.activation_test import ActivationFixture, Crash
-from updater.deploy_io import CommandError, canonical
+from updater.deploy_io import CommandError, StopRequested, canonical
 from updater.deploy_state import State
 from updater.deploy_verify import pull_image
 from updater.deploy_run import Updater
@@ -253,6 +253,23 @@ class HousekeepingTest(ActivationFixture, unittest.TestCase):
         secrets = mock.patch('updater.deploy_run.Secrets.run', return_value=True)
         secrets.start()
         self.addCleanup(secrets.stop)
+
+    def test_stop_during_activation_does_not_start_recovery(self):
+        with mock.patch.object(self.app.host, 'migrate', side_effect=StopRequested('stop')):
+            with mock.patch('updater.deploy_run.Activator.recover', wraps=self.engine.recover) as recover:
+                self.assertEqual(self.app.run(), 1)
+        self.assertEqual(recover.call_count, 1)
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'started')
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_stop_during_recovery_keeps_journal_recoverable(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        with mock.patch.object(self.host, 'schema', side_effect=StopRequested('stop')):
+            with self.assertRaises(StopRequested):
+                self.engine.recover()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
 
     def test_prune_failure_is_success_and_next_run_can_restart_caddy(self):
         self.paths.mode.write_text('activate\n')
