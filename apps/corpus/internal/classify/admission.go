@@ -44,6 +44,11 @@ func (r *Runner) admitBatch(ctx context.Context, prepared *screenBatch, o Option
 			if r.Client == nil {
 				return fmt.Errorf("classification submission requires a provider client")
 			}
+			identity, ok := r.Client.(interface{ AccountFingerprint() string })
+			if !ok || !validID(identity.AccountFingerprint()) {
+				return fmt.Errorf("classification provider account identity is unavailable")
+			}
+			s.AccountFingerprint = identity.AccountFingerprint()
 			if s.ID, err = newID(); err != nil {
 				return err
 			}

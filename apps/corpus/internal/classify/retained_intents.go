@@ -12,18 +12,23 @@ import (
 )
 
 type retainedStore struct {
-	intents        []Submission
-	byID           map[string]Submission
-	receipts       map[string]batchRecord
-	retryAbandoned map[string]bool
-	abandoned      map[string]bool
-	downloads      map[string][]storedCapture
-	attempts       map[string]map[int]retainedAttempt
-	settlements    map[string]settlementRecord
-	outcomes       map[string]map[string]Outcome
-	verified       map[string]batchDownload
-	missingRows    int
-	pendingPilot   string
+	intents          []Submission
+	byID             map[string]Submission
+	receipts         map[string]batchRecord
+	retryAbandoned   map[string]bool
+	seenBatchID      map[string]string
+	successfulCreate map[string]bool
+	abandoned        map[string]bool
+	abandonRecords   map[string]abandonmentRecord
+	dispatched       map[string]bool
+	claimed          map[string]bool
+	downloads        map[string][]storedCapture
+	attempts         map[string]map[int]retainedAttempt
+	settlements      map[string]settlementRecord
+	outcomes         map[string]map[string]Outcome
+	verified         map[string]batchDownload
+	missingRows      int
+	pendingPilot     string
 }
 
 type retainedAttempt struct {
@@ -44,6 +49,9 @@ func readRetainedFile(path string, value any) error {
 	if err != nil {
 		return fmt.Errorf("read classification record %s: %w", path, err)
 	}
+	if err = validateRetainedJSON(b, value); err != nil {
+		return fmt.Errorf("decode classification record %s: %w", path, err)
+	}
 	if err = json.Unmarshal(b, value); err != nil {
 		return fmt.Errorf("decode classification record %s: %w", path, err)
 	}
@@ -52,8 +60,8 @@ func readRetainedFile(path string, value any) error {
 
 func (r *Runner) readStore() (retainedStore, error) {
 	store := retainedStore{
-		byID: map[string]Submission{}, receipts: map[string]batchRecord{}, retryAbandoned: map[string]bool{},
-		abandoned: map[string]bool{}, downloads: map[string][]storedCapture{}, attempts: map[string]map[int]retainedAttempt{},
+		byID: map[string]Submission{}, receipts: map[string]batchRecord{}, retryAbandoned: map[string]bool{}, seenBatchID: map[string]string{}, successfulCreate: map[string]bool{},
+		abandoned: map[string]bool{}, abandonRecords: map[string]abandonmentRecord{}, dispatched: map[string]bool{}, claimed: map[string]bool{}, downloads: map[string][]storedCapture{}, attempts: map[string]map[int]retainedAttempt{},
 		settlements: map[string]settlementRecord{}, outcomes: map[string]map[string]Outcome{}, verified: map[string]batchDownload{},
 	}
 	root, err := readRetainedDirectory(r.IntentDir)
@@ -112,6 +120,49 @@ func (r *Runner) readStore() (retainedStore, error) {
 	for id := range store.byID {
 		store.retryAbandoned[id] = true
 	}
+	batchOwners := map[string]string{}
+	for id, intent := range store.byID {
+		responses, readErr := readProviderResponses(filepath.Join(r.IntentDir, "evidence", id, "responses"), id)
+		if readErr != nil {
+			return store, readErr
+		}
+		var saved *batchRecord
+		if receipt, found := store.receipts[id]; found {
+			saved = &receipt
+		}
+		receipt, found, seenID, successfulCreate, verifyErr := verifyReceipt(intent, saved, responses)
+		if verifyErr != nil {
+			return store, fmt.Errorf("verify provider receipt %s: %w", id, verifyErr)
+		}
+		if seenID != "" {
+			store.seenBatchID[id] = seenID
+		}
+		if seenID != "" || successfulCreate {
+			store.retryAbandoned[id] = false
+		}
+		store.successfulCreate[id] = successfulCreate
+		if found {
+			if ownerErr := registerBatchOwner(batchOwners, receipt.ID, id); ownerErr != nil {
+				return store, ownerErr
+			}
+			store.receipts[id] = receipt
+			store.retryAbandoned[id] = false
+		}
+		for _, response := range responses {
+			if response.Operation != "create" || response.Status < 200 || response.Status >= 300 {
+				continue
+			}
+			batch, identified, identityErr := observedBatchIdentity(response.Body)
+			if identityErr != nil {
+				return store, identityErr
+			}
+			if identified {
+				if ownerErr := registerBatchOwner(batchOwners, batch, id); ownerErr != nil {
+					return store, ownerErr
+				}
+			}
+		}
+	}
 	for _, f := range files {
 		id, suffix, _ := strings.Cut(f.Name(), ".")
 		path := filepath.Join(dir, f.Name())
@@ -140,6 +191,7 @@ func (r *Runner) readStore() (retainedStore, error) {
 				return store, fmt.Errorf("invalid abandonment record %s for intent %s", path, filepath.Join(dir, id+".json"))
 			}
 			store.abandoned[id] = true
+			store.abandonRecords[id] = record
 		case "creator.absent", "creator.finished", "creator.dispatch":
 			var record creatorRecord
 			if err = readRetainedFile(path, &record); err != nil {
@@ -149,6 +201,7 @@ func (r *Runner) readStore() (retainedStore, error) {
 				return store, fmt.Errorf("invalid creator record %s for intent %s", path, filepath.Join(dir, id+".json"))
 			}
 			if record.Dispatched {
+				store.dispatched[id] = true
 				store.retryAbandoned[id] = false
 			}
 		}
@@ -204,6 +257,9 @@ func (r *Runner) readStore() (retainedStore, error) {
 		if err = r.inspectCaptures(store.byID, &store); err != nil {
 			return store, err
 		}
+	}
+	if err = r.verifyAbandonments(&store); err != nil {
+		return store, err
 	}
 	if present["counts"] {
 		return store, r.inspectCounts()

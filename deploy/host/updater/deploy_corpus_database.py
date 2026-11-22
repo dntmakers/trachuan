@@ -4,6 +4,7 @@ import re
 from . import deploy_corpus_sql as sql
 from . import deploy_release_catalog as catalog
 from . import deploy_release_target as target
+from . import deploy_smoke_container
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_lock import AdvisoryLock
 from .deploy_corpus_verify import toc
@@ -263,11 +264,11 @@ class Database:
             raise ValueError('restored release row differs from manifest')
 
     def server(self, image, *args, secret=False, **options):
-        command = ['podman', 'run', '--rm', '--network=host', '--read-only', '--cap-drop=ALL',
+        command = ['--network=host', '--read-only', '--cap-drop=ALL',
                    '--security-opt=no-new-privileges', '--env-file', str(self.host.paths.host / 'server.env')]
         if secret:
             command += ['--secret', 'server_corpus_database_url,type=env,target=SERVER_CORPUS_DATABASE_URL']
-        return self.host.user(*command, image, *args, timeout=150, **options)
+        return deploy_smoke_container.run(self.host, [*command, image, *args], timeout=150, **options)
 
     def describe(self, image, database=None, **options):
         args = ['release-check', *self.kind.check]

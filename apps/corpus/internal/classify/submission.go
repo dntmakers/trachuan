@@ -24,29 +24,30 @@ type Item struct {
 }
 
 type Submission struct {
-	KeyVersion      int    `json:"key_version,omitempty"`
-	PriceVersion    string `json:"price_version,omitempty"`
-	attempts        []attemptRecord
-	ID              string             `json:"id"`
-	RunID           int64              `json:"run_id"`
-	Country         string             `json:"country"`
-	Release         string             `json:"release"`
-	ScreenHash      string             `json:"screen_hash"`
-	Recipe          Recipe             `json:"recipe"`
-	Families        []Family           `json:"families"`
-	Items           []Item             `json:"items"`
-	ItemsHash       string             `json:"items_hash"`
-	State           string             `json:"state"`
-	BatchID         string             `json:"provider_job_id"`
-	CreatedAt       time.Time          `json:"created_at"`
-	SubmittedAt     *time.Time         `json:"submitted_at"`
-	DeadlineAt      *time.Time         `json:"deadline_at"`
-	Budget          string             `json:"budget"`
-	BudgetMicroUSD  int64              `json:"budget_micro_usd"`
-	ReserveMicroUSD int64              `json:"reserved_micro_usd"`
-	Settled         bool               `json:"settled"`
-	CostMicroUSD    int64              `json:"cost_micro_usd"`
-	Results         map[string]Outcome `json:"results"`
+	KeyVersion         int    `json:"key_version,omitempty"`
+	PriceVersion       string `json:"price_version,omitempty"`
+	AccountFingerprint string `json:"account_fingerprint,omitempty"`
+	attempts           []attemptRecord
+	ID                 string             `json:"id"`
+	RunID              int64              `json:"run_id"`
+	Country            string             `json:"country"`
+	Release            string             `json:"release"`
+	ScreenHash         string             `json:"screen_hash"`
+	Recipe             Recipe             `json:"recipe"`
+	Families           []Family           `json:"families"`
+	Items              []Item             `json:"items"`
+	ItemsHash          string             `json:"items_hash"`
+	State              string             `json:"state"`
+	BatchID            string             `json:"provider_job_id"`
+	CreatedAt          time.Time          `json:"created_at"`
+	SubmittedAt        *time.Time         `json:"submitted_at"`
+	DeadlineAt         *time.Time         `json:"deadline_at"`
+	Budget             string             `json:"budget"`
+	BudgetMicroUSD     int64              `json:"budget_micro_usd"`
+	ReserveMicroUSD    int64              `json:"reserved_micro_usd"`
+	Settled            bool               `json:"settled"`
+	CostMicroUSD       int64              `json:"cost_micro_usd"`
+	Results            map[string]Outcome `json:"results"`
 }
 
 type Repository interface {

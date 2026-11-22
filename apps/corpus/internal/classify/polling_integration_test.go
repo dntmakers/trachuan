@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,6 +24,8 @@ type pollingClient struct {
 	message                  anthropic.Message
 }
 
+func (p *pollingClient) AccountFingerprint() string { return strings.Repeat("a", 32) }
+
 func (p *pollingClient) CountTokens(context.Context, anthropic.MessageNewParams) (int64, error) {
 	return 100, nil
 }
@@ -30,17 +33,32 @@ func (p *pollingClient) Create(_ context.Context, requests []batchapi.Request) (
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.requests = requests
-	return anthropic.MessageBatch{ID: "batch_synthetic"}, nil
+	return fakeProviderBatch("batch_synthetic", "in_progress", time.Time{}), nil
 }
 func (p *pollingClient) Get(context.Context, string) (anthropic.MessageBatch, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	b := anthropic.MessageBatch{ID: "batch_synthetic"}
+	status := "in_progress"
 	if p.ended {
-		b.ProcessingStatus = "ended"
+		status = "ended"
 	}
-	return b, nil
+	return fakeProviderBatch("batch_synthetic", status, time.Time{}), nil
 }
+func (p *pollingClient) CreateRaw(ctx context.Context, requests []batchapi.Request) ([]byte, int, error) {
+	response, err := p.Create(ctx, requests)
+	if err != nil {
+		return []byte(response.RawJSON()), 0, err
+	}
+	return []byte(response.RawJSON()), 200, nil
+}
+func (p *pollingClient) GetRaw(ctx context.Context, id string) ([]byte, int, error) {
+	response, err := p.Get(ctx, id)
+	if err != nil {
+		return []byte(response.RawJSON()), 0, err
+	}
+	return []byte(response.RawJSON()), 200, nil
+}
+
 func (p *pollingClient) StreamResults(_ context.Context, _ string, visit func(batchapi.Result) error) error {
 	p.mu.Lock()
 	p.downloads++

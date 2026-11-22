@@ -98,9 +98,20 @@ func (p *PGRepository) List(ctx context.Context) ([]Submission, error) {
 			s.BatchID = *v.ProviderJobID
 		}
 		for _, entry := range []struct {
-			raw []byte
-			dst any
-		}{{v.Recipe, &s.Recipe}, {v.Families, &s.Families}, {v.ItemList, &s.Items}, {v.Results, &s.Results}} {
+			raw      []byte
+			dst      any
+			nullable bool
+		}{
+			{v.Recipe, &s.Recipe, false}, {v.Families, &s.Families, true}, {v.ItemList, &s.Items, false}, {v.Results, &s.Results, true},
+		} {
+			if entry.nullable {
+				err = validateNullableRetainedCollection(entry.raw, entry.dst)
+			} else {
+				err = validateRetainedJSON(entry.raw, entry.dst)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("decode submission ledger: %w", err)
+			}
 			if err = json.Unmarshal(entry.raw, entry.dst); err != nil {
 				return nil, fmt.Errorf("decode submission ledger: %w", err)
 			}

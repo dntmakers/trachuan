@@ -4,7 +4,7 @@
 
 **Spec:** `docs/adr/0017-findings-and-reviewed-knowledge.md`, `docs/design/knowledge-loop.md`, `docs/research/write-path-findings-2026-11.md`. Related: `docs/design/validity-status.md`, `relations-text.md`, `ocr-check.md`, `error-reports.md`, `evaluation-fixtures.md`, `corpus-release.md`.
 
-**Routes:** `instructions/workflow.md`. Executor: trachuan-dev (corpus), after the batch 2 release. Standing rules: no model and no network at build; existing gap kinds keep their names; no server-checked recipe changes without telling the coordinator.
+**Routes:** `instructions/workflow.md`. Executor: trachuan-features (from 2026-11-22); the batch 2 release dependency is met. Standing rules: no model and no network at build; existing gap kinds keep their names; no server-checked recipe changes without telling the coordinator.
 
 ## 16.0 Design (primary, astra review)
 - [x] ADR 0017, knowledge-loop.md and the survey note reviewed by `gpt-6-astra` in five rounds (S-01 to S-23, A-01, A-02 fixed) and read by the corpus session against the code; ADR accepted 2026-11-15.
@@ -28,10 +28,10 @@
 
 ## 16.4 Intake and release gate
 - [x] `sources/<cc>-reports.yaml` with the closed schema, origin registry, 500-record bound, replay idempotence; detector `external_report`; `corpus findings import` converts an export batch into records for a pull request; error-reports.md keeps its batch guarantees.
-- [ ] `identity.jsonl` in the evidence artifact (parent anchors, ambiguity mark, relation ends with `exact` and `named`, validity rows, the one hash format) and `changes.jsonl` from this summary and the predecessor's (bound to the predecessor's `identity.jsonl` hash; cause classes, hand-over key changes, legal and provenance changes, no moves, `baseline` when the predecessor has none), per release-evidence.md; upload of all three files; their hashes in the signed manifest; uploader and signing validator enforce the gate table of release-evidence.md; corpus-release.md updated in the same change.
+- [x] `identity.jsonl` in the evidence artifact (parent anchors, ambiguity mark, relation ends with `exact` and `named`, validity rows, the one hash format) and `changes.jsonl` from this summary and the predecessor's (bound to the predecessor's `identity.jsonl` hash; cause classes, hand-over key changes, legal and provenance changes, no moves, `baseline` when the predecessor has none), per release-evidence.md; upload of all three files; their hashes in the signed manifest; uploader and signing validator enforce the gate table of release-evidence.md; corpus-release.md updated in the same change. Landed in #460.
 
 ## 16.5 First use
 - [ ] Before the first release with `reviewed` rows: the image that admits them is live and the release floor is confirmed at it, and an evaluation case asserts the warning on the target provision. Evaluation has no warning assertion today and no release holds such a row, so the case ships with the first entries.
-- [ ] Triage the first run's findings in batches (model-adjudicated with a 10 percent read sample); operative claims in the 394 partly expired documents and the 196 `ocr_label_flagged` documents first.
+- [ ] Triage the first run's findings in batches (model-adjudicated with a 10 percent read sample); operative claims in the 394 partly expired documents and the 196 `ocr_label_flagged` documents first. Run vn/20261121_1 (production on 2026-11-22) has 61 open `unmatched_operative_claim` (review), 349 `partial_without_provision_effect`, 34 `raw_field_not_normalized` and 1 `waived_document_without_relations` (info).
 - [ ] Migrate gap kinds to findings one named migration at a time, converting accepted gaps into review decisions.
-- [ ] Rule in instructions/workflow.md and the PR template: a defect found by a person becomes a detector or a knowledge entry before its fix merges.
+- [x] Rule in instructions/workflow.md and the PR template: a defect found by a person becomes a detector or a knowledge entry before its fix merges.

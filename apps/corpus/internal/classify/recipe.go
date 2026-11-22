@@ -21,7 +21,7 @@ type Recipe struct {
 }
 
 func NewRecipe(model, taxonomyHash string) (Recipe, error) {
-	r := Recipe{Version: 1, Model: model, Effort: "medium", MaxTokens: 4096, InputBound: 90000, F: 5, PromptVersion: 2, SchemaVersion: 2, TaxonomyHash: taxonomyHash}
+	r := Recipe{Version: 1, Model: model, Effort: "medium", MaxTokens: 4096, InputBound: 90000, F: 5, PromptVersion: 3, SchemaVersion: 2, TaxonomyHash: taxonomyHash}
 	return r, r.Validate()
 }
 
@@ -36,7 +36,7 @@ func (r Recipe) validate(historical bool) error {
 	if r.Effort != "low" && r.Effort != "medium" && r.Effort != "high" && r.Effort != "xhigh" && r.Effort != "max" {
 		return fmt.Errorf("invalid classification effort")
 	}
-	if r.Version != 1 || (r.PromptVersion != 2 && ((!historical && r.Article == nil) || r.PromptVersion != 1)) || r.SchemaVersion != 2 || r.MaxTokens < 1 || r.MaxTokens > 32000 || r.InputBound < 1 || r.InputBound >= 100000 || r.F < 1 {
+	if r.Version != 1 || (r.PromptVersion < 1 || r.PromptVersion > 3 || (!historical && r.PromptVersion != 3)) || r.SchemaVersion != 2 || r.MaxTokens < 1 || r.MaxTokens > 32000 || r.InputBound < 1 || r.InputBound >= 100000 || r.F < 1 {
 		return fmt.Errorf("invalid classification recipe")
 	}
 	h, err := hex.DecodeString(r.TaxonomyHash)
@@ -44,7 +44,7 @@ func (r Recipe) validate(historical bool) error {
 		return fmt.Errorf("invalid taxonomy hash")
 	}
 	if r.Article != nil {
-		if err := r.validateArticle(); err != nil {
+		if err := r.validateArticle(historical); err != nil {
 			return err
 		}
 	}

@@ -4,7 +4,10 @@ package classify
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -79,15 +82,75 @@ func TestRebuild_DatabaseAbandonedReplacement(t *testing.T) {
 	if err := db.QueryRow(ctx, `SELECT count(*) FROM submission`).Scan(&count); err != nil || count != 2 {
 		t.Fatalf("restored count %d error %v", count, err)
 	}
-	t.Run("budget includes both attempts", func(t *testing.T) {
+	unlock, err := r.Repository.Lock(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := r.Repository.List(ctx)
+	if err != nil {
+		unlock()
+		t.Fatal(err)
+	}
+	retained, err := r.verifyStore(rows, nil)
+	unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := retained.byID[abandonedID]
+	finished, found, err := r.readCreatorRecord(original, ".creator.finished")
+	if err != nil || !found || finished.Dispatched || retained.dispatched[abandonedID] || len(retained.attempts[abandonedID]) != 0 {
+		t.Fatalf("original intent is not undispatched: finished=%+v found=%t err=%v", finished, found, err)
+	}
+	record := retained.abandonRecords[abandonedID]
+	if record.Path == "" || !validKey(record.Hash) || !retained.retryAbandoned[abandonedID] {
+		t.Fatal("abandonment has no verified listing proof")
+	}
+	listingDir := filepath.Join(r.IntentDir, filepath.FromSlash(record.Path))
+	var start captureStart
+	if err = readRetainedFile(filepath.Join(listingDir, "start.json"), &start); err != nil {
+		t.Fatal(err)
+	}
+	if start.After == nil || start.Before == nil || start.CapturedAt == nil || !start.After.Equal(created.Add(-time.Minute)) || !start.Before.Equal(created.Add(25*time.Hour)) || !start.CapturedAt.Equal(created.Add(25*time.Hour)) {
+		t.Fatalf("listing window %+v", start)
+	}
+	var end captureEnd
+	if err = readRetainedFile(filepath.Join(listingDir, "end.json"), &end); err != nil || end.Records != 1 || end.Error != "" {
+		t.Fatalf("listing end %+v error %v", end, err)
+	}
+	var raw string
+	if err = readRetainedFile(filepath.Join(listingDir, captureRecordName(0)), &raw); err != nil {
+		t.Fatal(err)
+	}
+	var page struct {
+		Data []struct {
+			ID     string `json:"id"`
+			Status string `json:"processing_status"`
+		} `json:"data"`
+	}
+	if err = json.Unmarshal([]byte(raw), &page); err != nil || len(page.Data) != 1 || page.Data[0].ID != "batch_synthetic" || page.Data[0].Status != "ended" {
+		t.Fatalf("listing candidate %+v error %v", page, err)
+	}
+	resultDir := filepath.Join(r.IntentDir, "evidence", abandonedID, captureScope("batch_synthetic"))
+	captures, err := os.ReadDir(resultDir)
+	if err != nil || len(captures) != 1 {
+		t.Fatalf("candidate captures %d error %v", len(captures), err)
+	}
+	if err = readRetainedFile(filepath.Join(resultDir, captures[0].Name(), "end.json"), &end); err != nil || end.Records != 0 || end.Error != "" {
+		t.Fatalf("candidate results end %+v error %v", end, err)
+	}
+	cost, err := retained.ledgerCost()
+	if err != nil || cost != 7499520 {
+		t.Fatalf("ledger total %d error %v", cost, err)
+	}
+	t.Run("budget releases evidenced abandonment", func(t *testing.T) {
 		o.RunID, o.Release = submissionRun(t, db)
 		o.Recipe, _ = NewRecipe("claude-haiku-5-5", o.Recipe.TaxonomyHash)
 		o.Documents = 1
 		o.Out = t.TempDir()
 		client.input = 100
 		before := client.creates
-		if _, err := r.Screen(ctx, o, documents(), families()); err == nil || client.creates != before {
-			t.Fatal("admitted without abandoned reservation")
+		if _, err := r.Screen(ctx, o, documents(), families()); err == nil || client.creates != before+1 {
+			t.Fatalf("expected admission followed by interrupted polling: creates %d before %d error %v", client.creates, before, err)
 		}
 	})
 }

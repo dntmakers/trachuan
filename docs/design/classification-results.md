@@ -82,6 +82,10 @@ stored provider evidence. Settle only submitted items, using one of these:
   first 16 bytes of the SHA-256 of the API key, never the key), and evidence
   counts only when the two match.
 
+A stored `Create` response with a 2xx status blocks abandonment by listing, even
+if its body is empty, truncated or invalid. The status alone does not establish
+a receipt. Reconcile the submission to its batch before settling it.
+
 A deadline, a timeout, a missing or expired result file, an item with no
 outcome, a duplicate or unknown `custom_id`, or usage that cannot be priced
 settles nothing; in classification, `failed` and `abandoned` in

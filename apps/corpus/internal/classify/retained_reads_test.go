@@ -105,7 +105,7 @@ func TestRetainedReads_ReconcileCannotForgetEarlierCompetingBatch(t *testing.T) 
 	s := ledger.rows[0]
 	batches := []anthropic.MessageBatch{{ID: "batch_A", CreatedAt: s.CreatedAt, ProcessingStatus: "ended"}, {ID: "batch_B", CreatedAt: s.CreatedAt, ProcessingStatus: "ended"}}
 	r.Client = &providerFault{fakeClient: f, pages: func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
-		return visit(batches, "")
+		return visit(batches, fakeListingRaw(batches))
 	}, stream: func(_ context.Context, _ string, visit func(batchapi.Result) error) error {
 		return visit(batchapi.Result{CustomID: customID(s.ID, 0), Type: "expired"})
 	}}

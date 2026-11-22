@@ -72,6 +72,10 @@ class LawFixture:
                               validate=json.dumps(release).encode())
         self.responses['release-check'] = b'{}\n'
         def runner(args, **kwargs):
+            if args[:2] == ['podman', 'rm']:
+                return b''
+            if args[:2] == ['podman', 'ps']:
+                return b''
             name = classify(args, (kwargs.get('input') or b'').decode())
             self.calls.append((name, args, kwargs))
             if name in self.failures:

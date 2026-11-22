@@ -6,9 +6,22 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
 func DecodeObject(b []byte) (map[string]json.RawMessage, error) {
+	return decodeEvidenceObject(b, false, nil)
+}
+
+func DecodeEvidenceObject(b []byte, names ...string) (map[string]json.RawMessage, error) {
+	return decodeEvidenceObject(b, false, names)
+}
+
+func DecodeEvidenceProjection(b []byte, names ...string) (map[string]json.RawMessage, error) {
+	return decodeEvidenceObject(b, true, names)
+}
+
+func decodeEvidenceObject(b []byte, project bool, names []string) (map[string]json.RawMessage, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	token, err := dec.Token()
 	if err != nil || token != json.Delim('{') {
@@ -21,12 +34,28 @@ func DecodeObject(b []byte) (map[string]json.RawMessage, error) {
 			return nil, fmt.Errorf("read JSON key: %w", err)
 		}
 		key, ok := token.(string)
-		if !ok || out[key] != nil {
-			return nil, fmt.Errorf("invalid or duplicate JSON key")
+		if !ok {
+			return nil, fmt.Errorf("invalid JSON key")
+		}
+		selected := false
+		for _, name := range names {
+			if strings.EqualFold(key, name) {
+				if key != name {
+					return nil, fmt.Errorf("case-variant evidence field")
+				}
+				selected = true
+				break
+			}
 		}
 		var raw json.RawMessage
 		if err = dec.Decode(&raw); err != nil {
 			return nil, fmt.Errorf("decode JSON value: %w", err)
+		}
+		if project && !selected {
+			continue
+		}
+		if _, exists := out[key]; exists {
+			return nil, fmt.Errorf("invalid or duplicate JSON key")
 		}
 		out[key] = raw
 	}

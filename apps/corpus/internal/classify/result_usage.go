@@ -4,7 +4,7 @@ import "danny.vn/trachuan/apps/corpus/internal/batchapi"
 
 func priceUsage(s Submission, raw string) (tokenUsage, *int64) {
 	var usage tokenUsage
-	fields, err := readObject([]byte(raw))
+	fields, err := batchapi.DecodeEvidenceObject([]byte(raw), "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "cache_creation")
 	if err != nil {
 		return usage, nil
 	}

@@ -2,6 +2,7 @@
 
 This note owns the authored case fixtures and the identity map that
 [evaluation](evaluation.md) scores; it was split from that note.
+[Reviewed warning cases](evaluation-warning-cases.md) use a separate fixture.
 
 Commit the authored banhmi `deploy/eval/golden.json` data unchanged to
 `apps/corpus/internal/evaluation/testdata/vn/legacy.json`. Retain all 92 IDs,

@@ -7,7 +7,7 @@ from updater import activation_test as activation_fixture
 from updater import deploy_run
 from updater import secrets_test as fixture
 from updater.deploy_activate import Activator
-from updater.deploy_io import canonical
+from updater.deploy_io import canonical, stop, StopRequested
 from updater.deploy_state import State
 
 
@@ -27,6 +27,42 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         patch = mock.patch('updater.deploy_run.Verifier.images')
         patch.start()
         self.addCleanup(patch.stop)
+
+    def test_stop_on_secrets_edge_probe_stops_caddy(self):
+        self.addCleanup(stop.clear)
+        self.reconcile.data['versions'] = dict(self.versions)
+        self.reconcile.storage.save()
+        self.versions['google_client_secret'] = 2
+        runner = self.app.host.runner
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            if args[-1] == 'https://trachuan.vn/':
+                stop.request()
+                raise StopRequested('stop')
+            return runner(args, **kwargs)
+        self.app.host.runner = run
+        self.assertEqual(self.app.run(), 1)
+        self.assertEqual(calls[-1], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertTrue(self.paths.hold.exists())
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('caddy stopped', result['message'])
+
+    def test_stop_after_verified_secrets_keeps_caddy_running(self):
+        self.addCleanup(stop.clear)
+        self.reconcile.data['versions'] = dict(self.versions)
+        self.reconcile.storage.save()
+        self.versions['google_client_secret'] = 2
+        self.app.phases = ('secrets', 'images')
+        def later(*args):
+            stop.request()
+            raise StopRequested('stop')
+        with mock.patch.object(self.app, 'images', side_effect=later):
+            self.assertEqual(self.app.run(), 1)
+        self.assertFalse(self.paths.hold.exists())
+        self.assertNotEqual(self.secret_calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
 
     def test_secret_metadata_is_private_and_separate_from_image_state(self):
         main_fields = {'version', 'active', 'accepted', 'retained', 'failed', 'consumed',
@@ -191,6 +227,12 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         self.assertEqual(self.app.run(), 1)
         self.assertEqual(State(self.state.path).data['active'], self.new.hash)
         self.assertFalse(any('deploy_vault.py' in ' '.join(args) for args, _, _ in self.secret_calls))
+
+class SecretsStopTest(fixture.SecretsFixture, unittest.TestCase):
+    def test_forced_reconcile_propagates_interruption(self):
+        with mock.patch.object(self.reconcile, 'fetch', side_effect=InterruptedError('stop')):
+            with self.assertRaises(InterruptedError):
+                self.reconcile.run(force=True)
 
 
 if __name__ == '__main__':

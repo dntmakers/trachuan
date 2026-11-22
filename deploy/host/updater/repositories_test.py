@@ -33,6 +33,7 @@ def rules():
 
 def keyed_policy(base, names):
     value = dict(base, repositories=names)
+    value.pop('frameworks', None)
     for kind, workflow in WORKFLOWS.items():
         if kind == 'frameworks':
             continue
@@ -81,7 +82,7 @@ class PolicyRepositoriesTest(unittest.TestCase):
         value = v.policy(HOST / 'deploy-policy.json')
         self.assertEqual(value['repositories'], [NEW])
         self.assertEqual(value['release_floor'], 67)
-        self.assertNotIn('frameworks', value)
+        self.assertEqual(set(value['frameworks']['identity']), {NEW})
         for key in ('release_identity', 'build_identity', 'rollback_identity', 'corpus_identity', 'images'):
             self.assertEqual(set(value[key]), {NEW})
 

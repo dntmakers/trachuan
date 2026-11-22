@@ -241,7 +241,9 @@ def pull_image(image, runner, user_prefix):
     inspect = user_prefix + ['podman', 'image', 'inspect', image]
     try:
         raw = runner(inspect)
-    except CommandError:
+    except CommandError as error:
+        if error.reason == 'timeout':
+            raise
         try:
             runner(user_prefix + ['podman', 'image', 'exists', image])
         except CommandError as error:

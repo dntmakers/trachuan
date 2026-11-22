@@ -1,4 +1,5 @@
 from .deploy_floor import bundle_floor
+from .deploy_io import check_stop, interrupted
 
 
 class Activator:
@@ -7,6 +8,7 @@ class Activator:
         self.recovery_message = 'interrupted activation recovered'
 
     def step(self, name):
+        check_stop()
         self.state.data['journal']['step'] = name
         self.state.save()
 
@@ -15,7 +17,9 @@ class Activator:
                              ('prune', lambda: self.store.prune(self.state))):
             try:
                 action()
-            except Exception:
+            except Exception as error:
+                if interrupted(error):
+                    raise
                 try:
                     self.host.warning(step, 'post-activation housekeeping failed; retry later')
                 except OSError:
@@ -124,7 +128,7 @@ class Activator:
             self.state.activate(candidate.hash, journal['baseline'])
         except BaseException as error:
             self.host.hold()
-            if not isinstance(error, Exception):
+            if interrupted(error) or not isinstance(error, Exception):
                 raise
             self.host.systemctl('stop', 'caddy')
             journal.update(status='stopped', step='recovery')

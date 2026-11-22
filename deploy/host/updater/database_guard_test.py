@@ -54,6 +54,10 @@ class LawFixture(GuardAssertions):
                         expected_active_db='corpus_vn_20990101_1', manifest=self.m, step='checked', oid=16400)
 
     def runner(self, args, **kwargs):
+        if args[:2] == ['podman', 'rm']:
+            return b''
+        if args[:2] == ['podman', 'ps']:
+            return b''
         self.calls.append(args)
         text = sql_text(args, kwargs.get('input')).decode()
         self.scripts.append(text)
