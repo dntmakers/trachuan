@@ -20,6 +20,40 @@ def check(candidate, previous=None):
                     release_row=recipe_fixture(candidate['retrieval_recipe'])[0])
 
 
+class VersionOneRejectionGateTest(unittest.TestCase):
+    def candidate(self):
+        candidate = version_two_pair()[1]
+        candidate.update(version=1, scorer='agent-eval/4')
+        candidate.pop('retrieval_recipe')
+        return candidate
+
+    def validate(self, candidate):
+        validate_report(candidate, 'vn', candidate['rel'])
+
+    def test_passing_rejections_are_accepted(self):
+        self.validate(self.candidate())
+
+    def test_three_rejections_are_required(self):
+        candidate = self.candidate()
+        candidate['rejections'].pop()
+        candidate['cohorts']['old_product']['case_count'] -= 1
+        with self.assertRaisesRegex(ValueError, 'rejection'):
+            self.validate(candidate)
+
+    def test_failed_or_invalid_passed_is_refused(self):
+        changes = [('false', lambda row: row.update(passed=False)),
+                   ('missing', lambda row: row.pop('passed')),
+                   ('integer', lambda row: row.update(passed=1)),
+                   ('text', lambda row: row.update(passed='true')),
+                   ('null', lambda row: row.update(passed=None))]
+        for name, change in changes:
+            with self.subTest(name=name):
+                candidate = self.candidate()
+                change(candidate['rejections'][1])
+                with self.assertRaisesRegex(ValueError, 'rejection'):
+                    self.validate(candidate)
+
+
 class VersionTwoRejectionRecordTest(unittest.TestCase):
     def test_a_passed_diacritics_refusal_is_accepted(self):
         previous, candidate = version_two_pair()
