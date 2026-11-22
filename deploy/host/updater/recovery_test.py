@@ -319,6 +319,32 @@ class HousekeepingTest(ActivationFixture, unittest.TestCase):
         self.assert_edge_cancelled()
         self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
 
+    def test_stop_after_verified_activation_keeps_caddy_running(self):
+        self.addCleanup(stop.clear)
+        self.app.phases = ('images', 'corpus')
+        def later(*args):
+            stop.request()
+            raise StopRequested('stop')
+        with mock.patch.object(self.app, 'corpus', side_effect=later):
+            self.assertEqual(self.app.run(), 1)
+        self.assertFalse(self.paths.hold.exists())
+        self.assertNotEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_stop_during_failure_recovery_edge_stops_caddy(self):
+        self.edge_stop()
+        original = self.app.host.migrate
+        calls = []
+        def migrate():
+            if not calls:
+                calls.append(True)
+                raise CommandError('activation failure')
+            return original()
+        with mock.patch.object(self.app.host, 'migrate', side_effect=migrate):
+            self.assertEqual(self.app.run(), 1)
+        self.assert_edge_cancelled()
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'recovering')
+
     def test_prune_failure_is_success_and_next_run_can_restart_caddy(self):
         self.paths.mode.write_text('activate\n')
         with mock.patch.object(self.app.store, 'prune', side_effect=OSError('synthetic prune failure')):

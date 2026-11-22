@@ -74,7 +74,7 @@ def release_arguments(write):
 class Host:
     def __init__(self, paths, runner=command, user_prefix=None):
         self.paths, self.runner = paths, runner
-        self.edge_started = False
+        self.unverified_ingress = False
         self.user_prefix = as_user() if user_prefix is None else user_prefix
 
     def user(self, *args, **kwargs):
@@ -82,14 +82,14 @@ class Host:
 
     def systemctl(self, action, *names):
         if action == 'start' and 'caddy' in names:
-            self.edge_started = True
+            self.unverified_ingress = True
         result = self.user('systemctl', '--user', action, *['trachuan-' + name + '.service' for name in names])
         if action == 'stop' and 'caddy' in names:
-            self.edge_started = False
+            self.unverified_ingress = False
         return result
 
     def cancel_edge(self):
-        self.edge_started = False
+        self.unverified_ingress = False
         return self.user('systemctl', '--user', 'stop', 'trachuan-caddy.service', timeout=10, cancel=True)
 
     def hold(self):
@@ -236,6 +236,8 @@ class Host:
             args += ['http://127.0.0.1:8080/readyz']
         if self.runner(args, timeout=120).strip() != b'200':
             raise ValueError('edge probe failed' if edge else 'readiness failed')
+        if edge:
+            self.unverified_ingress = False
 
     def confirm(self, candidate):
         installed = {}

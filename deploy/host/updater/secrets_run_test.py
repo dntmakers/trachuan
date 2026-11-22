@@ -49,6 +49,21 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         self.assertEqual(result['status'], 'failed')
         self.assertIn('caddy stopped', result['message'])
 
+    def test_stop_after_verified_secrets_keeps_caddy_running(self):
+        self.addCleanup(stop.clear)
+        self.reconcile.data['versions'] = dict(self.versions)
+        self.reconcile.storage.save()
+        self.versions['google_client_secret'] = 2
+        self.app.phases = ('secrets', 'images')
+        def later(*args):
+            stop.request()
+            raise StopRequested('stop')
+        with mock.patch.object(self.app, 'images', side_effect=later):
+            self.assertEqual(self.app.run(), 1)
+        self.assertFalse(self.paths.hold.exists())
+        self.assertNotEqual(self.secret_calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
     def test_secret_metadata_is_private_and_separate_from_image_state(self):
         main_fields = {'version', 'active', 'accepted', 'retained', 'failed', 'consumed',
                        'schemas', 'installed_bundle', 'journal'}
