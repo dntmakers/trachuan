@@ -14,12 +14,14 @@ import (
 )
 
 type captureStart struct {
-	Owner     string     `json:"intent_id"`
-	ID        string     `json:"capture_id"`
-	BatchID   string     `json:"provider_job_id,omitempty"`
-	After     *time.Time `json:"after,omitempty"`
-	Before    *time.Time `json:"before,omitempty"`
-	CreatedAt *time.Time `json:"provider_created_at,omitempty"`
+	Owner              string     `json:"intent_id"`
+	ID                 string     `json:"capture_id"`
+	BatchID            string     `json:"provider_job_id,omitempty"`
+	After              *time.Time `json:"after,omitempty"`
+	Before             *time.Time `json:"before,omitempty"`
+	CreatedAt          *time.Time `json:"provider_created_at,omitempty"`
+	CapturedAt         *time.Time `json:"captured_at,omitempty"`
+	AccountFingerprint string     `json:"account_fingerprint,omitempty"`
 }
 
 type captureEnd struct {
@@ -94,6 +96,9 @@ func (r *Runner) captureResults(ctx context.Context, owner, batchID string, crea
 		return fmt.Errorf("result stream requires a provider batch identity")
 	}
 	start := captureStart{Owner: owner, BatchID: batchID}
+	if identity, ok := r.Client.(interface{ AccountFingerprint() string }); ok && validID(identity.AccountFingerprint()) {
+		start.AccountFingerprint = identity.AccountFingerprint()
+	}
 	if !createdAt.IsZero() {
 		at := createdAt.UTC().Truncate(time.Microsecond)
 		start.CreatedAt = &at
@@ -105,6 +110,12 @@ func (r *Runner) captureResults(ctx context.Context, owner, batchID string, crea
 	n := 0
 	err = r.Client.StreamResults(ctx, batchID, func(v batchapi.Result) error {
 		body, bodyErr := rawResult(v)
+		if v.WireJSON != "" {
+			fields, wireErr := batchapi.DecodeEvidenceObject([]byte(v.WireJSON), "custom_id", "result")
+			if wireErr == nil && fields["result"] != nil {
+				body, bodyErr = string(fields["result"]), nil
+			}
+		}
 		if bodyErr != nil && v.WireJSON == "" {
 			return &captureWriteError{bodyErr}
 		}
@@ -118,36 +129,47 @@ func (r *Runner) captureResults(ctx context.Context, owner, batchID string, crea
 	return r.endCapture(c, n, err)
 }
 
-func (r *Runner) captureListing(ctx context.Context, lister batchLister, owner string, after, before time.Time) ([]anthropic.MessageBatch, error) {
-	c, err := r.startCapture(captureStart{Owner: owner, After: &after, Before: &before})
-	if err != nil {
-		return nil, err
+func (r *Runner) captureListing(ctx context.Context, lister batchLister, owner string, after time.Time) ([]listingBatch, captureReference, error) {
+	at := r.Now().UTC().Truncate(time.Microsecond)
+	before := at
+	identity, ok := r.Client.(interface{ AccountFingerprint() string })
+	if !ok || !validID(identity.AccountFingerprint()) {
+		return nil, captureReference{}, fmt.Errorf("classification provider account identity is unavailable")
 	}
-	var batches []anthropic.MessageBatch
+	c, err := r.startCapture(captureStart{Owner: owner, After: &after, Before: &before, CapturedAt: &at, AccountFingerprint: identity.AccountFingerprint()})
+	if err != nil {
+		return nil, captureReference{}, err
+	}
+	var batches []listingBatch
+	var pager listingPager
 	pages := 0
-	err = lister.StreamPages(ctx, func(data []anthropic.MessageBatch, raw string) error {
-		if raw == "" {
-			b, encodeErr := json.Marshal(struct {
-				Data []anthropic.MessageBatch `json:"data"`
-			}{data})
-			if encodeErr != nil {
-				return &captureWriteError{encodeErr}
-			}
-			raw = string(b)
-		}
+	err = lister.StreamPages(ctx, func(_ []anthropic.MessageBatch, raw string) error {
+
 		if writeErr := r.writeCapture(filepath.Join(c.dir, captureRecordName(pages)), raw); writeErr != nil {
 			return &captureWriteError{writeErr}
 		}
 		pages++
-		for _, b := range data {
+		page, pageErr := pager.accept(raw)
+		if pageErr != nil {
+			return &captureWriteError{pageErr}
+		}
+		for _, b := range page.Data {
 			if !b.CreatedAt.Before(after) && !b.CreatedAt.After(before) {
 				batches = append(batches, b)
 			}
 		}
 		return nil
 	})
-	if err = r.endCapture(c, pages, err); err != nil {
-		return nil, err
+	if err == nil && !pager.complete() {
+		err = fmt.Errorf("provider listing ended before final page")
 	}
-	return batches, nil
+	if err = r.endCapture(c, pages, err); err != nil {
+		return nil, captureReference{}, err
+	}
+	files, err := readRetainedDirectory(c.dir)
+	if err != nil {
+		return nil, captureReference{}, err
+	}
+	proof, err := captureProof(r.IntentDir, c.dir, files)
+	return batches, proof, err
 }

@@ -99,28 +99,26 @@ func collectBatchEvidence(s Submission, id string, captures []storedCapture, dis
 }
 
 func verifyCapturedLine(v capturedResult) (batchapi.Result, error) {
-	body, err := readObject([]byte(v.Body))
-	if err != nil {
-		return batchapi.Result{}, err
-	}
-	var kind string
-	if err = json.Unmarshal(body["type"], &kind); err != nil || kind != v.Type {
-		return batchapi.Result{}, fmt.Errorf("result type does not match captured body")
-	}
-	switch kind {
-	case "succeeded", "expired", "canceled", "errored":
-	default:
-		return batchapi.Result{}, fmt.Errorf("unknown provider result type")
-	}
 	if v.Wire != "" {
-		wire, decodeErr := readObject([]byte(v.Wire))
-		if decodeErr != nil {
-			return batchapi.Result{}, decodeErr
+		wire, err := batchapi.DecodeEvidenceObject([]byte(v.Wire), "custom_id", "result")
+		if err != nil {
+			return batchapi.Result{}, err
 		}
 		var id string
-		if err = json.Unmarshal(wire["custom_id"], &id); err != nil || id != v.CustomID || !bytes.Equal(wire["result"], []byte(v.Body)) {
+		if len(wire["custom_id"]) == 0 || wire["custom_id"][0] != '"' || json.Unmarshal(wire["custom_id"], &id) != nil || id != v.CustomID || !bytes.Equal(wire["result"], []byte(v.Body)) {
 			return batchapi.Result{}, fmt.Errorf("record does not match the original provider line")
 		}
+	}
+	body, err := batchapi.DecodeEvidenceProjection([]byte(v.Body), "type")
+	if err != nil {
+		return batchapi.Result{CustomID: v.CustomID, RawJSON: v.Body}, nil
+	}
+	var kind string
+	if len(body["type"]) == 0 || body["type"][0] != '"' || json.Unmarshal(body["type"], &kind) != nil {
+		return batchapi.Result{CustomID: v.CustomID, RawJSON: v.Body}, nil
+	}
+	if kind != v.Type {
+		return batchapi.Result{}, fmt.Errorf("result type does not match captured body")
 	}
 	return batchapi.Result{CustomID: v.CustomID, Type: kind, RawJSON: v.Body}, nil
 }

@@ -3,6 +3,8 @@ package batchapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -37,6 +39,10 @@ func TestSDK_CountAndSubmitIdenticalAdaptiveRequest(t *testing.T) {
 			}
 			response = `{"id":"batch_synthetic","processing_status":"in_progress"}`
 		}
+		system, ok := body["system"].([]any)
+		if !ok || len(system) != 2 || system[1].(map[string]any)["cache_control"].(map[string]any)["type"] != "ephemeral" {
+			t.Fatalf("lost cacheable system blocks: %v", body["system"])
+		}
 		if body["thinking"].(map[string]any)["type"] != "adaptive" || body["output_config"].(map[string]any)["effort"] != "medium" {
 			t.Fatal("lost thinking or effort")
 		}
@@ -45,7 +51,7 @@ func TestSDK_CountAndSubmitIdenticalAdaptiveRequest(t *testing.T) {
 		}
 		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(response))}, nil
 	})}))}
-	p := anthropic.MessageNewParams{Model: "claude-haiku-5-5", MaxTokens: 4096, Messages: []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("synthetic legal text"))}, Thinking: anthropic.ThinkingConfigParamUnion{OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{}}, OutputConfig: anthropic.OutputConfigParam{Effort: "medium", Format: anthropic.JSONOutputFormatParam{Schema: map[string]any{"type": "object"}}}}
+	p := anthropic.MessageNewParams{Model: "claude-haiku-5-5", MaxTokens: 4096, System: []anthropic.TextBlockParam{{Text: "instruction"}, {Text: "menu", CacheControl: anthropic.NewCacheControlEphemeralParam()}}, Messages: []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("synthetic legal text"))}, Thinking: anthropic.ThinkingConfigParamUnion{OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{}}, OutputConfig: anthropic.OutputConfigParam{Effort: "medium", Format: anthropic.JSONOutputFormatParam{Schema: map[string]any{"type": "object"}}}}
 	n, err := s.CountTokens(context.Background(), p)
 	if err != nil || n != 42 {
 		t.Fatalf("count %d error %v", n, err)
@@ -159,6 +165,120 @@ func TestSDK_CountTokensRequiresPositiveRawInteger(t *testing.T) {
 			})}))}
 			if n, err := s.CountTokens(context.Background(), anthropic.MessageNewParams{}); err == nil {
 				t.Fatalf("invalid provider number became count %d", n)
+			}
+		})
+	}
+}
+
+func TestSDK_RawResponsesRetainErrorAndPartialBodies(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		status      int
+		body        string
+		interrupted bool
+	}{
+		{"error response", 400, `{"type":"error","error":{"type":"invalid_request_error","message":"synthetic"}}`, false},
+		{"interrupted response", 200, `{"id":"batch_partial"`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+				body := io.NopCloser(strings.NewReader(tc.body))
+				if tc.interrupted {
+					body = interruptedBody{strings.NewReader(tc.body)}
+				}
+				return &http.Response{StatusCode: tc.status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: body}, nil
+			})}))}
+			raw, status, err := s.GetRaw(context.Background(), "batch_synthetic")
+			if err == nil || status != tc.status || string(raw) != tc.body {
+				t.Fatalf("status %d raw %q error %v", status, raw, err)
+			}
+		})
+	}
+}
+
+func TestSDK_CreateRawRetainsSuccessAndErrorBodies(t *testing.T) {
+	for _, tc := range []struct {
+		status    int
+		body      string
+		wantError bool
+	}{
+		{200, `{"id":"batch_synthetic","processing_status":"in_progress"}`, false},
+		{400, `{"type":"error","error":{"type":"invalid_request_error","message":"synthetic"}}`, true},
+	} {
+		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
+			s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: tc.status, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
+			})}))}
+			raw, status, err := s.CreateRaw(context.Background(), []Request{{CustomID: "synthetic", Params: anthropic.MessageNewParams{Model: "claude-haiku-5-5", MaxTokens: 1}}})
+			if status != tc.status || string(raw) != tc.body || (err != nil) != tc.wantError {
+				t.Fatalf("status %d raw %q error %v", status, raw, err)
+			}
+		})
+	}
+}
+
+func TestSDK_StreamPagesRejectsCaseVariantPagination(t *testing.T) {
+	wire := `{"data":[],"HAS_MORE":false}`
+	seen := false
+	s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil
+	})}))}
+	err := s.StreamPages(context.Background(), func(_ []anthropic.MessageBatch, raw string) error { seen = raw == wire; return nil })
+	if err == nil || !seen {
+		t.Fatalf("accepted invalid pagination or lost raw page: seen %t error %v", seen, err)
+	}
+}
+
+func TestSDK_CollectedResultsRejectCaseVariantEvidence(t *testing.T) {
+	wire := `{"custom_id":"x","CUSTOM_ID":"y","result":{"type":"expired"}}` + "\n"
+	s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/x-jsonl"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil
+	})}))}
+	if _, err := s.Results(context.Background(), "batch_synthetic"); err == nil {
+		t.Fatal("accepted case-variant result ID")
+	}
+}
+
+func TestSDK_CreateRejectsAmbiguousProviderErrorMetadata(t *testing.T) {
+	wire := `{"type":"error","error":{"type":"rate_limit_error","TYPE":"invalid_request_error"}}`
+	s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 400, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(wire))}, nil
+	})}))}
+	_, err := s.Create(context.Background(), []Request{{CustomID: "synthetic", Params: anthropic.MessageNewParams{Model: "claude-haiku-5-5", MaxTokens: 1}}})
+	var api *anthropic.Error
+	if err == nil || errors.As(err, &api) {
+		t.Fatal("ambiguous provider error metadata escaped exact validation")
+	}
+}
+
+func TestSDK_RejectsNon2xxBatchLookingBody(t *testing.T) {
+	body := `{"id":"batch_synthetic","created_at":"2099-01-01T00:00:00Z","processing_status":"in_progress"}`
+	s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: 302, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+	})}))}
+	if _, err := s.Create(context.Background(), []Request{{CustomID: "synthetic", Params: anthropic.MessageNewParams{Model: "claude-haiku-5-5", MaxTokens: 1}}}); err == nil {
+		t.Fatal("accepted non-2xx create")
+	}
+	if _, err := s.Get(context.Background(), "batch_synthetic"); err == nil {
+		t.Fatal("accepted non-2xx get")
+	}
+}
+
+func TestSDK_StreamResultsRetainsMalformedResponsePayload(t *testing.T) {
+	for _, result := range []string{
+		`{"type":"succeeded","message":{"content":false,"usage":{"input_tokens":"invalid","output_tokens":10}}}`,
+		`{"type":"succeeded","type":"expired"}`,
+		`null`, `false`, `"invalid"`, `[]`,
+	} {
+		t.Run(result, func(t *testing.T) {
+			wire := `{"custom_id":"synthetic-000000","result":` + result + `}`
+			s := SDK{Client: anthropic.NewClient(option.WithoutEnvironmentDefaults(), option.WithAPIKey("synthetic"), option.WithMaxRetries(0), option.WithHTTPClient(&http.Client{Transport: transportFunc(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/x-jsonl"}}, Body: io.NopCloser(strings.NewReader(wire + "\n"))}, nil
+			})}))}
+			var got Result
+			err := s.StreamResults(context.Background(), "batch_synthetic", func(r Result) error { got = r; return nil })
+			if err != nil || got.CustomID != "synthetic-000000" || got.WireJSON != wire {
+				t.Fatalf("malformed response line lost: %+v error %v", got, err)
 			}
 		})
 	}

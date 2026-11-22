@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"danny.vn/trachuan/apps/corpus/internal/batchapi"
 )
 
 type countedRequest struct {
@@ -25,14 +27,19 @@ func readCount(path, key string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("read token count %s: %w", path, err)
 	}
-	var v countedRequest
-	if err = json.Unmarshal(b, &v); err != nil {
+	fields, err := batchapi.DecodeEvidenceObject(b, "key", "input_tokens")
+	if err != nil {
 		return 0, fmt.Errorf("decode token count %s: %w", path, err)
 	}
-	if v.Key != key || v.Count <= 0 {
+	var storedKey string
+	if len(fields["key"]) == 0 || fields["key"][0] != '"' || json.Unmarshal(fields["key"], &storedKey) != nil {
 		return 0, fmt.Errorf("invalid token count %s", path)
 	}
-	return v.Count, nil
+	count, ok := batchapi.TokenInteger(fields["input_tokens"], 1)
+	if storedKey != key || !ok {
+		return 0, fmt.Errorf("invalid token count %s", path)
+	}
+	return count, nil
 }
 
 func (r *Runner) writeCount(key string, n int64) error {

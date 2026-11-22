@@ -49,7 +49,8 @@ func (c *stalledReconcileClient) StreamPages(ctx context.Context, visit func([]a
 			return err
 		}
 	}
-	return visit([]anthropic.MessageBatch{{ID: "unrelated_synthetic", ProcessingStatus: "ended", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}}, "")
+	data := []anthropic.MessageBatch{{ID: "unrelated_synthetic", ProcessingStatus: "ended", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)}}
+	return visit(data, fakeListingRaw(data))
 }
 
 func (c *stalledReconcileClient) StreamResults(ctx context.Context, id string, visit func(batchapi.Result) error) error {

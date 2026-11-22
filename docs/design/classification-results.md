@@ -63,12 +63,25 @@ stored provider evidence. Each item settles from one of these:
   error line), at zero cost;
 - for the whole submission, a provider batch that ended in validation failure
   with no requests processed, at zero cost; or
-- for the whole submission, a stored, fully paginated listing of the provider's
-  batches in the key's workspace (Anthropic) or project (OpenAI) over the
-  submission's time window, in which every candidate batch was checked and none
-  carries the submission (Anthropic by `custom_id` prefix, OpenAI by the
-  submission id in batch metadata and the recorded input file id); this records
-  the submission `abandoned` at zero cost.
+- for the whole submission, at least 24 hours after its creation, a stored,
+  fully paginated listing of the provider's batches in the key's workspace
+  (Anthropic) or project (OpenAI) from one minute before its creation to at
+  least 24 hours after it, in which every candidate batch has ended and has a
+  complete stored results capture, and none carries the submission (Anthropic by
+  `custom_id` prefix, OpenAI by the submission id in batch metadata and the
+  recorded input file id); this records the submission `abandoned` at zero cost,
+  and the `.abandoned` record names that listing by path and SHA-256. A
+  candidate still running, or one whose results cannot be fully captured, blocks
+  abandonment. The listing counts as complete only when its cursors move forward
+  and its last page reports no further pages; a candidate's capture counts as
+  complete only when its distinct `custom_id` lines equal the batch's request
+  counts. The intent and the listing both record the account fingerprint (the
+  first 16 bytes of the SHA-256 of the API key, never the key), and evidence
+  counts only when the two match.
+
+A stored `Create` response with a 2xx status blocks abandonment by listing, even
+if its body is empty, truncated or invalid. The status alone does not establish
+a receipt. Reconcile the submission to its batch before settling it.
 
 A deadline, a timeout, a missing or expired result file, an item with no
 outcome, a duplicate or unknown `custom_id`, or usage that cannot be priced
@@ -93,8 +106,9 @@ intent, and every attempt record and settlement needs its intent and a receipt
 with the same batch id. Rebuild and every admission check this first, and any
 violation stops both for the whole store until an operator repairs it; an
 `abandoned` submission may be replaced only when it has no dispatch trace and no
-attempt. Second, evidence is never discarded: results downloaded for a batch id
-that matches an unsettled submission are recorded whatever the submission's
+attempt, or when its `.abandoned` record names a listing that meets the evidence
+rule above. Second, evidence is never discarded: results downloaded for a batch
+id that matches an unsettled submission are recorded whatever the submission's
 state, and a deadline only stops polling. Provider data is written to the intent
 log store as soon as it arrives, before any other step that can fail: a batch id
 the moment `create` returns it, each result line as it is decoded, a partial

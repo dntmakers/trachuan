@@ -81,6 +81,9 @@ func (r *Runner) readCreatorRecord(s Submission, suffix string) (creatorRecord, 
 		return creatorRecord{}, false, fmt.Errorf("read creator record: %w", err)
 	}
 	var record creatorRecord
+	if err = validateRetainedJSON(b, &record); err != nil {
+		return creatorRecord{}, false, fmt.Errorf("decode creator record: %w", err)
+	}
 	if err = json.Unmarshal(b, &record); err != nil {
 		return creatorRecord{}, false, fmt.Errorf("decode creator record: %w", err)
 	}
@@ -117,4 +120,35 @@ func (r *Runner) creatorQuietSince(s Submission) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return absent.At, nil
+}
+
+func (r *Runner) verifyListingCreator(s Submission, started time.Time) error {
+	finished, found, err := r.readCreatorRecord(s, ".creator.finished")
+	if err != nil {
+		return err
+	}
+	var earliest time.Time
+	if found {
+		quiet := s.CreatedAt
+		if finished.Dispatched {
+			quiet = finished.At
+		}
+		earliest = quiet.Add(creatorQuietWindow)
+		if finished.At.After(earliest) {
+			earliest = finished.At
+		}
+	} else {
+		absent, known, readErr := r.readCreatorRecord(s, ".creator.absent")
+		if readErr != nil {
+			return readErr
+		}
+		if !known {
+			return fmt.Errorf("listing has no creator quiet evidence")
+		}
+		earliest = absent.At.Add(creatorQuietWindow)
+	}
+	if started.Before(earliest) {
+		return fmt.Errorf("listing started before creator quiet period ended")
+	}
+	return nil
 }

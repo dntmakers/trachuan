@@ -21,6 +21,9 @@ func ReadLabels(path string) (taxonomy.Labels, string, error) {
 	if err != nil {
 		return labels, "", fmt.Errorf("read taxonomy labels: %w", err)
 	}
+	if err = validateRetainedJSON(b, &labels); err != nil {
+		return labels, "", fmt.Errorf("decode taxonomy labels: %w", err)
+	}
 	if err = json.Unmarshal(b, &labels); err != nil {
 		return labels, "", fmt.Errorf("decode taxonomy labels: %w", err)
 	}
