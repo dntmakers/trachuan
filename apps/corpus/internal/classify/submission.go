@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	"danny.vn/trachuan/apps/corpus/internal/batchapi"
@@ -14,6 +13,8 @@ import (
 )
 
 type Item struct {
+	Local       bool               `json:"local,omitempty"`
+	LocalReason keyDisposition     `json:"local_reason,omitempty"`
 	Key         string             `json:"key"`
 	RequestHash string             `json:"request_hash"`
 	InputTokens int64              `json:"counted_input_tokens"`
@@ -23,6 +24,9 @@ type Item struct {
 }
 
 type Submission struct {
+	KeyVersion      int    `json:"key_version,omitempty"`
+	PriceVersion    string `json:"price_version,omitempty"`
+	attempts        []attemptRecord
 	ID              string             `json:"id"`
 	RunID           int64              `json:"run_id"`
 	Country         string             `json:"country"`
@@ -47,6 +51,7 @@ type Submission struct {
 
 type Repository interface {
 	Lock(context.Context) (func(), error)
+	Admission(context.Context, func() error) error
 	List(context.Context) ([]Submission, error)
 	Save(context.Context, Submission) error
 	Restore(context.Context, []Submission) error
@@ -56,7 +61,7 @@ type Client interface {
 	CountTokens(context.Context, anthropic.MessageNewParams) (int64, error)
 	Create(context.Context, []batchapi.Request) (anthropic.MessageBatch, error)
 	Get(context.Context, string) (anthropic.MessageBatch, error)
-	Results(context.Context, string) ([]batchapi.Result, error)
+	StreamResults(context.Context, string, func(batchapi.Result) error) error
 }
 
 type Runner struct {
@@ -86,6 +91,8 @@ type Options struct {
 type Summary struct {
 	Step            int    `json:"step,omitempty"`
 	Requests        int    `json:"requests"`
+	HeldKeys        int    `json:"held_keys,omitempty"`
+	UnknownKeys     int    `json:"unknown_keys,omitempty"`
 	InputTokens     int64  `json:"counted_input_tokens"`
 	ReserveMicroUSD int64  `json:"reserve_micro_usd"`
 	LedgerMicroUSD  int64  `json:"ledger_micro_usd"`
@@ -130,21 +137,28 @@ func newID() (string, error) {
 
 func itemsHash(items []Item) string { b, _ := json.Marshal(items); return digest(b) }
 
-func ledgerCost(rows []Submission) (int64, error) {
-	var total int64
-	for _, s := range rows {
-		charge := s.ReserveMicroUSD
-		if s.Settled || s.CostMicroUSD > charge {
-			charge = s.CostMicroUSD
-		}
-		if charge < 0 || charge > math.MaxInt64-total {
-			return 0, fmt.Errorf("invalid submission ledger cost")
-		}
-		total += charge
-	}
-	return total, nil
-}
-
 func nonterminal(state string) bool {
 	return state == "preparing" || state == "submitted" || state == "uncertain" || state == "cancelling"
+}
+
+func (s Submission) summary() Summary {
+	result := Summary{ReserveMicroUSD: s.ReserveMicroUSD, Admitted: true, SubmissionID: s.ID}
+	for _, item := range s.Items {
+		if !item.Local {
+			result.Requests++
+			result.InputTokens += item.InputTokens
+		} else {
+			result.addGap(item.LocalReason)
+		}
+	}
+	return result
+}
+
+func (s *Summary) addGap(disposition keyDisposition) {
+	switch disposition {
+	case keyHeld:
+		s.HeldKeys++
+	case keyUnknown:
+		s.UnknownKeys++
+	}
 }

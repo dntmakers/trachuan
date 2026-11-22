@@ -61,13 +61,17 @@ func TestArticles_DryRunAndAdmission(t *testing.T) {
 	r, m, f, o, families := runArticlesFixture(t)
 	o.DryRun = true
 	s, err := r.Articles(context.Background(), o, "labels", articleInputs(1, ""), families, articleNodes())
-	if err != nil || s.Requests != 1 || s.InputTokens != 100 || s.ReserveMicroUSD != 2053 || !s.Admitted || len(m.rows) != 0 || f.creates != 0 {
+	if err != nil || s.Requests != 1 || s.InputTokens != 100 || s.ReserveMicroUSD != 2055 || !s.Admitted || len(m.rows) != 0 || f.creates != 0 {
 		t.Fatalf("summary %+v error %v", s, err)
 	}
-	m.rows = []Submission{{RunID: 2, State: "failed", ReserveMicroUSD: 15000000}}
+	seedHistoricalPilot(t, r, m, o, o.BudgetMicroUSD)
+	if err = r.Rebuild(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	o.DryRun = false
-	if _, err = r.Articles(context.Background(), o, "labels", articleInputs(1, ""), families, articleNodes()); err == nil || f.creates != 0 {
-		t.Fatal("overspent budget")
+	o.RunID++
+	if _, err = r.Articles(context.Background(), o, "labels", articleInputs(1, ""), families, articleNodes()); err == nil || !strings.Contains(err.Error(), "refused by pilot budget") || f.creates != 0 {
+		t.Fatalf("overspent durable ledger: creates %d error %v", f.creates, err)
 	}
 }
 
@@ -108,8 +112,7 @@ func TestArticles_DropsForeignAnchorsInOutcomeAndArtifact(t *testing.T) {
 	prepare := client.beforeCreate
 	client.beforeCreate = func(requests []batchapi.Request) {
 		prepare(requests)
-		block := &client.results[0].Message.Content[0]
-		block.Text = strings.TrimSuffix(block.Text, "}") + `,"foreign":null}`
+		client.results[0] = storeResult(t, requests[0].CustomID, `{"stop_reason":"end_turn","content":[{"type":"text","text":"{\"dieu-1\":{\"codes\":[{\"code\":\"1.1.c1\",\"confidence\":0.9}]},\"foreign\":{\"codes\":[]}}"}],"usage":{"input_tokens":100,"output_tokens":100}}`)
 	}
 	if _, err := r.Articles(context.Background(), options, "labels", articleInputs(1, ""), families, articleNodes()); err != nil {
 		t.Fatal(err)

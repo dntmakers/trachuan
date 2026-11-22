@@ -34,6 +34,15 @@ type Chunk struct {
 	Spans             json.RawMessage
 }
 
+type ClassificationAttempt struct {
+	SubmissionID string
+	ItemIndex    int32
+	RequestKey   string
+	Outcome      string
+	CostMicroUsd *int64
+	PriceVersion string
+}
+
 type Document struct {
 	ArtifactID       int64
 	Key              string
@@ -361,4 +370,6 @@ type Submission struct {
 	CostMicroUsd     int64
 	CostSettled      bool
 	Results          json.RawMessage
+	KeyVersion       int32
+	PriceVersion     *string
 }

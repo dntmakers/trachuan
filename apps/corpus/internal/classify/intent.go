@@ -13,7 +13,7 @@ import (
 
 func writeOnce(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := durableDirectory(dir); err != nil {
 		return fmt.Errorf("create submission directory: %w", err)
 	}
 	f, err := os.CreateTemp(dir, ".submission-")
@@ -44,6 +44,34 @@ func writeOnce(path string, data []byte) error {
 			return fmt.Errorf("existing submission file differs")
 		}
 	}
+	if err = os.Remove(f.Name()); err != nil {
+		return fmt.Errorf("remove temporary submission file: %w", err)
+	}
+	return syncDirectory(dir)
+}
+
+func durableDirectory(dir string) error {
+	err := os.Mkdir(dir, 0700)
+	if errors.Is(err, os.ErrNotExist) {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return fmt.Errorf("create submission directory: %w", err)
+		}
+		if err = durableDirectory(parent); err != nil {
+			return err
+		}
+		err = os.Mkdir(dir, 0700)
+	}
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("create submission directory: %w", err)
+	}
+	if err == nil {
+		return syncDirectory(filepath.Dir(dir))
+	}
+	return nil
+}
+
+func syncDirectory(dir string) error {
 	d, err := os.Open(dir)
 	if err != nil {
 		return fmt.Errorf("open submission directory: %w", err)
@@ -119,7 +147,7 @@ func (r *Runner) restoreReceipt(s *Submission) (bool, error) {
 	if err = json.Unmarshal(b, &record); err != nil {
 		return false, fmt.Errorf("decode provider batch identity: %w", err)
 	}
-	if record.ID == "" || record.SubmittedAt.Before(s.CreatedAt.Add(-time.Minute)) || !record.DeadlineAt.Equal(record.SubmittedAt.Add(26*time.Hour)) {
+	if !validReceipt(*s, record) {
 		return false, fmt.Errorf("invalid provider batch identity")
 	}
 	s.BatchID = record.ID

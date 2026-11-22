@@ -73,13 +73,22 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	if err != nil {
 		return summary, err
 	}
+	retained, err := r.verifyStore(rows, func(store retainedStore) error {
+		if store.missingRows != 0 {
+			return fmt.Errorf("submission ledger omits retained intents; run corpus submissions --rebuild before admission")
+		}
+		if !o.DryRun {
+			return r.recoverLedgerSettlements(ctx, rows, store)
+		}
+		return nil
+	})
+	if err != nil {
+		return summary, err
+	}
 	hash := screenHash(o)
 	for _, s := range rows {
 		if s.ScreenHash == hash && (s.State == "completed" || s.State == "cancelled") {
-			summary = Summary{Requests: len(s.Items), ReserveMicroUSD: s.ReserveMicroUSD, Admitted: true, SubmissionID: s.ID}
-			for _, item := range s.Items {
-				summary.InputTokens += item.InputTokens
-			}
+			summary = s.summary()
 			if o.DryRun {
 				return summary, nil
 			}
@@ -90,15 +99,10 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	for i := range rows {
 		s := &rows[i]
 		if s.State == "preparing" || s.State == "uncertain" {
-			known, restoreErr := r.restoreAbandonment(s)
-			if restoreErr != nil {
-				return summary, restoreErr
-			}
-			if !known {
-				known, restoreErr = r.restoreReceipt(s)
-			}
-			if restoreErr != nil {
-				return summary, restoreErr
+			known := retained.attachReceipt(s)
+			if !known && retained.abandoned[s.ID] {
+				s.State = "abandoned"
+				known = true
 			}
 			if known && !o.DryRun {
 				if err = r.Repository.Save(ctx, *s); err != nil {
@@ -121,10 +125,7 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	for i := len(rows) - 1; i >= 0; i-- {
 		s := rows[i]
 		if s.ScreenHash == hash && s.State != "abandoned" {
-			summary = Summary{Requests: len(s.Items), ReserveMicroUSD: s.ReserveMicroUSD, Admitted: true, SubmissionID: s.ID}
-			for _, item := range s.Items {
-				summary.InputTokens += item.InputTokens
-			}
+			summary = s.summary()
 			if o.DryRun {
 				return summary, nil
 			}
@@ -142,9 +143,6 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 			return summary, fmt.Errorf("earlier classification submission %s blocks this release", s.ID)
 		}
 	}
-	if err = r.requireReconstruction(rows); err != nil {
-		return summary, err
-	}
 	entries, readErr := os.ReadDir(o.Out)
 	if readErr != nil && !os.IsNotExist(readErr) {
 		return summary, fmt.Errorf("inspect screening output: %w", readErr)
@@ -154,71 +152,64 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 	}
 	if prepared == nil {
 		release()
-		ready, prepareErr := r.prepareScreenBatch(ctx, o, docs, families)
+		ready, prepareErr := r.prepareScreenBatch(ctx, o, docs, families, indexingHistory(rows, retained))
 		if prepareErr != nil {
 			return summary, prepareErr
 		}
 		return r.screen(ctx, o, docs, families, ready)
 	}
-	s, requests := prepared.submission, prepared.requests
-	summary = prepared.summary
-	total, err := ledgerCost(rows)
-	if err != nil {
-		return summary, err
-	}
-	summary.Requests = len(requests)
-	summary.ReserveMicroUSD = s.ReserveMicroUSD
-	summary.LedgerMicroUSD = total
-	summary.Admitted = total <= o.BudgetMicroUSD && s.ReserveMicroUSD <= o.BudgetMicroUSD-total
-	if o.DryRun {
-		return summary, nil
-	}
-	if !summary.Admitted {
-		return summary, fmt.Errorf("classification batch refused by %s budget", o.Budget)
-	}
-	if len(requests) == 0 {
-		return summary, writeArticles(o.Out, s)
-	}
-	if s.ID, err = newID(); err != nil {
-		return summary, err
-	}
-	summary.SubmissionID = s.ID
-	s.ItemsHash = itemsHash(s.Items)
-	s.CreatedAt = r.Now().UTC().Truncate(time.Microsecond)
-	creator, err := r.lockCreator(s.ID)
-	if err != nil {
-		return summary, err
-	}
+	s, requests, summary, creator, err := r.admitBatch(ctx, prepared, o)
 	dispatched, finished := false, false
 	finishCreator := func() error {
-		if finished {
+		if creator == nil || finished {
 			return nil
 		}
 		finished = true
+		if unlock == nil {
+			releaseFinish, lockErr := r.Repository.Lock(context.WithoutCancel(ctx))
+			if lockErr != nil {
+				_ = creator.close()
+				return lockErr
+			}
+			defer releaseFinish()
+		}
 		return r.finishCreator(s, creator, dispatched)
 	}
 	defer func() { _ = finishCreator() }()
-	if err = r.Repository.Save(ctx, s); err != nil {
+	if err != nil || o.DryRun {
 		return summary, err
 	}
-	if err = r.writeIntent(s); err != nil {
-		return summary, err
+	if len(requests) == 0 {
+		s.Settled = true
+		return summary, writeFamilies(o.Out, s)
 	}
-	for i := range requests {
-		requests[i].CustomID = customID(s.ID, i)
+	j := 0
+	for i, item := range s.Items {
+		if !item.Local {
+			requests[j].CustomID = customID(s.ID, i)
+			j++
+		}
 	}
 	release()
 	_, err = r.transition(ctx, s.ID, func(latest *Submission) (bool, error) {
 		if latest.State != "preparing" || latest.BatchID != "" || latest.ItemsHash != s.ItemsHash {
 			return false, fmt.Errorf("creator is no longer authorized to submit this attempt")
 		}
-		return false, nil
+		return false, r.writeCreatorTrace(*latest, "creator.dispatch", true)
 	})
 	if err != nil {
 		return summary, err
 	}
 	dispatched = true
 	b, err := r.Client.Create(ctx, requests)
+	if b.ID != "" {
+		if !b.CreatedAt.IsZero() {
+			s.SubmittedAt = &b.CreatedAt
+		}
+		if writeErr := r.withStoreLock(true, func() error { return r.recordBatch(&s, b.ID) }); writeErr != nil {
+			return summary, writeErr
+		}
+	}
 	if err != nil || b.ID == "" {
 		_, saveErr := r.transition(ctx, s.ID, func(latest *Submission) (bool, error) {
 			if latest.State != "preparing" {
@@ -234,12 +225,6 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 			return summary, fmt.Errorf("classification create response is uncertain; reconcile submission %s: %w", s.ID, providerError(err))
 		}
 		return summary, fmt.Errorf("classification create response is uncertain; reconcile submission %s", s.ID)
-	}
-	if !b.CreatedAt.IsZero() {
-		s.SubmittedAt = &b.CreatedAt
-	}
-	if err = r.recordBatch(&s, b.ID); err != nil {
-		return summary, err
 	}
 	attached, err := r.transition(ctx, s.ID, func(latest *Submission) (bool, error) {
 		if latest.BatchID != "" {

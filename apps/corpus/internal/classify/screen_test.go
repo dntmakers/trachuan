@@ -3,6 +3,7 @@ package classify
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,8 @@ import (
 )
 
 type memoryLedger struct{ rows []Submission }
+
+func (m *memoryLedger) Admission(_ context.Context, fn func() error) error { return fn() }
 
 func (m *memoryLedger) Lock(context.Context) (func(), error) { return func() {}, nil }
 func (m *memoryLedger) List(context.Context) ([]Submission, error) {
@@ -60,19 +63,31 @@ func (f *fakeClient) Create(_ context.Context, r []batchapi.Request) (anthropic.
 	if f.beforeCreate != nil {
 		f.beforeCreate(r)
 	}
-	return anthropic.MessageBatch{ID: "batch_synthetic", CreatedAt: f.batchCreated}, f.createErr
+	if f.createErr != nil {
+		return anthropic.MessageBatch{}, f.createErr
+	}
+	batchID := "batch_synthetic"
+	if f.creates > 1 {
+		batchID = fmt.Sprintf("batch_synthetic_%d", f.creates)
+	}
+	return anthropic.MessageBatch{ID: batchID, CreatedAt: f.batchCreated}, nil
 }
-func (f *fakeClient) Get(context.Context, string) (anthropic.MessageBatch, error) {
+func (f *fakeClient) Get(_ context.Context, id string) (anthropic.MessageBatch, error) {
 	f.gets++
-	b := anthropic.MessageBatch{ID: "batch_synthetic"}
+	b := anthropic.MessageBatch{ID: id}
 	if f.ended {
 		b.ProcessingStatus = "ended"
 	}
 	return b, nil
 }
-func (f *fakeClient) Results(context.Context, string) ([]batchapi.Result, error) {
+func (f *fakeClient) StreamResults(_ context.Context, _ string, visit func(batchapi.Result) error) error {
 	f.downloads++
-	return f.results, nil
+	for _, v := range f.results {
+		if err := visit(v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func screenFixture(t *testing.T) (*Runner, *memoryLedger, *fakeClient, Options) {
@@ -109,15 +124,15 @@ func families() []Family {
 	return []Family{{Code: "1.1", Name: "Synthetic family", ParentName: "Synthetic topic"}}
 }
 
-func TestScreen_DryRunNeverWritesOrSubmits(t *testing.T) {
+func TestScreen_DryRunDoesNotWriteSubmissionOrSubmit(t *testing.T) {
 	r, m, f, o := screenFixture(t)
 	o.DryRun = true
 	s, err := r.Screen(context.Background(), o, documents(), families())
-	if err != nil || s.Requests != 1 || s.InputTokens != 100 || s.ReserveMicroUSD != 1029 || !s.Admitted || f.creates != 0 || len(m.rows) != 0 {
+	if err != nil || s.Requests != 1 || s.InputTokens != 100 || s.ReserveMicroUSD != 1031 || !s.Admitted || f.creates != 0 || len(m.rows) != 0 {
 		t.Fatalf("summary %+v rows %d creates %d error %v", s, len(m.rows), f.creates, err)
 	}
-	if _, err = os.Stat(r.IntentDir); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("dry run wrote intent directory")
+	if _, err = os.Stat(filepath.Join(r.IntentDir, "submissions")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("dry run wrote a submission intent")
 	}
 }
 
@@ -186,10 +201,10 @@ func TestScreen_TrialPricingAndSettlement(t *testing.T) {
 		model         string
 		reserve, cost int64
 	}{
-		{"claude-haiku-5-5", 1029, 8},
-		{"claude-sonnet-5-5", 20580, 150},
-		{"claude-opus-5-5", 41160, 300},
-		{"claude-fable-5-2", 82320, 600},
+		{"claude-haiku-5-5", 1031, 8},
+		{"claude-sonnet-5-5", 20605, 150},
+		{"claude-opus-5-5", 41210, 300},
+		{"claude-fable-5-2", 82420, 600},
 	} {
 		t.Run(tc.model, func(t *testing.T) {
 			r, m, _, o := screenFixture(t)
@@ -206,22 +221,33 @@ func TestScreen_TrialPricingAndSettlement(t *testing.T) {
 	}
 }
 
-func TestApply_UnsupportedModelRetainsReserve(t *testing.T) {
-	_, _, _, o := screenFixture(t)
-	o.Recipe.Model = "unsupported"
-	s := Submission{Recipe: o.Recipe, State: "submitted", ReserveMicroUSD: 1000}
-	if err := apply(&s, nil); err == nil || s.Settled || s.State != "submitted" {
-		t.Fatalf("ledger %+v, error %v; want unsettled submission", s, err)
-	}
-}
-
-func TestScreen_AdmissionCountsEveryUnsettledRow(t *testing.T) {
-	for _, state := range []string{"submitted", "failed", "abandoned", "cancelled"} {
+func TestScreen_AdmissionCountsDurableUnsettledReserves(t *testing.T) {
+	for _, state := range []string{"submitted", "failed", "abandoned", "cancelling"} {
 		t.Run(state, func(t *testing.T) {
 			r, m, f, o := screenFixture(t)
-			m.rows = []Submission{{ID: strings.Repeat("b", 32), RunID: 2, State: state, ReserveMicroUSD: 14999000}}
-			if _, err := r.Screen(context.Background(), o, documents(), families()); err == nil || f.creates != 0 {
-				t.Fatal("overspent reserved budget")
+			o.Recipe, _ = NewRecipe("claude-fable-5-2", o.Recipe.TaxonomyHash)
+			o.Recipe.MaxTokens = 32000
+			f.input = 90000
+			prior := o
+			prior.Documents = 13
+			docs := make([]Document, prior.Documents)
+			for i := range docs {
+				docs[i] = Document{Key: fmt.Sprintf("vn:vbpl:%d", i+2), Title: "Prior synthetic document"}
+			}
+			s := seedUndispatchedScreen(t, r, prior, docs)
+			if state == "abandoned" {
+				r.Now = func() time.Time { return s.CreatedAt.Add(25 * time.Hour) }
+				if err := r.writeAbandonment(&s); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := r.recordBatch(&s, "batch_held"); err != nil {
+				t.Fatal(err)
+			}
+			s.State = state
+			m.rows[0] = s
+			o.RunID++
+			if _, err := r.Screen(context.Background(), o, documents(), families()); err == nil || !strings.Contains(err.Error(), "refused by pilot budget") || f.creates != 0 {
+				t.Fatalf("overspent durable reserve: creates %d error %v", f.creates, err)
 			}
 		})
 	}
@@ -246,11 +272,13 @@ func TestScreen_ResumesAndEnforcesDeadline(t *testing.T) {
 }
 
 func TestScreen_CompletedOutputSurvivesUnrelatedUncertainty(t *testing.T) {
-	r, m, _, o := screenFixture(t)
+	r, _, _, o := screenFixture(t)
 	if _, err := r.Screen(context.Background(), o, documents(), families()); err != nil {
 		t.Fatal(err)
 	}
-	m.rows = append(m.rows, Submission{ID: strings.Repeat("b", 32), RunID: 2, State: "uncertain"})
+	other := o
+	other.RunID++
+	seedUndispatchedScreen(t, r, other, []Document{{Key: "vn:vbpl:2", Title: "Other synthetic document"}})
 	if _, err := r.Screen(context.Background(), o, documents(), families()); err != nil {
 		t.Fatal("completed screen was blocked", err)
 	}

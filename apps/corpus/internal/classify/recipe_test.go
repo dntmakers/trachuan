@@ -35,10 +35,10 @@ func TestReserve_BatchPricesByModel(t *testing.T) {
 		model string
 		want  int64
 	}{
-		{"claude-haiku-5-5", 11},
-		{"claude-sonnet-5-5", 208},
-		{"claude-opus-5-5", 416},
-		{"claude-fable-5-2", 832},
+		{"claude-haiku-5-5", 12},
+		{"claude-sonnet-5-5", 239},
+		{"claude-opus-5-5", 478},
+		{"claude-fable-5-2", 955},
 	} {
 		t.Run(tc.model, func(t *testing.T) {
 			r, err := NewRecipe(tc.model, strings.Repeat("a", 64))
@@ -56,7 +56,7 @@ func TestReserve_BatchPricesByModel(t *testing.T) {
 func TestReserve_RoundsUpAndRejectsTierCrossing(t *testing.T) {
 	r, _ := NewRecipe("claude-haiku-5-5", strings.Repeat("a", 64))
 	r.MaxTokens = 1
-	for _, tc := range []struct{ input, want int64 }{{1, 1}, {20, 2}, {99999, 5001}} {
+	for _, tc := range []struct{ input, want int64 }{{1, 1}, {20, 2}, {99999, 6251}} {
 		r.InputBound = 99999
 		got, err := r.Reserve(tc.input)
 		if err != nil || got != tc.want {

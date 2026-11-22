@@ -64,7 +64,13 @@ func runSubmissions(ctx context.Context, args []string, stdout, stderr io.Writer
 }
 
 func printSubmission(out io.Writer, s classify.Submission) error {
-	_, err := fmt.Fprintf(out, "id=%s release=%s/%s state=%s requests=%d created_at=%s window_end=%s reserved_micro_usd=%d cost_micro_usd=%d settled=%t\n", s.ID, s.Country, s.Release, s.State, len(s.Items), s.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"), s.CreatedAt.Add(10*time.Minute).UTC().Format("2006-01-02T15:04:05Z"), s.ReserveMicroUSD, s.CostMicroUSD, s.Settled)
+	requests := 0
+	for _, item := range s.Items {
+		if !item.Local {
+			requests++
+		}
+	}
+	_, err := fmt.Fprintf(out, "id=%s release=%s/%s state=%s requests=%d created_at=%s window_end=%s reserved_micro_usd=%d reservation_is_estimate=%t cost_micro_usd=%d settled=%t\n", s.ID, s.Country, s.Release, s.State, requests, s.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"), s.CreatedAt.Add(10*time.Minute).UTC().Format("2006-01-02T15:04:05Z"), s.ReserveMicroUSD, !s.Settled, s.CostMicroUSD, s.Settled)
 	if err != nil {
 		return fmt.Errorf("write submission summary: %w", err)
 	}

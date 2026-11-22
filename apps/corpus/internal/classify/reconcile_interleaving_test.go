@@ -16,22 +16,22 @@ type hookedReconcileClient struct {
 	resultsHook func() error
 }
 
-func (c *hookedReconcileClient) List(ctx context.Context, after, before time.Time) ([]anthropic.MessageBatch, error) {
+func (c *hookedReconcileClient) StreamPages(ctx context.Context, visit func([]anthropic.MessageBatch, string) error) error {
 	if c.listHook != nil {
 		if err := c.listHook(); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return c.fakeClient.List(ctx, after, before)
+	return c.fakeClient.StreamPages(ctx, visit)
 }
 
-func (c *hookedReconcileClient) Results(ctx context.Context, id string) ([]batchapi.Result, error) {
+func (c *hookedReconcileClient) StreamResults(ctx context.Context, id string, visit func(batchapi.Result) error) error {
 	if c.resultsHook != nil {
 		if err := c.resultsHook(); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return c.fakeClient.Results(ctx, id)
+	return c.fakeClient.StreamResults(ctx, id, visit)
 }
 
 func TestReconcile_ProviderCallsReleaseLedger(t *testing.T) {

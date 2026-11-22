@@ -59,36 +59,30 @@ func (r *Runner) Articles(ctx context.Context, o Options, labelsHash string, art
 	return summary, err
 }
 
-func (r *Runner) prepareArticleBatch(ctx context.Context, o Options) (*screenBatch, error) {
+func (r *Runner) prepareArticleBatch(ctx context.Context, o Options, history keyHistory) (*screenBatch, error) {
 	w := o.article
-	plan, err := BuildArticlePlan(ctx, o.Recipe, w.articles, w.choices, w.nodes, r.Client.CountTokens)
+	counts := map[string]int64{}
+	plan, err := BuildArticlePlan(ctx, o.Recipe, w.articles, w.choices, w.nodes, r.countWith(history, counts))
 	if err != nil {
 		return nil, err
 	}
-	s := Submission{RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
-	meta := &ArticleMetadata{LabelsHash: w.labelsHash, Skipped: plan.Skipped}
+	s := Submission{KeyVersion: keyVersion, PriceVersion: batchPriceVersion, RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
+	meta := &ArticleMetadata{LabelsHash: w.labelsHash, Skipped: plan.Skipped, CountedRequests: counts}
 	if o.Recipe.Article.Step != 0 {
 		meta.InputHash = articleInputHash(o.Country, o.Release, w.labelsHash, w.articles)
 	}
 	var requests []batchapi.Request
-	size := len(`{"requests":[]}`)
-	var summary Summary
 	for i, req := range plan.Requests {
 		p, buildErr := BuildArticleRequest(o.Recipe, req)
 		if buildErr != nil {
 			return nil, buildErr
 		}
-		reserve, reserveErr := o.Recipe.Reserve(req.InputTokens)
-		if reserveErr != nil {
-			return nil, reserveErr
-		}
-		s.ReserveMicroUSD += reserve
-		summary.InputTokens += req.InputTokens
-		b, encodeErr := json.Marshal(p)
+		request := batchapi.Request{Params: p}
+		key, encodeErr := requestKey(&request)
 		if encodeErr != nil {
-			return nil, fmt.Errorf("encode article request: %w", encodeErr)
+			return nil, encodeErr
 		}
-		item := Item{Key: fmt.Sprintf("%s/%s", req.DocumentKey, req.Articles[0].Anchor), RequestHash: digest(b), InputTokens: req.InputTokens, Article: &req}
+		item := Item{Key: fmt.Sprintf("%s/%s", req.DocumentKey, req.Articles[0].Anchor), RequestHash: key, InputTokens: req.InputTokens, Article: &req}
 		if req.Step == 2 {
 			item.Key += "/" + req.Family
 		}
@@ -96,21 +90,10 @@ func (r *Runner) prepareArticleBatch(ctx context.Context, o Options) (*screenBat
 			item.ArticleMeta = meta
 		}
 		s.Items = append(s.Items, item)
-		request := batchapi.Request{CustomID: customID("00000000000000000000000000000000", i), Params: p}
-		encoded, encodeErr := json.Marshal(batchapi.Parameters(request))
-		if encodeErr != nil {
-			return nil, fmt.Errorf("encode article batch request: %w", encodeErr)
-		}
-		size += len(encoded) + 1
 		requests = append(requests, request)
-	}
-	if len(requests) > 100000 || size > 256000000 {
-		return nil, fmt.Errorf("article batch exceeds provider limit")
 	}
 	if len(requests) == 0 {
 		s.Items = []Item{{ArticleMeta: meta}}
 	}
-	summary.Requests = len(requests)
-	summary.ReserveMicroUSD = s.ReserveMicroUSD
-	return &screenBatch{submission: s, requests: requests, summary: summary}, nil
+	return &screenBatch{submission: s, requests: requests}, nil
 }

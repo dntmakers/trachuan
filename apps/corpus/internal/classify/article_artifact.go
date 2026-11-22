@@ -21,9 +21,10 @@ type FamilyArtifact struct {
 }
 
 type ArticleMetadata struct {
-	LabelsHash string          `json:"labels_sha256"`
-	Skipped    []ArticleRecord `json:"skipped"`
-	InputHash  string          `json:"input_sha256,omitempty"`
+	LabelsHash      string           `json:"labels_sha256"`
+	Skipped         []ArticleRecord  `json:"skipped"`
+	InputHash       string           `json:"input_sha256,omitempty"`
+	CountedRequests map[string]int64 `json:"counted_requests,omitempty"`
 }
 
 type ArticleArtifact struct {

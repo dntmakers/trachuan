@@ -1,13 +1,13 @@
 package classify
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
 	"sort"
 	"strconv"
+
+	"danny.vn/trachuan/apps/corpus/internal/batchapi"
 )
 
 func emptyArticle(outcome string) ArticleOutcome {
@@ -15,35 +15,7 @@ func emptyArticle(outcome string) ArticleOutcome {
 }
 
 func readObject(b []byte) (map[string]json.RawMessage, error) {
-	dec := json.NewDecoder(bytes.NewReader(b))
-	token, err := dec.Token()
-	if err != nil || token != json.Delim('{') {
-		return nil, fmt.Errorf("expected JSON object")
-	}
-	out := map[string]json.RawMessage{}
-	for dec.More() {
-		token, err = dec.Token()
-		if err != nil {
-			return nil, fmt.Errorf("read JSON key: %w", err)
-		}
-		key, ok := token.(string)
-		if !ok || out[key] != nil {
-			return nil, fmt.Errorf("invalid or duplicate JSON key")
-		}
-		var raw json.RawMessage
-		if err = dec.Decode(&raw); err != nil {
-			return nil, fmt.Errorf("decode JSON value: %w", err)
-		}
-		out[key] = raw
-	}
-	if _, err = dec.Token(); err != nil {
-		return nil, fmt.Errorf("close JSON object: %w", err)
-	}
-	var trailing any
-	if dec.Decode(&trailing) != io.EOF {
-		return nil, fmt.Errorf("unexpected trailing JSON data")
-	}
-	return out, nil
+	return batchapi.DecodeObject(b)
 }
 
 func closedObject(b []byte, keys []string) (map[string]json.RawMessage, error) {
