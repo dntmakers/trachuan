@@ -125,7 +125,7 @@ func loadInventoryV2(ctx context.Context, q store.Querier, run stage.Run, limit 
 	if err != nil {
 		return Inventory{}, err
 	}
-	i := Inventory{Version: 2, Country: run.Country, SourceListHash: run.Snapshot.SourceListHash, FinalMembershipHash: hash, Membership: snap, ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}, Failures: p.Failures, PausedSources: p.PausedSources}
+	i := Inventory{Version: 2, ExtractSnapshot: run.Snapshot, Country: run.Country, SourceListHash: run.Snapshot.SourceListHash, FinalMembershipHash: hash, Membership: snap, ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}, Failures: p.Failures, PausedSources: p.PausedSources}
 	for _, e := range append(append([]membership.Entry{}, snap.Active...), snap.RetainedRemovals...) {
 		i.ExpectedKeys = append(i.ExpectedKeys, e.DocumentKey)
 	}

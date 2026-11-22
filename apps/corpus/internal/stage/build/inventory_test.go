@@ -166,10 +166,13 @@ func TestInventory_V2QuerySnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run := stage.Run{Country: "vn", Snapshot: stage.Snapshot{SourceList: []byte(`{"vbpl":{"selection_version":1}}`)}}
+	run := stage.Run{Country: "vn", Snapshot: stage.Snapshot{SourceList: []byte(`{"vbpl":{"selection_version":1}}`), ExtractRecordContract: stage.ExtractRecordV1, Recipes: map[string]string{"extract": strings.Repeat("a", 64)}}}
 	inv, err := LoadInventory(context.Background(), inventoryQueryStub{raw: raw}, run, "embed")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(inv.ExtractSnapshot, run.Snapshot) {
+		t.Fatalf("v2 extract snapshot=%+v", inv.ExtractSnapshot)
 	}
 	if !reflect.DeepEqual(inv.ExpectedKeys, []string{"a", "b"}) || len(inv.Membership.Entries) != 3 || len(inv.Provenance.Files) != 1 || inv.Provenance.Files[0].Name != "kept" || inv.Gaps[0].Source == nil || *inv.Gaps[0].Source != "vbpl" {
 		t.Fatalf("unexpected inventory: %+v", inv)
@@ -207,11 +210,34 @@ func (q inventoryQueryStub) GetBuildInventory(context.Context, int64) (json.RawM
 
 func TestInventory_V1IgnoresExpand(t *testing.T) {
 	q := inventoryQueryStub{raw: json.RawMessage(`{"items":[{"stage":"expand","item_key":"a","state":"done"}],"gaps":[{"stage":"expand","item_key":"a","kind":"x","detail":"y"}]}`)}
-	inv, err := LoadInventory(context.Background(), q, stage.Run{Snapshot: stage.Snapshot{SourceList: []byte(`{"vbpl":{"selection_version":0}}`)}}, "embed")
+	run := stage.Run{Snapshot: stage.Snapshot{SourceList: []byte(`{"vbpl":{"selection_version":0}}`), ExtractRecordContract: stage.ExtractRecordLegacy, Recipes: map[string]string{"extract": strings.Repeat("a", 64)}}}
+	inv, err := LoadInventory(context.Background(), q, run, "embed")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !reflect.DeepEqual(inv.ExtractSnapshot, run.Snapshot) {
+		t.Fatalf("v1 extract snapshot=%+v", inv.ExtractSnapshot)
+	}
 	if len(inv.Items) != 0 || len(inv.Gaps) != 0 {
 		t.Fatalf("legacy included expand: %+v", inv)
+	}
+}
+
+func TestInventory_ExtractAuthorityNotSerializedOrHashed(t *testing.T) {
+	for _, version := range []int{0, 2} {
+		base := Inventory{Version: version, Country: "vn", ExpectedKeys: []string{}, Items: []InventoryItem{}, Gaps: []InventoryGap{}}
+		withAuthority := base
+		withAuthority.ExtractSnapshot = stage.Snapshot{ExtractRecordContract: stage.ExtractRecordV1, Recipes: map[string]string{"extract": strings.Repeat("a", 64)}}
+		original, err := json.Marshal(base)
+		if err != nil {
+			t.Fatal(err)
+		}
+		updated, err := json.Marshal(withAuthority)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(original) != string(updated) || base.SourceManifestHash() != withAuthority.SourceManifestHash() || base.IdentityHash() != withAuthority.IdentityHash() {
+			t.Fatalf("version=%d base=%s with=%s", version, original, updated)
+		}
 	}
 }

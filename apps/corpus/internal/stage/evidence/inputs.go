@@ -92,6 +92,7 @@ type predecessor struct {
 
 type frozenInputs struct {
 	build        artifact.Result
+	registryHash string
 	buildDir     string
 	reportPath   string
 	reportSHA256 string
@@ -133,7 +134,11 @@ func (f frozenInputs) changesBindings(rel string) changesBindings {
 }
 
 func (f frozenInputs) bindings(rel string) Bindings {
-	return Bindings{Rel: rel, DumpSHA256: hashPrefix + f.dumpSHA256, BuildArtifactSHA256: hashPrefix + f.build.SHA256, ReportSHA256: hashPrefix + f.reportSHA256, DetectorRegistrySHA256: hashPrefix + detector.Hash(), PredecessorRel: f.predecessor.rel, PredecessorFindingsSHA256: prefixedOrNone(f.predecessor.findingsSHA256)}
+	registryHash := f.registryHash
+	if registryHash == "" {
+		registryHash = detector.LegacyHash()
+	}
+	return Bindings{Rel: rel, DumpSHA256: hashPrefix + f.dumpSHA256, BuildArtifactSHA256: hashPrefix + f.build.SHA256, ReportSHA256: hashPrefix + f.reportSHA256, DetectorRegistrySHA256: hashPrefix + registryHash, PredecessorRel: f.predecessor.rel, PredecessorFindingsSHA256: prefixedOrNone(f.predecessor.findingsSHA256)}
 }
 
 func (s *Stage) committedBuild(ctx context.Context, env stage.Env, q store.Querier, run stage.Run, inv inventory, verifyDump bool) (artifact.Result, error) {
@@ -224,7 +229,7 @@ func (s *Stage) resolveInputs(ctx context.Context, env stage.Env, run stage.Run,
 	if err != nil {
 		return frozenInputs{}, err
 	}
-	return frozenInputs{build: build, buildDir: buildDir, reportPath: reportPath, reportSHA256: bareSHA256(data), dumpSHA256: report.DumpSHA256, gapSnapshot: gaps, knowledge: knowledge, predecessor: previous}, nil
+	return frozenInputs{build: build, registryHash: evidenceRegistryHash(run.Snapshot), buildDir: buildDir, reportPath: reportPath, reportSHA256: bareSHA256(data), dumpSHA256: report.DumpSHA256, gapSnapshot: gaps, knowledge: knowledge, predecessor: previous}, nil
 }
 
 func resolvePredecessor(ctx context.Context, env stage.Env, q store.Querier, run stage.Run, decision stage.PreviousReport, compared *evaluation.ComparedRelease) (predecessor, error) {

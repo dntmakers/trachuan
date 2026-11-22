@@ -94,10 +94,7 @@ func identityInventoryWithFetch(inv Inventory, artifacts artifact.Store, anchors
 			return identityResult{err: fmt.Errorf("identity %s: %w", item.Stage, err)}
 		}
 		if item.Stage == "extract" {
-			if item.InputHash == nil {
-				return identityResult{err: fmt.Errorf("missing extract input hash")}
-			}
-			if err := fetch.CheckExtractLineage(dir, *fetchItem.ArtifactSHA256, *item.InputHash); err != nil {
+			if err := checkBuildExtractLineage(inv, item, dir, *fetchItem.ArtifactSHA256); err != nil {
 				return identityResult{err: fmt.Errorf("identity extract lineage: %w", err)}
 			}
 			var nodes []chunk.Node

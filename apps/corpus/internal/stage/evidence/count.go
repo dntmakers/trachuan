@@ -27,6 +27,7 @@ func CountInputs(ctx context.Context, q store.Querier, env stage.Env, run stage.
 }
 
 func CountFindings(ctx context.Context, in Inputs, detectors []Detector) []Count {
+	in = withDetectorInputs(ctx, in)
 	counts := make([]Count, 0, len(detectors))
 	for _, d := range detectors {
 		spec := d.Spec()

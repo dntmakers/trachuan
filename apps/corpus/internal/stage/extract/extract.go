@@ -52,16 +52,35 @@ func (s *Stage) WithWaivers(w Waivers) *Stage { s.waivers = w; return s }
 
 func (*Stage) Name() string { return "extract" }
 
-func (s *Stage) Recipe(stage.Snapshot) string {
+func (s *Stage) Recipe(snapshot stage.Snapshot) string {
+	if validateExtractContract(snapshot.ExtractRecordContract) != nil {
+		return ""
+	}
 	parts := append([]string{"html-transcription/1", "textparse/8", "heading-only/1", "ocr-store/2", s.checker}, s.engines...)
 	parts = append(parts, manualMismatchRecipe()...)
 	if s.waivers.hash != "" {
 		parts = append(parts, s.waivers.hash)
 	}
+	if snapshot.ExtractRecordContract == stage.ExtractRecordV1 {
+		parts = append(parts, stage.ExtractRecordV1)
+	}
 	return stage.RecipeHash("extract", "tree/1", parts...)
 }
 
+func validateExtractContract(contract string) error {
+	switch contract {
+	case "", stage.ExtractRecordLegacy, stage.ExtractRecordV1:
+		return nil
+	default:
+		return fmt.Errorf("unknown extract record contract %q", contract)
+	}
+}
+
 func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage.Item, error) {
+	if err := validateExtractContract(run.Snapshot.ExtractRecordContract); err != nil {
+		return nil, err
+	}
+	v1 := run.Snapshot.ExtractRecordContract == stage.ExtractRecordV1
 	q := store.New(env.DB)
 	active, err := membership.FinalActiveKeys(ctx, q, run)
 	if err != nil {
@@ -81,13 +100,29 @@ func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage
 		if getErr != nil {
 			return nil, fmt.Errorf("load fetch artifact: %w", getErr)
 		}
-		selected, selectErr := planFrozenSelection(ctx, q, run.ID, input.ItemKey, func() (selection, error) {
-			choice, _, err := chooseForCheck(ctx, env.Artifacts.Abs(entry.Path), input.ItemKey, s.ocr, s.engines, s.checker, false, s.waivers.find(input.ItemKey))
-			if errors.Is(err, vbpl.ErrTreeTooLarge) {
+		if v1 {
+			if input.Sha256 != entry.Sha256 {
+				return nil, stage.Retryable(fmt.Errorf("fetch artifact changed for %q", input.ItemKey))
+			}
+			if err = verifyFetch(env.Artifacts.Abs(entry.Path), entry.Sha256); err != nil {
+				return nil, err
+			}
+		}
+		choose := func() (selection, error) {
+			choice, _, chooseErr := chooseForCheck(ctx, env.Artifacts.Abs(entry.Path), input.ItemKey, s.ocr, s.engines, s.checker, false, s.waivers.find(input.ItemKey))
+			if errors.Is(chooseErr, vbpl.ErrTreeTooLarge) {
 				return selection{source: "source_tree"}, nil
 			}
-			return choice, err
-		})
+			return choice, chooseErr
+		}
+		var selected selection
+		var itemHash string
+		var selectErr error
+		if v1 {
+			selected, itemHash, selectErr = planFrozenSelectionV1(ctx, q, run.ID, input.ItemKey, entry.Sha256, choose)
+		} else {
+			selected, selectErr = planFrozenSelection(ctx, q, run.ID, input.ItemKey, choose)
+		}
 		if selectErr != nil {
 			return nil, fmt.Errorf("select text source: %w", selectErr)
 		}
@@ -100,10 +135,16 @@ func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage
 				return nil, fmt.Errorf("check frozen selection: %w", checkErr)
 			}
 			if mismatch.gap != "" {
+				if v1 {
+					return nil, fmt.Errorf("frozen OCR selection conflicts with number mismatch")
+				}
 				selected = mismatch
 			}
 		}
-		items = append(items, stage.Item{Key: input.ItemKey, InputHash: selectionInputHash(input.Sha256, selected)})
+		if !v1 {
+			itemHash = selectionInputHash(input.Sha256, selected)
+		}
+		items = append(items, stage.Item{Key: input.ItemKey, InputHash: itemHash})
 	}
 	if err := s.waivers.validateSelections(seenWaivers); err != nil {
 		return nil, err
@@ -112,6 +153,10 @@ func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage
 }
 
 func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item stage.Item) (stage.Output, error) {
+	if err := validateExtractContract(run.Snapshot.ExtractRecordContract); err != nil {
+		return stage.Output{}, err
+	}
+	v1 := run.Snapshot.ExtractRecordContract == stage.ExtractRecordV1
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	input, err := store.New(env.DB).GetExtractInput(ctx, store.GetExtractInputParams{RunID: run.ID, ItemKey: item.Key})
@@ -125,17 +170,29 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	row, lookupErr := q.GetRunOCRSelection(ctx, store.GetRunOCRSelectionParams{RunID: run.ID, ItemKey: item.Key})
 	var selected selection
 	var nodes []vbpl.Node
+	var ocrData []byte
 	if lookupErr == nil {
-		selected, err = selectionFromRow(row)
-		if err == nil && selected.gap != "text_number_mismatch" {
-			var mismatch selection
-			mismatch, err = frozenMismatch(env.Artifacts.Abs(input.Path), item.Key)
-			if mismatch.gap != "" {
-				selected = mismatch
+		if v1 {
+			selected, nodes, ocrData, err = verifyFrozenSelectionV1(ctx, env.Artifacts.Abs(input.Path), item.Key, input.Sha256, item.InputHash, row, s.ocr)
+			if err == nil && selected.gap != "text_number_mismatch" {
+				var mismatch selection
+				mismatch, err = frozenMismatch(env.Artifacts.Abs(input.Path), item.Key)
+				if err == nil && mismatch.gap != "" {
+					err = fmt.Errorf("frozen OCR selection conflicts with number mismatch")
+				}
 			}
-		}
-		if err == nil {
-			selected, nodes, err = materializeFrozen(ctx, env.Artifacts.Abs(input.Path), item.Key, selected)
+		} else {
+			selected, err = selectionFromRow(row)
+			if err == nil && selected.gap != "text_number_mismatch" {
+				var mismatch selection
+				mismatch, err = frozenMismatch(env.Artifacts.Abs(input.Path), item.Key)
+				if mismatch.gap != "" {
+					selected = mismatch
+				}
+			}
+			if err == nil {
+				selected, nodes, err = materializeFrozen(ctx, env.Artifacts.Abs(input.Path), item.Key, selected)
+			}
 		}
 	} else if errors.Is(lookupErr, pgx.ErrNoRows) {
 		selected, nodes, err = choose(ctx, env.Artifacts.Abs(input.Path), item.Key)
@@ -151,7 +208,11 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if err != nil {
 		return stage.Output{}, fmt.Errorf("select text source: %w", err)
 	}
-	if selectionInputHash(input.Sha256, selected) != item.InputHash {
+	expectedHash := selectionInputHash(input.Sha256, selected)
+	if v1 {
+		expectedHash = observationInputHash(input.Sha256, selected)
+	}
+	if expectedHash != item.InputHash {
 		return stage.Output{}, stage.Retryable(fmt.Errorf("text selection changed for %q", item.Key))
 	}
 	var rows []provision
@@ -181,9 +242,13 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 		if s.ocr == nil {
 			return stage.Output{}, fmt.Errorf("OCR store is not configured")
 		}
-		data, readErr := s.ocr.ReadText(selected.entry.Text)
-		if readErr != nil {
-			return stage.Output{}, fmt.Errorf("read OCR text: %w", readErr)
+		data := ocrData
+		if !v1 {
+			var readErr error
+			data, readErr = s.ocr.ReadText(selected.entry.Text)
+			if readErr != nil {
+				return stage.Output{}, fmt.Errorf("read OCR text: %w", readErr)
+			}
 		}
 		rows, gaps, record = parseOCR(selected, data)
 	default:
@@ -211,8 +276,14 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 				return fmt.Errorf("write %s: %w", file.name, writeErr)
 			}
 		}
-		if record != nil {
-			b, marshalErr := json.Marshal(record)
+		if record != nil || v1 {
+			var b []byte
+			var marshalErr error
+			if v1 {
+				b, marshalErr = marshalV1TextRecord(record, selected, ocrData)
+			} else {
+				b, marshalErr = json.Marshal(record)
+			}
 			if marshalErr != nil {
 				return fmt.Errorf("encode text.json: %w", marshalErr)
 			}
