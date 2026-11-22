@@ -34,4 +34,4 @@
 - [ ] Before the first release with `reviewed` rows: the image that admits them is live and the release floor is confirmed at it, and an evaluation case asserts the warning on the target provision. Evaluation has no warning assertion today and no release holds such a row, so the case ships with the first entries.
 - [ ] Triage the first run's findings in batches (model-adjudicated with a 10 percent read sample); operative claims in the 394 partly expired documents and the 196 `ocr_label_flagged` documents first.
 - [ ] Migrate gap kinds to findings one named migration at a time, converting accepted gaps into review decisions.
-- [ ] Rule in instructions/workflow.md and the PR template: a defect found by a person becomes a detector or a knowledge entry before its fix merges.
+- [x] Rule in instructions/workflow.md and the PR template: a defect found by a person becomes a detector or a knowledge entry before its fix merges.
