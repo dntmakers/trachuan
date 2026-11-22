@@ -2,7 +2,7 @@
 
 ## Scope and authority
 
-This file owns the shared rules for Claude Code and Codex in trachuan. `CLAUDE.md` imports it and adds Claude Code specifics. Component `AGENTS.md` files, added when a component exists, map local sources, boundaries and checks. Role definitions in `.codex/agents/` are thin wrappers that name a duty and the instruction files that role reads; Claude Code subagents get the same role rules in their brief.
+This file owns the shared rules for Claude Code and Codex in trachuan. `CLAUDE.md` imports it and adds Claude Code specifics. Component `AGENTS.md` files, added when a component exists, map local sources, boundaries and checks. Worker role rules are in `instructions/roles.md`.
 
 Direct owner instructions and platform safety rules come first.
 
@@ -37,7 +37,7 @@ Precedence: an accepted ADR wins over design text; design wins over a plan. Code
 
 ## Agents
 
-The primary session owns designs, ADRs, documentation, decisions, briefs, verification, Git, tags and deploys. Workers implement bounded tasks and reviewers independently review architecture designs and code. `instructions/workflow.md` owns dispatch and model routing. No model reviews its own work.
+The primary session owns documentation, design and ADR decisions, briefs, verification, Git, tags and deploys. GPT Sol drafts designs, GPT Astra reviews them, GPT Terra implements and GPT Sol reviews code; `instructions/workflow.md` owns dispatch, routing and stand-ins. No model reviews its own work.
 
 |Lane|Owned paths|Never|
 |-|-|-|
@@ -52,13 +52,13 @@ The primary session owns designs, ADRs, documentation, decisions, briefs, verifi
 - Keep files small: Markdown at most 300 lines (plans in `docs/plans/` exempt), non-test code at most 400 (`scripts/check-lengths.sh`, enforced in the pre-commit hook). Split by concern, one concern per file, named after it.
 - Each fact has one home. Plans are deleted when done; design, ADRs, code and runbooks remain.
 - Never commit secrets, personal data or user questions. The repository may become public.
-- Plain words, active voice, no em dashes, no plan or task IDs in code or living docs. Agent-only files (this file, `instructions/`, `.claude/`, `.codex/`, `docs/plans/`) stay minified: one line per paragraph or list item.
+- Plain words, active voice, no em dashes, no plan or task IDs in code or living docs. Agent-only files (this file, `instructions/`, `.claude/`, `docs/plans/`) stay minified: one line per paragraph or list item.
 
 ## Briefs and reports
 
-A brief names the objective, authorities to read, owned paths, forbidden actions, definition of done, checks the primary will run, and the report contract. Implementers and CLI reviewers start with `git status --short`; the primary supplies it to Agent roles without shell access. Leave existing changes alone. Stop at a document conflict, overlapping ownership or missing decision; report it instead of inventing a contract.
+A brief names the objective, authorities to read, owned paths, forbidden actions, definition of done, checks the primary will run, and the report contract. Implementers and reviewers start with `git status --short`. Leave existing changes alone. Stop at a document conflict, overlapping ownership or missing decision; report it instead of inventing a contract.
 
-A report lists exact new, changed and deleted files; checks run with results; checks not run with the command and reason; evidence paths; open items. The Codex launcher saves only the final message, so the complete report goes there.
+A report lists exact new, changed and deleted files; checks run with results; checks not run with the command and reason; evidence paths; open items. The worker's final message is the complete report.
 
 ## Git
 

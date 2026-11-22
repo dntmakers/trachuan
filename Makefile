@@ -14,7 +14,7 @@ pre-push: ## Static checks before pushing
 	bash scripts/pre-push.sh
 
 docs-fmt: ## Format human-read Markdown with Prettier
-	npx prettier --write "**/*.md" "!**/AGENTS.md" "!**/CLAUDE.md" "!**/CLAUDE.local.md" "!instructions/**" "!docs/plans/**" "!.claude/**" "!.codex/**" "!**/node_modules/**" "!**/.venv/**"
+	npx prettier --write "**/*.md" "!**/AGENTS.md" "!**/CLAUDE.md" "!**/CLAUDE.local.md" "!instructions/**" "!docs/plans/**" "!.claude/**" "!**/node_modules/**" "!**/.venv/**"
 
 EMBEDDER_MODEL_DIR ?= work/models/vi_v2-bundle
 override QUERYEMBED_GO_VERSION := $(shell awk '$$1 == "go" { print $$2; exit }' go.mod)

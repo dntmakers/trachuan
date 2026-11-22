@@ -1,6 +1,6 @@
 # Classification Plan (Plan 8)
 
-> **For agentic workers:** Routes (`instructions/workflow.md`): every task that submits or prepares paid batches is hard: Sol implements, Astra reviews; the design delta is written by the primary and reviewed by Astra. Executor: the primary. Paid calls use `ANTHROPIC_API_KEY` from `~/.config/claude-api-keys.env` or `OPENAI_API_KEY` from `~/.config/openai-api-keys.env`, passed per command, never exported, never switched while a batch is in flight.
+> **For agentic workers:** Routes: `instructions/workflow.md`. Executor: the primary. Paid calls use `ANTHROPIC_API_KEY` from `~/.config/claude-api-keys.env` or `OPENAI_API_KEY` from `~/.config/openai-api-keys.env`, passed per command, never exported, never switched while a batch is in flight.
 
 **Goal:** every primary article in the release carries subject nodes: seeds from the 2023 codification package, then inheritance through consolidations, then an LLM layer in batches for the rest, gated by the floors in [taxonomy](../design/taxonomy.md#evaluation-gate).
 
@@ -64,5 +64,5 @@ Order: no new paid call runs before the result store lands, whatever its outcome
 - [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
 - [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
 - [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
-- [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a `gpt-6.2-astra` trial on every slice.
+- [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a trial of the newest Astra model on every slice.
 - [ ] Full run with the model chosen by classification-results.md "Providers and models", under the `full` budget set as above.

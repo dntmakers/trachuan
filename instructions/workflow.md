@@ -1,33 +1,31 @@
 # Workflow
 
-The primary session plans, writes and reviews designs, ADRs and documentation, makes the decisions, briefs, verifies and owns Git. Workers implement and troubleshoot bounded tasks; a reviewer on a different model from the author reviews architecture designs and code independently. The primary asks the owner only for decisions the owner must make, one at a time, with a recommendation. It answers worker questions from the reviewed design, settles conflicts itself with the reviewer's input, and records approved contract changes in `docs/design/` or an ADR before work resumes.
+The primary session plans, writes documentation, edits and decides designs and ADRs, briefs, verifies and owns Git. Sol drafts designs, Terra implements and troubleshoots bounded tasks, and a reviewer on a different model from the author reviews designs and code independently. The primary asks the owner only for decisions the owner must make, one at a time, with a recommendation. It answers worker questions from the reviewed design, settles conflicts itself with the reviewer's input, and records approved contract changes in `docs/design/` or an ADR before work resumes.
 
 ## Routes
 
-|Work|Role and model|
-|-|-|
-|Design, ADR, contract proposal, documentation, decisions|The primary, which reviews its own documentation and prose|
-|Independent review of an architecture design, ADR or routine code|GPT Sol or Opus|
-|Routine implementation, troubleshooting with supplied evidence|GPT Terra or Sonnet|
-|Hard or complex implementation|Sol or Opus|
-|Hard independent review (security, concurrency, migration, or repeated failure)|GPT Astra or Fable; neither implements code|
-|Searches, summaries, mechanical reading|Claude `Explore` agent|
-|Optional second design draft|Codex CLI `designer`, docs only, at the primary's discretion|
+|Work|GPT agent|Claude stand-in|
+|-|-|-|
+|Design, ADR or contract draft (role `designer`)|Sol|Opus|
+|Design review (role `reviewer`)|Astra|Fable|
+|Implementation and troubleshooting (role `implementer`)|Terra|Sonnet|
+|Code review (role `reviewer`)|Sol|Opus|
+|Searches, summaries, mechanical reading|-|Claude `Explore` agent|
 
-Each tier runs its newest model. `.codex/agents/` and the owner's user-level agents hold the only pins; the primary moves a pin when a newer model ships, after a no-tool smoke test of the exact ID. Plans and briefs name the tier (Terra, Sol, Astra), not a model ID.
+The primary writes documentation and prose itself, edits every design draft and decides. Role rules are in `instructions/roles.md`; each brief names the role and points the worker there.
 
-Dispatch every worker as a fresh `Agent` subagent. Claude models take `model` (`sonnet`, `opus`, `fable`); GPT models take `subagent_type` `terra`, `sol` or `astra`, the owner's user-level agents with the model in frontmatter, and no `model` override. Confirm the child's runtime model before relying on it. These agents have every tool, so each brief carries the role rules from `.codex/agents/implementer.toml` or `reviewer.toml`; a reviewer brief forbids edits, writing commands and Git. Give reviewers the exact diff, worktree status, local checks and exact-commit CI evidence. State the route in the brief; choose a different model from the author and resume the same reviewer for confirmations.
+Dispatch each worker as a fresh `Agent` subagent with `subagent_type` `terra`, `sol` or `astra` and no `model` override. These are the owner's user-level agents; each alias resolves to the newest model of its family, so plans and briefs name the family, never a model ID. The worker's first report line is its runtime model ID, which must belong to the named family. When a user-level agent cannot be dispatched, use the Codex plugin (`codex:codex-rescue` agent for work, `/codex:review` or `/codex:adversarial-review` for review) with `--model` set to the newest ID of the family in `~/.codex/models_cache.json`; when GPT is unavailable, use the Claude stand-in with the `Agent` `model` `sonnet`, `opus` or `fable`. Never fork for independent review: a fork inherits the parent model and context.
 
-If direct dispatch fails or the runtime model cannot be confirmed, use `scripts/codex-agent.sh [--model <m>] [--effort <e>] [--search] [--resume <session-id>] <role> <worktree> <brief-file> <report-file>`. A CLI resume requires the model that started the worker, even when it differs from the role default.
+A reviewer never runs on the author's model. Astra and Fable never write code. These agents have every tool, so a reviewer brief forbids edits, writing commands and Git. Give reviewers the exact diff, worktree status, local checks and exact-commit CI evidence. Resume the same reviewer with SendMessage to confirm fixes, and answer a worker's question with SendMessage to the same agent instead of starting a fresh one.
 
 ## Flow
 
 1. Read the design and accepted ADRs for the area. An accepted ADR wins over design text; design wins over a plan.
-2. For a contract or architecture change, the primary writes the proposal and an independent reviewer reviews it before any code. Documentation and prose the primary wrote need no independent review. Small changes skip design.
+2. For a contract or architecture change, Sol drafts the proposal from the primary's brief, the primary edits and decides, and Astra reviews it before any code. Documentation and prose the primary wrote need no independent review. Small changes skip design.
 3. Brief one implementer per bounded task with exact owned paths. Failing test first, then the smallest fix. Adversarial cases for hostile input, authorization, races and bounds belong to the author.
 4. The primary runs `make pre-push` and the checks the brief names, inspects the diff and report, then dispatches the independent reviewer once after the last code task. One-line and test-only changes skip review.
 5. Return findings to the author; the same reviewer confirms the fixes.
-6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head. The owner merges with a signed merge; delete merged branches. A change only to agent setup or working process (`.claude/`, `.codex/`, AGENTS.md, CLAUDE.md, `instructions/`) needs no independent review: the primary merges it after `make pre-push` with `gh pr merge --admin`, which the repository admin role may bypass on the `main` ruleset.
+6. Push a branch, open a draft pull request, mark it ready when complete. Landing needs independent review and green CI on the exact head. The owner merges with a signed merge; delete merged branches. A change only to agent setup or working process (`.claude/`, AGENTS.md, CLAUDE.md, `instructions/`) needs no independent review: the primary merges it after `make pre-push` with `gh pr merge --admin`, which the repository admin role may bypass on the `main` ruleset.
 7. When CI fails, the primary saves the failing job logs to the scratchpad and briefs `implementer` with them. Two red runs from the same cause means stop and repair the process.
 
 ## Reviews
