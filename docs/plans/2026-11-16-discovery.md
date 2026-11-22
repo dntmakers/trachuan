@@ -1,6 +1,6 @@
 # Discovery Plan (Plan 18)
 
-> **For agentic workers:** Routes (`instructions/workflow.md`): D1 and D2 are routine web work implemented by Terra in `apps/web/` and reviewed by Sol; the codes endpoint is backend work briefed to a dev session. The primary runs `make web-test`, `make web-build`, `make pre-push` and, for the backend PR, `make test` and `make test-integration`.
+> **For agentic workers:** Routes: `instructions/workflow.md`. D1 and D2 are web work in `apps/web/`; the codes endpoint is backend work briefed to a dev session. The primary runs `make web-test`, `make web-build`, `make pre-push` and, for the backend PR, `make test` and `make test-integration`.
 
 **Goal:** search engines and AI answer engines find and quote Tra Chuẩn's public pages as [discovery](../design/discovery.md) describes. The spec wins over this plan.
 

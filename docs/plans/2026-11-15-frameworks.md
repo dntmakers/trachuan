@@ -4,7 +4,7 @@
 
 **Spec:** `docs/adr/0016-control-frameworks-corpus.md`, `docs/design/frameworks.md`, `docs/design/frameworks-access.md`, `docs/research/compliary-survey-2026-11.md`. Sources: the owner's clone of `compliary-private` (never copied into this repository); seeds from `/Users/danny/src/dannyota/compliary/deploy/seed/` and `deploy/eval/golden.csv`.
 
-**Routes:** access, entitlements, serving and release paths are hard (Sol implements, Astra reviews); parsers and web pages are routine (Terra implements, Sol reviews). Standing rules: no licensed text in Git, fixtures, logs, reports or PR bodies; fixtures are invented frameworks; a framework version is `licensed` unless the registry says `free` with an open licence.
+**Routes:** `instructions/workflow.md`. Standing rules: no licensed text in Git, fixtures, logs, reports or PR bodies; fixtures are invented frameworks; a framework version is `licensed` unless the registry says `free` with an open licence.
 
 ## 15.0 Design (primary, astra review)
 - [x] ADR 0016, frameworks.md, frameworks-access.md and the survey note reviewed by `gpt-6-astra` in four rounds (A-01 to A-04, S-01 to S-07 fixed); ADR accepted 2026-11-15.

@@ -4,7 +4,7 @@
 
 **Spec:** `docs/adr/0017-findings-and-reviewed-knowledge.md`, `docs/design/knowledge-loop.md`, `docs/research/write-path-findings-2026-11.md`. Related: `docs/design/validity-status.md`, `relations-text.md`, `ocr-check.md`, `error-reports.md`, `evaluation-fixtures.md`, `corpus-release.md`.
 
-**Routes:** the validator, application of knowledge in build and the uploader gate are hard (Sol implements, Astra reviews); detectors, CLI and reports are routine (Terra implements, Sol reviews). Executor: trachuan-dev (corpus), after the batch 2 release. Standing rules: no model and no network at build; existing gap kinds keep their names; no server-checked recipe changes without telling the coordinator.
+**Routes:** `instructions/workflow.md`. Executor: trachuan-dev (corpus), after the batch 2 release. Standing rules: no model and no network at build; existing gap kinds keep their names; no server-checked recipe changes without telling the coordinator.
 
 ## 16.0 Design (primary, astra review)
 - [x] ADR 0017, knowledge-loop.md and the survey note reviewed by `gpt-6-astra` in five rounds (S-01 to S-23, A-01, A-02 fixed) and read by the corpus session against the code; ADR accepted 2026-11-15.

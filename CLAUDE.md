@@ -3,9 +3,8 @@
 ## Claude Code specifics
 
 - The primary session runs Claude Code's default prompt with this file and `CLAUDE.local.md`; the owner picks its model with `/model`. Duties are in AGENTS.md "Agents" and `instructions/workflow.md`.
-- Agent dispatch and model routes are in `instructions/workflow.md`. The CLI fallback reads `.codex/agents/<role>.toml` from the worker's worktree and saves its final message to the report file.
-- Codex CLI workers run offline unit checks in the sandbox: the launcher makes the Go build and lint caches writable, allows loopback listeners and sets `GOPROXY=off`; integration tests and proofs stay with the primary. Workers mount `.codex/` read-only; the primary edits role files.
-- When a CLI worker stops with a question, answer in a short file and resume it instead of starting a fresh worker; copy the previous report first, because `-o` overwrites it. Put standing answers for small ambiguities in the brief.
+- Agent dispatch, model routes and fallbacks are in `instructions/workflow.md`; worker role rules in `instructions/roles.md`.
+- When a worker stops with a question, answer it with SendMessage to the same agent instead of starting a fresh one. Put standing answers for small ambiguities in the brief.
 - Write briefs with a quoted heredoc (`<<'EOF'`); point workers at exact files, not whole dependencies.
 - Probe and fixture-recording scripts record what the source returns and stop only on real errors (transport failure, non-2xx), never on valid but unexpected shapes such as nullable fields or an HTTP 200 with an error envelope.
 - When a reviewer keeps finding variants of one edge case, close the class with one fail-closed rule in the design instead of patching each variant.

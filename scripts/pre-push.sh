@@ -13,8 +13,8 @@ for mod in $(git ls-files -- '**/go.mod' 'go.mod' 2>/dev/null); do
   if command -v golangci-lint >/dev/null; then (cd "$dir" && golangci-lint run ./...); fi
 done
 if command -v npx >/dev/null && [[ -f package.json ]]; then
-  npx prettier --check "**/*.md" "!**/AGENTS.md" "!**/CLAUDE.md" "!**/CLAUDE.local.md" "!instructions/**" "!docs/plans/**" "!.claude/**" "!.codex/**" "!**/node_modules/**" "!**/.venv/**"
-  npx markdownlint-cli2 "**/*.md" "#**/node_modules" "#**/.venv" "#.superpowers" "#work" "#.playwright-mcp" "#**/test-results" "#**/playwright-report" "#**/AGENTS.md" "#**/CLAUDE.md" "#**/CLAUDE.local.md" "#instructions" "#docs/plans" "#.claude" "#.codex"
+  npx prettier --check "**/*.md" "!**/AGENTS.md" "!**/CLAUDE.md" "!**/CLAUDE.local.md" "!instructions/**" "!docs/plans/**" "!.claude/**" "!**/node_modules/**" "!**/.venv/**"
+  npx markdownlint-cli2 "**/*.md" "#**/node_modules" "#**/.venv" "#.superpowers" "#work" "#.playwright-mcp" "#**/test-results" "#**/playwright-report" "#**/AGENTS.md" "#**/CLAUDE.md" "#**/CLAUDE.local.md" "#instructions" "#docs/plans" "#.claude"
 fi
 if command -v uv >/dev/null; then
   (cd apps/docembed && uv run --frozen --only-group dev ruff check && uv run --frozen --only-group dev ruff format --check)
