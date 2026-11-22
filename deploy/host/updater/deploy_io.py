@@ -14,6 +14,18 @@ import time
 import tempfile
 
 
+
+JSON_LIMIT = 1024 * 1024
+
+
+def read_json_bytes(path, what, limit=JSON_LIMIT):
+    with Path(path).open('rb') as source:
+        data = source.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError(what + ' too large')
+    return data
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
 
@@ -23,6 +35,14 @@ def decode(data, what):
         return json.loads(data)
     except (ValueError, RecursionError) as error:
         raise ValueError('invalid ' + what + ' JSON') from error
+
+
+def sync_dir(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def atomic(path, data, mode=0o600):
@@ -35,11 +55,7 @@ def atomic(path, data, mode=0o600):
             output.flush()
             os.fsync(output.fileno())
         os.replace(name, path)
-        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        sync_dir(path.parent)
     finally:
         Path(name).unlink(missing_ok=True)
 
@@ -346,35 +362,3 @@ def interrupted(error):
         seen.add(id(error))
         error = error.__cause__ or error.__context__
     return False
-
-
-class Result:
-    def __init__(self, path, log, clock=now, state=None):
-        self.path, self.log, self.clock = Path(path), Path(log), clock
-        self.state = state
-        self.started = clock()
-        self.previous = {}
-        try:
-            self.previous = json.loads(self.path.read_bytes())
-            if not isinstance(self.previous, dict):
-                self.previous = {}
-        except (OSError, ValueError):
-            pass
-
-    def write(self, status, step, message, digest=None, manifest=None):
-        manifest = manifest or {}
-        finished = self.clock()
-        success = finished if status in ('ok', 'verified', 'bootstrapped', 'current') else self.previous.get('last_success_at')
-        value = dict(status=status, manifest_hash=digest, release=manifest.get('release'),
-                     sequence=manifest.get('sequence'), step=step, message=message,
-                     release_floor=self.state.data.get('release_floor') if self.state else None,
-                     started_at=self.started, finished_at=finished, last_success_at=success)
-        atomic(self.path, canonical(value) + b'\n', 0o640)
-        self.append(value)
-
-    def append(self, value):
-        descriptor = os.open(self.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o640)
-        with os.fdopen(descriptor, 'ab') as output:
-            output.write(canonical(dict(timestamp=self.clock(), **value)) + b'\n')
-            output.flush()
-            os.fsync(output.fileno())

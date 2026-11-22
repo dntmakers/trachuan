@@ -1,8 +1,14 @@
+import copy
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
+
+from updater import deploy_state as state_module
 
 from updater import deploy_activate as a
 from updater.deploy_io import CommandError, canonical, command
@@ -102,6 +108,89 @@ class ActivationFixture:
 
 
 class ActivationTest(ActivationFixture, unittest.TestCase):
+    def test_terminal_recovery_barrier_failure_keeps_ingress_held(self):
+        for terminal in ('activated', 'rolled_back'):
+            with self.subTest(terminal=terminal):
+                self.setUp()
+                if terminal == 'activated':
+                    self.engine.activate(self.new)
+                else:
+                    self.crash_step = 'migrate'
+                    with self.assertRaises(Crash):
+                        self.engine.activate(self.new)
+                    self.assertEqual(self.engine.recover(), 'rolled_back')
+                self.host.hold()
+                self.calls.clear()
+                with mock.patch('updater.deploy_activate.sync_dir', side_effect=OSError('sync unavailable')):
+                    with self.assertRaisesRegex(OSError, 'sync unavailable'):
+                        self.engine.recover()
+                self.assertTrue(self.paths.hold.exists())
+                self.assertFalse(any(args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']
+                                     for args, _ in self.calls))
+
+    def test_terminal_recovery_syncs_state_directory_before_reopening_ingress(self):
+        self.engine.activate(self.new)
+        self.host.hold()
+        directory = os.stat(self.state.path.parent)
+        original_fsync, runner = os.fsync, self.host.runner
+        synced, started = [], []
+        def fsync(fd):
+            info = os.fstat(fd)
+            if stat.S_ISDIR(info.st_mode) and (info.st_dev, info.st_ino) == (directory.st_dev, directory.st_ino):
+                synced.append(True)
+            return original_fsync(fd)
+        def command(args, **kwargs):
+            if args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']:
+                self.assertTrue(synced)
+                started.append(True)
+            return runner(args, **kwargs)
+        self.host.runner = command
+        with mock.patch('updater.deploy_io.os.fsync', side_effect=fsync):
+            self.assertIsNone(self.engine.recover())
+        self.assertTrue(started)
+        self.assertFalse(self.paths.hold.exists())
+
+    def test_resume_rejects_nonterminal_state_before_ingress(self):
+        self.calls.clear()
+        with self.assertRaisesRegex(ValueError, 'terminal'):
+            self.engine.resume_ingress()
+        self.assertFalse(any(args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']
+                             for args, _ in self.calls))
+
+    def test_resume_failure_stops_caddy_when_hold_write_fails(self):
+        self.engine.activate(self.new)
+        with mock.patch.object(self.host, 'probe', side_effect=[None, ValueError('edge failed')]), \
+                mock.patch.object(self.host, 'hold', side_effect=OSError('hold unavailable')), \
+                mock.patch.object(self.host, 'cancel_edge') as cancel:
+            with self.assertRaises(ValueError):
+                self.engine.resume_ingress()
+        cancel.assert_called_once()
+
+    def test_preflight_rejects_oversized_final_commit_before_service_change(self):
+        projected = State(self.state.path, copy.deepcopy(self.state.data))
+        projected.data['retained'] = [self.old.hash]
+        projected.data['journal'] = dict(target=self.new.hash, previous=self.old.hash, baseline=7,
+                                         restart_postgres=False, status='activated', step='complete', authorization=None)
+        projected.save = lambda: None
+        projected.activate(self.new.hash, 9999999999999999999)
+        limit = len(canonical(projected.data))
+        self.calls.clear()
+        before = self.state.path.read_bytes()
+        with mock.patch.object(state_module, 'STATE_LIMIT', limit):
+            with self.assertRaisesRegex(ValueError, 'state too large'):
+                self.engine.activate(self.new)
+        self.assertEqual(self.state.path.read_bytes(), before)
+        self.assertFalse(any('systemctl' in args or 'install.sh' in ' '.join(args) for args, _ in self.calls))
+
+    def test_recovery_discards_unsaved_activated_state(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        self.state.data['journal'].update(status='activated', step='complete')
+        self.state.data['active'] = self.new.hash
+        self.assertEqual(self.engine.recover(), 'rolled_back')
+        self.assertEqual(State(self.state.path).data['active'], self.old.hash)
+
     def test_recovery_restores_previous_postgres_before_querying_schema(self):
         self.paths.postgres_unit.write_bytes(b'changed\n')
         self.crash_step = 'migrate'
@@ -237,6 +326,14 @@ class ActivationTest(ActivationFixture, unittest.TestCase):
         self.assertEqual(self.engine.recover(), 'stopped')
         self.assertEqual(self.state.data['journal']['baseline'], 7)
         self.assertEqual(self.calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
+
+    def test_prune_rejects_wrong_retained_manifest_shape(self):
+        path = self.store.directory / self.old.hash / 'manifest.json'
+        for value in (None, [], {'host_bundle': None}, {'host_bundle': {'sha256': []}}):
+            with self.subTest(value=value):
+                path.write_bytes(canonical(value))
+                with self.assertRaises(ValueError):
+                    self.store.prune(self.state)
 
     def test_retention_keeps_five_and_never_discards_sequence_bindings(self):
         for sequence in range(16, 23):

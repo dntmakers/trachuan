@@ -9,7 +9,7 @@ import subprocess
 from .deploy_vault import names
 from .deploy_floor import release_floor
 from .deploy_bundle import bundle
-from .deploy_io import canonical, command, CommandError
+from .deploy_io import canonical, command, CommandError, decode, JSON_LIMIT, read_json_bytes
 
 
 COSIGN = '/usr/local/libexec/trachuan/bin/cosign'
@@ -72,7 +72,7 @@ def frameworks_policy(value):
 
 
 def policy(path):
-    value = json.loads(Path(path).read_bytes())
+    value = decode(read_json_bytes(path, 'policy'), 'policy')
     keys = {'version', 'repositories', 'release_repository', 'rollback_repository',
             'release_identity', 'build_identity', 'rollback_identity', 'issuer',
             'workflow_path', 'images', 'upstream', 'extensions', 'sigstore_trust_root',
@@ -114,7 +114,7 @@ def policy(path):
 
 
 def release(data, rules):
-    obj = json.loads(data)
+    obj = decode(data, 'release manifest')
     keys = {'kind', 'version', 'repository', 'commit', 'ref', 'release', 'sequence',
             'target', 'images', 'upstream', 'host_bundle', 'corpus_release', 'rollback_target'}
     if not isinstance(obj, dict) or set(obj) != keys:
@@ -147,7 +147,7 @@ def release(data, rules):
 
 
 def rollback(data):
-    obj = json.loads(data)
+    obj = decode(data, 'rollback manifest')
     if not isinstance(obj, dict) or set(obj) != {'kind', 'version', 'current', 'target', 'sequence'}:
         raise ValueError('invalid rollback fields')
     if obj['kind'] != 'trachuan.rollback' or type(obj['version']) is not int or obj['version'] != 1:
@@ -178,7 +178,7 @@ def verify_blob(directory, rules, runner, kind, repository, ref, commit=None):
 
 
 def verify_manifest(directory, rules, runner=command, kind='release'):
-    data = (Path(directory) / 'manifest.json').read_bytes()
+    data = read_json_bytes(Path(directory) / 'manifest.json', kind + ' manifest')
     if kind == 'release':
         obj = release(data, rules)
         verify_blob(directory, rules, runner, kind, obj['repository'], obj['ref'], obj['commit'])
@@ -226,8 +226,8 @@ def envelopes(raw):
             text = text.lstrip()[end:]
         if not rows:
             raise ValueError('missing attestation')
-        return [json.loads(base64.b64decode(row['payload'], validate=True)) for row in rows]
-    except (KeyError, TypeError, UnicodeError) as error:
+        return [decode(base64.b64decode(row['payload'], validate=True), 'attestation payload') for row in rows]
+    except (KeyError, TypeError, ValueError, RecursionError) as error:
         raise ValueError('invalid attestation envelope') from error
 
 
@@ -240,7 +240,7 @@ def as_user():
 def pull_image(image, runner, user_prefix):
     inspect = user_prefix + ['podman', 'image', 'inspect', image]
     try:
-        raw = runner(inspect)
+        raw = runner(inspect, stdout_limit=JSON_LIMIT)
     except CommandError as error:
         if error.reason == 'timeout':
             raise
@@ -258,9 +258,12 @@ def pull_image(image, runner, user_prefix):
             if not isinstance(error.__cause__, subprocess.TimeoutExpired):
                 raise
             runner(pull, timeout=600)
-        raw = runner(inspect)
-    rows = json.loads(raw)
-    if len(rows) != 1 or image not in rows[0].get('RepoDigests', []):
+        raw = runner(inspect, stdout_limit=JSON_LIMIT)
+    rows = decode(raw, 'image inspection')
+    if (not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict)
+            or not isinstance(rows[0].get('RepoDigests'), list)
+            or not all(isinstance(item, str) for item in rows[0]['RepoDigests'])
+            or image not in rows[0]['RepoDigests']):
         raise ValueError('local digest mismatch')
 
 
@@ -271,7 +274,8 @@ class Verifier:
 
     def attestation(self, manifest, image, expected_image=None):
         raw = self.runner([COSIGN, 'verify-attestation', '--new-bundle-format', '--type', 'slsaprovenance1',
-                           *flags(self.rules, 'build', manifest['repository'], manifest['ref'], manifest['commit']), image])
+                           *flags(self.rules, 'build', manifest['repository'], manifest['ref'], manifest['commit']), image],
+                          stdout_limit=JSON_LIMIT)
         statements = envelopes(raw)
         for statement in statements:
             provenance(statement, manifest, expected_image or image, self.rules)

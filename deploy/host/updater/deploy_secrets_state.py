@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 
-from .deploy_io import atomic, canonical
+from .deploy_io import atomic, canonical, decode, JSON_LIMIT, read_json_bytes
 from .deploy_vault import names, retired
 
 
@@ -10,7 +9,7 @@ class SecretsState:
     def __init__(self, path):
         self.path = Path(path)
         try:
-            self.data = json.loads(self.path.read_bytes())
+            self.data = decode(read_json_bytes(self.path, 'secrets state'), 'secrets state')
         except FileNotFoundError:
             self.data = dict(versions={}, pending={}, last_success_at=None, held=False)
         self.prune_retired()
@@ -50,14 +49,15 @@ class SecretsState:
 
     def save(self):
         self.validate()
-        atomic(self.path, canonical(self.data) + b'\n', 0o600)
+        raw = canonical(self.data) + b'\n'
+        if len(raw) > JSON_LIMIT:
+            raise ValueError('secrets state too large')
+        atomic(self.path, raw, 0o600)
 
 
 def raw_pending(path):
     try:
-        raw = json.loads(Path(path).read_bytes())
+        return bool(SecretsState(path).data['pending'])
     except (OSError, ValueError):
-        return False
-    pending = raw.get('pending') if isinstance(raw, dict) else None
-    return isinstance(pending, dict) and bool(pending)
+        return True
 

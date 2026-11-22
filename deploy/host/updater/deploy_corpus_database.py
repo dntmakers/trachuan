@@ -1,4 +1,3 @@
-import json
 import re
 
 from . import deploy_corpus_sql as sql
@@ -9,7 +8,7 @@ from .deploy_corpus_kind import LAW
 from .deploy_corpus_lock import AdvisoryLock
 from .deploy_corpus_verify import toc
 from .deploy_host import activator_arguments, activator_client
-from .deploy_io import CommandError, interrupted
+from .deploy_io import CommandError, decode, interrupted, JSON_LIMIT
 from .deploy_release_tables import Tables
 
 
@@ -71,10 +70,12 @@ class Database:
         return self.host.psql(self.target(database), statements, options).decode().strip()
 
     def catalog(self, locked=True):
-        value = json.loads(self.query(CATALOG) if locked else self.unlocked(CATALOG))
-        if not isinstance(value, dict):
+        value = decode(self.query(CATALOG) if locked else self.unlocked(CATALOG), 'database catalog')
+        if not isinstance(value, dict) or any(
+                not isinstance(item, dict) or type(item.get('oid')) is not int or item['oid'] < 1
+                or not isinstance(item.get('owner'), str) for item in value.values()):
             raise ValueError('invalid database catalog')
-        return {name: dict(oid=int(item['oid']), owner=item['owner']) for name, item in value.items()}
+        return {name: dict(oid=item['oid'], owner=item['owner']) for name, item in value.items()}
 
     def remember_target(self, row):
         name = self.target(row['database_name'])
@@ -170,8 +171,8 @@ class Database:
             self.host.note('leftovers', 'leftover sweep deferred: command failed')
 
     def check_extensions(self, manifest):
-        installed = json.loads(self.query('SELECT pg_catalog.json_object_agg(name,default_version) '
-            "FROM pg_catalog.pg_available_extensions WHERE name IN ('vector','ltree');", 'postgres', sql.CATALOG_PATH))
+        installed = decode(self.query('SELECT pg_catalog.json_object_agg(name,default_version) '
+            "FROM pg_catalog.pg_available_extensions WHERE name IN ('vector','ltree');", 'postgres', sql.CATALOG_PATH), 'extensions')
         if installed != manifest['extensions']:
             raise ValueError('PostgreSQL extension versions differ from corpus manifest')
 
@@ -260,7 +261,7 @@ class Database:
     def validate(self, row):
         raw = self.on_target(row, sql.RELEASE_ROW)
         expected = {key: row['manifest'][key] for key in ('country', 'rel', 'schema_version', 'recipes')}
-        if not raw or json.loads(raw) != expected:
+        if not raw or decode(raw, 'release row') != expected:
             raise ValueError('restored release row differs from manifest')
 
     def server(self, image, *args, secret=False, **options):
@@ -275,7 +276,7 @@ class Database:
         if database is not None:
             self.sql.database(database)
             args += ['--database', database]
-        return json.loads(self.server(image, *args, secret=database is not None, **options))
+        return decode(self.server(image, *args, secret=database is not None, stdout_limit=JSON_LIMIT, **options), 'release check')
 
     def smoke(self, row, image):
         self.target(row['database_name'])

@@ -6,7 +6,7 @@ import re
 
 from .deploy_corpus_heading import validate_headings
 from .deploy_corpus_sql import RELEASE
-from .deploy_io import canonical, decode
+from .deploy_io import canonical, decode, read_json_bytes
 from .deploy_verify import accepted, flags, match, positive
 
 
@@ -76,7 +76,7 @@ def manifest(data, rules):
 
 def verify(directory, rules, runner):
     path = Path(directory) / 'manifest.json'
-    data = path.read_bytes()
+    data = read_json_bytes(path, 'corpus manifest')
     obj = manifest(data, rules)
     runner(['/usr/local/libexec/trachuan/bin/cosign', 'verify-blob', '--bundle',
             str(Path(directory) / 'manifest.sigstore.json'),
@@ -85,6 +85,8 @@ def verify(directory, rules, runner):
 
 
 def uncalibrated(recipe):
+    if not isinstance(recipe, dict) or not isinstance(recipe.get('abstention', {}), dict):
+        raise ValueError('invalid retrieval recipe')
     obj = copy.deepcopy(recipe)
     obj.get('abstention', {}).pop('threshold', None)
     obj.get('abstention', {}).pop('calibration_sha256', None)
@@ -92,6 +94,14 @@ def uncalibrated(recipe):
 
 
 def compatible(obj, report):
+    if (not isinstance(report, dict) or not isinstance(report.get('schema_versions'), list)
+            or not isinstance(report.get('dense_query_hash'), str)
+            or not isinstance(report.get('running_query'), dict)
+            or not isinstance(report['running_query'].get('recipe_hash'), str)
+            or not isinstance(report.get('lexical_recipe'), dict)
+            or not isinstance(report.get('retrieval_recipes'), list)):
+        raise ValueError('invalid corpus release-check output')
+    retrieval = [uncalibrated(recipe) for recipe in report['retrieval_recipes']]
     if obj['schema_version'] not in report['schema_versions']:
         raise ValueError('unsupported corpus schema version')
     recipes = obj['recipes']
@@ -99,7 +109,7 @@ def compatible(obj, report):
     return (query == report['dense_query_hash'] == report['running_query']['recipe_hash']
             and recipes['dense']['query'] == report['running_query'].get('recipe')
             and recipes['lexical'] == report['lexical_recipe']
-            and uncalibrated(recipes['retrieval']) in [uncalibrated(r) for r in report['retrieval_recipes']])
+            and uncalibrated(recipes['retrieval']) in retrieval)
 
 
 def toc(text, extensions, omit=None):

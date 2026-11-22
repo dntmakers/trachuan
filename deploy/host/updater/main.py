@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from updater.deploy_run import Updater
 from updater.deploy_store import Paths
-from updater.deploy_io import Busy, Lock, Result, stop
+from updater.deploy_io import Busy, Lock, stop
+from updater.deploy_result import Result
 from updater.deploy_state import State
 
 

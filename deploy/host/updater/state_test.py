@@ -4,6 +4,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from unittest import mock
+
 from updater import deploy_state as s
 
 
@@ -13,6 +15,16 @@ class StateTest(unittest.TestCase):
         self.addCleanup(self.work.cleanup)
         self.path = Path(self.work.name) / 'state.json'
         self.state = s.State.bootstrap(self.path, 'a' * 64, 14, 7, 'b' * 64)
+
+    def test_oversized_save_preserves_previous_readable_state(self):
+        previous = self.path.read_bytes()
+        with mock.patch.object(s, 'STATE_LIMIT', len(previous), create=True):
+            self.state.save()
+            self.assertEqual(self.path.read_bytes(), previous)
+            with self.assertRaisesRegex(ValueError, 'state too large'):
+                self.state.accept('image', 'c' * 64, 15)
+            self.assertEqual(self.path.read_bytes(), previous)
+            self.assertEqual(s.State(self.path).data['active'], 'a' * 64)
 
     def test_existing_bootstrap_state_keeps_main_validator_shape(self):
         original = dict(version=1, active='a' * 64,

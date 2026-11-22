@@ -66,6 +66,34 @@ class VerificationTest(unittest.TestCase):
             return canonical({'payload': base64.b64encode(canonical(statement(self.manifest, args[-1]))).decode()})
         return b''
 
+    def test_image_inspection_rejects_wrong_json_shapes(self):
+        for value in (None, {}, [None], [{'RepoDigests': None}], [{'RepoDigests': {}}]):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                v.pull_image('image@sha256:' + 'a' * 64, lambda *args, **kwargs: canonical(value), [])
+
+    def test_bundle_rejects_policy_larger_than_installer_limit(self):
+        limit = 1024 * 1024
+        base = dict(self.policy, issuer='')
+        exact = dict(base, issuer='x' * (limit - len(canonical(base))))
+        self.assertEqual(len(canonical(exact)), limit)
+        policy_path = self.path / 'deploy-policy.json'
+        policy_path.write_bytes(canonical(exact))
+        self.assertEqual(v.policy(policy_path), exact)
+        data = archive(policy=exact)
+        path = self.path / 'bundle.tar.gz'
+        path.write_bytes(data)
+        manifest = dict(self.manifest, host_bundle={'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)})
+        v.bundle(path, manifest)
+        too_large = dict(exact, issuer=exact['issuer'] + 'x')
+        policy_path.write_bytes(canonical(too_large))
+        with self.assertRaisesRegex(ValueError, 'policy too large'):
+            v.policy(policy_path)
+        data = archive(policy=too_large)
+        path.write_bytes(data)
+        manifest['host_bundle'] = {'sha256': hashlib.sha256(data).hexdigest(), 'size': len(data)}
+        with self.assertRaisesRegex(ValueError, 'policy too large'):
+            v.bundle(path, manifest)
+
     def test_policy_requires_exact_secret_names_and_valid_vault_region(self):
         for change in ({'secrets': self.policy['secrets'][:-1]},
                        {'secrets': self.policy['secrets'] + ['smtp_password']},

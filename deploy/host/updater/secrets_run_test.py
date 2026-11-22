@@ -5,9 +5,11 @@ from unittest import mock
 
 from updater import activation_test as activation_fixture
 from updater import deploy_run
+from updater import deploy_secrets_state
 from updater import secrets_test as fixture
 from updater.deploy_activate import Activator
 from updater.deploy_io import canonical, stop, StopRequested
+from updater.deploy_result import ResultTooLarge
 from updater.deploy_state import State
 
 
@@ -27,6 +29,40 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         patch = mock.patch('updater.deploy_run.Verifier.images')
         patch.start()
         self.addCleanup(patch.stop)
+
+    def test_pending_detection_secures_ingress_before_log_failure(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        with mock.patch.object(self.app.host, 'note', side_effect=OSError('log unavailable')):
+            self.assertTrue(self.app.secret_pending())
+        self.assertTrue(self.paths.hold.exists())
+        self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                            'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
+
+    def test_unreadable_state_stops_ingress_before_receipt_failure(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        self.reconcile.storage = None
+        self.reconcile.data = None
+        for target, error in (('write', OSError('result unavailable')),
+                              ('write', ResultTooLarge('result too large')),
+                              ('append', OSError('log unavailable'))):
+            with self.subTest(target=target, error=type(error).__name__):
+                self.paths.hold.unlink(missing_ok=True)
+                self.secret_calls.clear()
+                with mock.patch('updater.deploy_secrets.Result.' + target, side_effect=error):
+                    with self.assertRaises(type(error)):
+                        self.reconcile.run()
+                self.assertTrue(self.paths.hold.exists())
+                self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                                    'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
+
+    def test_caddy_stop_is_attempted_when_hold_write_fails(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        self.reconcile.storage = None
+        self.reconcile.data = None
+        with mock.patch.object(self.host, 'hold', side_effect=OSError('hold unavailable')):
+            self.reconcile.run()
+        self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                            'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
 
     def test_stop_on_secrets_edge_probe_stops_caddy(self):
         self.addCleanup(stop.clear)
@@ -63,6 +99,16 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         self.assertFalse(self.paths.hold.exists())
         self.assertNotEqual(self.secret_calls[-1][0], ['systemctl', '--user', 'stop', 'trachuan-caddy.service'])
         self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+    def test_secrets_state_save_obeys_read_limit(self):
+        path = self.paths.state / 'secrets-state.json'
+        storage = deploy_secrets_state.SecretsState(path)
+        storage.save()
+        previous = path.read_bytes()
+        storage.data['pending']['smtp_password'] = 1
+        with mock.patch.object(deploy_secrets_state, 'JSON_LIMIT', len(previous), create=True):
+            with self.assertRaisesRegex(ValueError, 'secrets state too large'):
+                storage.save()
+        self.assertEqual(path.read_bytes(), previous)
 
     def test_secret_metadata_is_private_and_separate_from_image_state(self):
         main_fields = {'version', 'active', 'accepted', 'retained', 'failed', 'consumed',
@@ -96,6 +142,25 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         self.assertEqual(json.loads(path.read_bytes())['versions'], self.versions)
         self.assertEqual(self.restarts(), [])
 
+    def test_unreadable_secret_state_keeps_held_journal(self):
+        for raw in (b'{', b' ' * (1024 * 1024 + 1)):
+            with self.subTest(size=len(raw)):
+                self.setUp()
+                self.crash_step = 'migrate'
+                with self.assertRaises(activation_fixture.Crash):
+                    self.engine.activate(self.new)
+                self.assertTrue(self.paths.hold.exists())
+                (self.paths.state / 'secrets-state.json').write_bytes(raw)
+                self.app.phases = ('secrets',)
+                self.assertEqual(self.app.run(), 1)
+                self.assertTrue(self.paths.hold.exists())
+                self.assertIn(State(self.state.path).data['journal']['status'], ('started', 'recovering'))
+                result = json.loads(self.paths.result.with_name('secrets.json').read_bytes())
+                self.assertEqual((result['status'], result['message']), ('failed', 'state: InvalidSecretsState'))
+                events = [json.loads(line) for line in self.paths.log.read_bytes().splitlines()]
+                self.assertTrue(any(event.get('message') == 'secret state unreadable; recovery withheld'
+                                    for event in events))
+
     def test_invalid_metadata_with_pending_work_blocks_activation(self):
         metadata = dict(versions={}, pending={}, last_success_at=None, held=False)
         for pending in ({'smtp_password': 'invalid'}, {'server_signup_emails': 4}):
@@ -111,7 +176,7 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
                 result = json.loads(self.paths.result.with_name('secrets.json').read_bytes())
                 self.assertEqual((result['status'], result['step']), ('failed', 'secrets'))
 
-    def test_corrupt_secret_metadata_fails_secrets_but_images_still_activate(self):
+    def test_corrupt_secret_metadata_blocks_images(self):
         metadata = dict(versions={}, pending={}, last_success_at=None, held=False)
         cases = [b'{synthetic corrupt metadata', b'[]', b'null', b'{}',
                  canonical(dict(metadata, versions={'unlisted': 1})),
@@ -124,12 +189,12 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
                 path.write_bytes(raw)
                 installed = dict(self.installed)
                 self.assertEqual(self.app.run(), 1)
-                self.assertEqual(State(self.state.path).data['active'], self.new.hash)
+                self.assertEqual(State(self.state.path).data['active'], self.old.hash)
                 self.assertEqual(self.installed, installed)
                 self.assertEqual(path.read_bytes(), raw)
                 result = json.loads(self.paths.result.with_name('secrets.json').read_bytes())
                 self.assertEqual((result['status'], result['step']), ('failed', 'secrets'))
-                self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'ok')
+                self.assertTrue(self.paths.hold.exists())
                 self.assertFalse(any('deploy_vault.py' in ' '.join(args) for args, _, _ in self.secret_calls))
                 self.assert_safe()
 

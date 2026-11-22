@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 import tempfile
@@ -9,10 +8,11 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, interrupted, Lock, remove, Result, stop
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, decode, interrupted, Lock, read_json_bytes, remove, stop
+from .deploy_result import Result, ResultTooLarge
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
-from .deploy_secrets_state import raw_pending, SecretsState
+from .deploy_secrets_state import SecretsState
 from .deploy_state import State
 from .deploy_store import Candidate, Paths, Store
 from .deploy_verify import match, policy, positive, Verifier, verify_manifest
@@ -58,7 +58,16 @@ class Updater:
         try:
             return bool(SecretsState(self.paths.state / 'secrets-state.json').data['pending'])
         except (OSError, ValueError):
-            return raw_pending(self.paths.state / 'secrets-state.json')
+            for action in (self.host.hold, self.host.cancel_edge):
+                try:
+                    action()
+                except Exception:
+                    pass
+            try:
+                self.host.note('secrets', 'secret state unreadable; recovery withheld')
+            except Exception:
+                pass
+            return True
 
     def secrets(self, state, directory, mode, result, force=False, candidate=None):
         self.step = 'secrets'
@@ -198,17 +207,29 @@ class Updater:
         if recovery_message:
             reason += '; ' + recovery_message
         if (stop_seen or stop.requested()) and self.host.unverified_ingress:
-            self.host.hold()
+            try:
+                self.host.hold()
+            except Exception:
+                reason += '; ingress hold failed'
             try:
                 self.host.cancel_edge()
                 reason += '; caddy stopped'
-            except (OSError, CommandError):
+            except Exception:
                 reason += '; caddy stop failed'
-        result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
+        elif (stop_seen or stop.requested()) and self.host.edge_cancelled:
+            reason += '; caddy stopped'
+        if isinstance(error, ResultTooLarge):
+            result.publish(result.overflow())
+            return 1
+        try:
+            result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
+        except ResultTooLarge:
+            pass
         return 1
 
     def run(self):
         self.secrets_failed = False
+        self.host.edge_cancelled = False
         try:
             with Lock(self.paths.lock), Lock(self.paths.backup_lock, create=False):
                 result = Result(self.paths.result, self.paths.log)
@@ -293,5 +314,9 @@ class Updater:
 
     def status(self):
         state = State(self.paths.state / 'state.json')
-        result = json.loads(self.paths.result.read_bytes()) if self.paths.result.exists() else None
+        result = None
+        if self.paths.result.exists():
+            result = decode(read_json_bytes(self.paths.result, 'result'), 'result')
+            if not isinstance(result, dict):
+                raise ValueError('invalid result')
         return dict(mode=self.mode(), active=state.data['active'], journal=state.data['journal'], result=result)

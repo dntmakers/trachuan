@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 
 from .deploy_frameworks_sql import RELEASE
-from .deploy_io import canonical, decode
+from .deploy_io import canonical, decode, read_json_bytes
 from .deploy_verify import accepted, flags, match, positive
 
 
@@ -63,7 +63,7 @@ def manifest(data, rules):
 
 def verify(directory, rules, runner):
     path = Path(directory) / 'manifest.json'
-    data = path.read_bytes()
+    data = read_json_bytes(path, 'frameworks manifest')
     obj = manifest(data, rules)
     identity = dict(rules, frameworks_identity=rules['frameworks']['identity'])
     runner(['/usr/local/libexec/trachuan/bin/cosign', 'verify-blob', '--bundle',

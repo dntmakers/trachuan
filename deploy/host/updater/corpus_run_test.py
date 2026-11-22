@@ -18,6 +18,21 @@ class CorpusRunTest(LawCase, unittest.TestCase):
         super().setUp()
         self.baseline()
 
+    def test_prune_rejects_wrong_marker_shape(self):
+        marker = self.paths.state / self.phase.kind.marker
+        for value in (None, [], {}, 12, 'not-a-date'):
+            with self.subTest(value=value):
+                marker.write_bytes(canonical(value))
+                with self.assertRaises(ValueError):
+                    self.phase.prune('activate')
+
+    def test_oversized_corpus_result_remains_failed_after_handler(self):
+        with mock.patch('updater.deploy_result.RESULT_LIMIT', 256):
+            self.assertFalse(self.run_phase('verify'))
+        result = self.result()
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
+
     def test_unpublished_corpus_package_is_current_until_a_manifest_was_accepted(self):
         self.state.data['accepted']['corpus'].clear()
         self.state.save()

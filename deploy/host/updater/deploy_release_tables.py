@@ -1,7 +1,5 @@
-import json
-
 from . import deploy_corpus_sql as law
-from .deploy_io import CommandError
+from .deploy_io import CommandError, decode
 from .deploy_release_target import Waiting
 
 
@@ -41,7 +39,7 @@ class Tables:
 
     def protected(self, operation=None):
         try:
-            names = json.loads(self.read(law.protected_names(operation)))
+            names = decode(self.read(law.protected_names(operation)), 'protected names')
         except ValueError:
             raise TableFailure('auth tables unreadable') from None
         if not isinstance(names, list) or not all(isinstance(name, str) for name in names):

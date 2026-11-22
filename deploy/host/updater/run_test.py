@@ -1,17 +1,23 @@
+from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
 import unittest
 from unittest import mock
 
 from updater import deploy_run as r
+from updater import deploy_registry
+from updater import deploy_state
 from updater import activation_test as fixture
 from updater.activation_test import Crash
 from updater.deploy_io import canonical
 from updater.deploy_io import CommandError
 from updater.deploy_state import State
 from updater.deploy_host import pins
+from updater.io_test import METRICS
 from watch import observations, signals
 
 
@@ -36,6 +42,112 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         secret_phase = mock.patch('updater.deploy_run.Secrets.run', return_value=True)
         secret_phase.start()
         self.addCleanup(secret_phase.stop)
+
+    def test_post_rename_sync_failure_never_reopens_ingress_without_durable_barrier(self):
+        self.paths.mode.write_text('activate\n')
+        original_fsync = os.fsync
+        state_dir = os.stat(self.state.path.parent)
+        failed, later_starts = [], []
+        runner = self.app.host.runner
+        def command(args, **kwargs):
+            if failed and args == ['systemctl', '--user', 'start', 'trachuan-caddy.service']:
+                later_starts.append(args)
+            return runner(args, **kwargs)
+        def fsync(fd):
+            info = os.fstat(fd)
+            if (stat.S_ISDIR(info.st_mode) and (info.st_dev, info.st_ino) == (state_dir.st_dev, state_dir.st_ino)
+                    and json.loads(self.state.path.read_bytes())['journal'] is not None
+                    and json.loads(self.state.path.read_bytes())['journal']['status'] == 'activated'):
+                failed.append(True)
+                raise OSError('state directory sync failed')
+            return original_fsync(fd)
+        self.app.host.runner = command
+        with mock.patch('updater.deploy_io.os.fsync', side_effect=fsync):
+            self.assertEqual(self.app.run(), 1)
+        self.assertGreaterEqual(len(failed), 2)
+        self.assertTrue(self.paths.hold.exists())
+        self.assertEqual(later_starts, [])
+        self.assertEqual(State(self.state.path).data['journal']['status'], 'activated')
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_interruption_stops_caddy_even_when_hold_raises(self):
+        self.app.host.unverified_ingress = True
+        with mock.patch.object(self.app.host, 'hold', side_effect=ValueError('hold failed')), \
+                mock.patch.object(self.app.host, 'cancel_edge') as cancel:
+            self.assertEqual(self.app.failure(mock.Mock(), None, r.StopRequested('stopped')), 1)
+        cancel.assert_called_once()
+
+    def test_final_activation_save_failure_recovers_from_persisted_journal(self):
+        self.paths.mode.write_text('activate\n')
+        original = State.save
+        failed = []
+        def save(state):
+            journal = state.data['journal'] or {}
+            if journal.get('status') == 'activated' and state.data['active'] == self.new.hash and not failed:
+                failed.append(True)
+                raise ValueError('state too large')
+            return original(state)
+        with mock.patch.object(State, 'save', save):
+            self.assertEqual(self.app.run(), 1)
+        self.assertTrue(failed)
+        state = State(self.state.path)
+        self.assertEqual(state.data['active'], self.old.hash)
+        self.assertEqual(state.data['journal']['status'], 'rolled_back')
+
+    def test_status_rejects_wrong_result_shape(self):
+        self.paths.result.write_bytes(b'[]')
+        with self.assertRaisesRegex(ValueError, 'invalid result'):
+            self.app.status()
+
+    def test_oversized_success_receipt_stays_failed_through_handler(self):
+        self.paths.result.write_bytes(canonical({'last_success_at': '2026-01-01T00:00:00Z'}))
+        self.state.data['release_floor'] = 10
+        self.state.save()
+        with mock.patch('updater.deploy_result.RESULT_LIMIT', 256):
+            self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
+        observations.result(self.paths.result, 'deploy')
+        metrics = METRICS.deploy(self.paths.result, datetime(2026, 1, 2, tzinfo=timezone.utc))
+        self.assertIn(('deploy_release_floor', 10), metrics)
+        self.assertIn(('deploy_last_success_age_seconds', 86400), metrics)
+
+    def test_oversized_failure_receipt_does_not_escape_failure_handler(self):
+        self.images.side_effect = ValueError('x' * (1024 * 1024))
+        self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
+
+    def test_bad_registry_shape_records_failure(self):
+        def registry_command(args, **kwargs):
+            return b'sha256:' + b'a' * 64 if 'resolve' in args else b'null'
+        self.app.registry = deploy_registry.Registry(self.rules, registry_command)
+        self.assertEqual(self.app.run(), 1)
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+
+    def test_state_size_failure_records_result_and_preserves_state(self):
+        previous = self.state.path.read_bytes()
+        manifest = dict(self.new.manifest, sequence=16)
+        (self.new.directory / 'manifest.json').write_bytes(canonical(manifest))
+        with mock.patch.object(deploy_state, 'STATE_LIMIT', len(previous), create=True):
+            self.assertEqual(self.app.run(), 1)
+        self.assertEqual(self.state.path.read_bytes(), previous)
+        self.assertEqual(json.loads(self.paths.result.read_bytes())['status'], 'failed')
+        self.assertIn('state too large', json.loads(self.paths.result.read_bytes())['message'])
+
+    def test_bad_manifest_records_failure(self):
+        for data, message in ((b'[' * 100000 + b']' * 100000, 'invalid release'),
+                              (b'\xff', 'invalid release manifest JSON'),
+                              (b' ' * (1024 * 1024 + 1), 'release manifest too large')):
+            with self.subTest(size=len(data)):
+                (self.new.directory / 'manifest.json').write_bytes(data)
+                self.assertEqual(self.app.run(), 1)
+                result = json.loads(self.paths.result.read_bytes())
+                self.assertEqual(result['status'], 'failed')
+                self.assertEqual(result['step'], 'manifest')
+                self.assertIn(message, result['message'])
 
     def test_verify_keeps_pending_without_activation_or_install(self):
         self.assertEqual(self.app.run(), 0)
@@ -116,6 +228,15 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         self.registry.latest_rollback.return_value = str(sequence)
         self.registry.fetch.side_effect = lambda repository, tag, path, kind: directory if kind == 'rollback' else self.new.directory
         return hashlib.sha256(data).hexdigest()
+
+    def test_bad_rollback_manifest_records_failure(self):
+        self.rollback_artifact(self.new.hash, self.old.hash)
+        path = self.paths.state / 'rollback-fixture' / 'manifest.json'
+        path.write_bytes(b'\xff')
+        self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('invalid rollback manifest JSON', result['message'])
 
     def test_authorized_rollback_is_consumed_before_activation_and_not_replayed_by_timer(self):
         self.paths.mode.write_text('activate\n')

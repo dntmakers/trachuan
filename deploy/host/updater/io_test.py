@@ -1,10 +1,21 @@
+import importlib.util
 import json
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
 
-from updater.deploy_io import atomic, command, CommandError, describe, failure_reason, Result
+from updater.deploy_io import atomic, command, CommandError, decode, describe, failure_reason
+from updater.deploy_result import Result
+from updater.deploy_corpus_result import ReleaseResult
+from watch import observations, storage
+
+
+SPEC = importlib.util.spec_from_file_location('updater_metrics', Path(__file__).parents[1] / 'metrics/publish-metrics.py')
+METRICS = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(METRICS)
 
 
 class IOTest(unittest.TestCase):
@@ -17,6 +28,166 @@ class IOTest(unittest.TestCase):
                     atomic(path, b'next')
             self.assertEqual(path.read_bytes(), b'previous')
             self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_prior_surrogate_timestamp_is_normalized_for_normal_and_overflow_receipts(self):
+        for oversized in (False, True):
+            with self.subTest(oversized=oversized), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path, log = root / 'release.json', root / 'deploy.log'
+                path.write_bytes(b'{"last_success_at":"2026-01-01\\ud80000:00:00+00:00",'
+                                 b'"waiting_since":"2026-01-01\\ud80000:00:00+00:00"}')
+                result = ReleaseResult(SimpleNamespace(result=root / 'result.json', log=log), lambda: 1767312000)
+                if oversized:
+                    with self.assertRaisesRegex(ValueError, 'result too large'):
+                        result.write('failed', 'result', 'x' * 100000)
+                else:
+                    result.write('failed', 'result', 'failed')
+                value = json.loads(path.read_bytes())
+                self.assertEqual(value['last_success_at'], '2026-01-01T00:00:00Z')
+                self.assertEqual(value['waiting_since'], '2026-01-01T00:00:00Z')
+                observed = observations.result(path, 'release')
+                self.assertEqual(observed['last_success_at'], 1767225600)
+                self.assertEqual(observed['waiting_since'], 1767225600)
+
+    def test_overflow_uses_valid_previous_floor_when_state_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, log = Path(directory) / 'result.json', Path(directory) / 'deploy.log'
+            path.write_text('{"last_success_at":"2026-01-01T00:00:00Z","release_floor":17}')
+            result = Result(path, log, clock=lambda: '2026-01-02T00:00:00Z')
+            with self.assertRaisesRegex(ValueError, 'result too large'):
+                result.write('failed', 'result', 'x' * 100000)
+            self.assertIn(('deploy_release_floor', 17), METRICS.deploy(path, datetime(2026, 1, 2, tzinfo=timezone.utc)))
+
+    def test_overlong_release_identity_produces_watchable_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            log = Path(directory) / 'deploy.log'
+            result = Result(path, log, clock=lambda: '2026-01-02T00:00:00Z')
+            with self.assertRaisesRegex(ValueError, 'result too large'):
+                result.write('ok', 'complete', 'ok', manifest={'release': 'v' * 257})
+            self.assertEqual(observations.result(path, 'deploy')['status'], 'failed')
+
+    def test_receipt_limit_matches_both_readers_at_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, log = Path(directory) / 'result.json', Path(directory) / 'deploy.log'
+            result = Result(path, log, clock=lambda: '2026-01-02T00:00:00Z')
+            base = {'status': 'failed', 'started_at': '2026-01-02T00:00:00Z', 'message': ''}
+            size = len(json.dumps(base, sort_keys=True, separators=(',', ':')).encode()) + 1
+            value = dict(base, message='x' * (65536 - size))
+            result.publish(value)
+            self.assertEqual(path.stat().st_size, 65536)
+            self.assertEqual(observations.result(path, 'deploy')['status'], 'failed')
+            self.assertIn(('deploy_failed', 1), METRICS.deploy(path, datetime(2026, 1, 2, tzinfo=timezone.utc)))
+            value['message'] += 'x'
+            with self.assertRaisesRegex(ValueError, 'result too large'):
+                result.publish(value)
+            self.assertLess(path.stat().st_size, 65536)
+            self.assertEqual(observations.result(path, 'deploy')['status'], 'failed')
+
+    def test_receipt_limit_matches_watch_and_metrics(self):
+        from updater import deploy_result
+        self.assertEqual(deploy_result.RESULT_LIMIT, 65536)
+        self.assertEqual(storage.MAX_RESULT_BYTES, deploy_result.RESULT_LIMIT)
+        self.assertEqual(METRICS.MAX_RESULT_BYTES, deploy_result.RESULT_LIMIT)
+
+    def test_valid_waiting_timestamp_without_hash_is_not_corruption(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path, log = root / 'release.json', root / 'release.log'
+            path.write_text('{"waiting_since":"2026-01-01T00:00:00Z"}')
+            result = ReleaseResult(SimpleNamespace(result=root / 'result.json', log=root / 'deploy.log'),
+                                   lambda: 1767312000)
+            result.write('failed', 'result', 'failed')
+            self.assertEqual(observations.result(path, 'release')['waiting_since'], 1767225600)
+            events = [json.loads(line) for line in log.read_bytes().splitlines()]
+            self.assertFalse(any(row.get('level') == 'warning' for row in events))
+
+    def test_invalid_previous_scalars_are_dropped_and_warned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path, log = root / 'release.json', root / 'deploy.log'
+            path.write_text('{"last_success_at":"invalid","waiting_since":{},'
+                            '"waiting_manifest_hash":"not-a-hash","manifest_hash":[],"release_floor":"invalid"}')
+            result = ReleaseResult(SimpleNamespace(result=root / 'result.json', log=log), lambda: 1767312000)
+            result.write('failed', 'fetch', 'failed')
+            observed = observations.result(path, 'release')
+            self.assertIsNone(observed['last_success_at'])
+            self.assertIsNone(observed['waiting_since'])
+            self.assertIsNone(observed.get('waiting_manifest_hash'))
+            events = [json.loads(line) for line in result.log.read_bytes().splitlines()]
+            self.assertTrue(any(row.get('message') == 'previous result unreadable' for row in events))
+
+    def test_overflow_receipts_are_readable_by_watch_and_metrics(self):
+        for kind in ('deploy', 'secrets', 'release'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                path, log = root / 'result.json', root / 'deploy.log'
+                prior = {'last_success_at': '2026-01-01T00:00:00Z'}
+                if kind == 'release':
+                    path = root / 'release.json'
+                path.write_text(json.dumps(prior))
+                state = SimpleNamespace(data={'release_floor': 17})
+                if kind == 'release':
+                    result = ReleaseResult(SimpleNamespace(result=root / 'result.json', log=log),
+                                           lambda: 1767312000, integrity=lambda: ['record_rebuilt'])
+                else:
+                    result = Result(path, log, clock=lambda: '2026-01-02T00:00:00Z', state=state)
+                with self.assertRaisesRegex(ValueError, 'result too large'):
+                    result.write('failed', 'manifest', 'x' * 100000)
+                observed = observations.result(path, kind)
+                self.assertEqual(observed['status'], 'failed')
+                self.assertNotIn('manifest_hash', observed)
+                self.assertNotIn('waiting_manifest_hash', observed)
+                self.assertNotIn('release', observed)
+                self.assertNotIn('sequence', observed)
+                self.assertIsNotNone(observed['started_at'])
+                self.assertIsNotNone(observed['finished_at'])
+                self.assertIsNotNone(observed['last_success_at'])
+                now = datetime(2026, 1, 2, tzinfo=timezone.utc)
+                if kind == 'deploy':
+                    self.assertIn(('deploy_release_floor', 17), METRICS.deploy(path, now))
+                    self.assertIn(('deploy_last_success_age_seconds', 86400), METRICS.deploy(path, now))
+                elif kind == 'release':
+                    self.assertEqual(observed['integrity'], ['record_rebuilt'])
+                    self.assertIn(('release_integrity', 1), METRICS.release(path, now))
+                else:
+                    self.assertIn(('secrets_last_success_age_seconds', 86400), METRICS.job_result(
+                        path, now, 'secrets', ('failed',), ('failed',)))
+
+    def test_oversized_result_records_bounded_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            log = Path(directory) / 'deploy.log'
+            with self.assertRaisesRegex(ValueError, 'result too large'):
+                Result(path, log).write('ok', 'complete', 'x' * (1024 * 1024))
+            value = json.loads(path.read_bytes())
+            self.assertEqual((value['status'], value['step'], value['message']),
+                             ('failed', 'result', 'result too large'))
+            self.assertLessEqual(path.stat().st_size, 1024 * 1024)
+
+    def test_corrupt_previous_result_is_logged_without_blocking_new_result(self):
+        for raw in (b'{', b' ' * (1024 * 1024 + 1)):
+            with self.subTest(size=len(raw)), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'result.json'
+                log = Path(directory) / 'deploy.log'
+                path.write_bytes(raw)
+                Result(path, log).write('failed', 'manifest', 'rejected')
+                self.assertEqual(json.loads(path.read_bytes())['status'], 'failed')
+                events = [json.loads(line) for line in log.read_bytes().splitlines()]
+                self.assertTrue(any(event.get('level') == 'warning' and
+                                    event.get('message') == 'previous result unreadable' for event in events))
+
+    def test_decode_wraps_recursion_error(self):
+        with mock.patch('updater.deploy_io.json.loads', side_effect=RecursionError):
+            with self.assertRaisesRegex(ValueError, 'invalid manifest JSON'):
+                decode(b'[]', 'manifest')
+
+    def test_oversized_previous_result_is_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            path.write_bytes(b'{"last_success_at":"' + b'x' * (1024 * 1024) + b'"}')
+            result = Result(path, Path(directory) / 'deploy.log')
+            self.assertEqual(result.previous, {})
 
     def test_invalid_previous_result_does_not_block_failure_reporting(self):
         with tempfile.TemporaryDirectory() as directory:

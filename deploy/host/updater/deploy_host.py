@@ -3,7 +3,8 @@ import re
 from . import deploy_corpus_sql, deploy_frameworks_sql
 from .deploy_corpus_sql import (AUTH_ACTIVE_DATABASE, AUTH_SCHEMA_VERSION, CATALOG_PATH, PREWARM, PREWARM_SKIPPED,
                                 SCHEMA_PATH, database_owner)
-from .deploy_io import atomic, command, CommandError, remove, Result
+from .deploy_io import atomic, command, CommandError, JSON_LIMIT, remove
+from .deploy_result import Result
 from .deploy_transfer import program
 from .deploy_verify import as_user, pull_image
 
@@ -75,6 +76,7 @@ class Host:
     def __init__(self, paths, runner=command, user_prefix=None):
         self.paths, self.runner = paths, runner
         self.unverified_ingress = False
+        self.edge_cancelled = False
         self.user_prefix = as_user() if user_prefix is None else user_prefix
 
     def user(self, *args, **kwargs):
@@ -83,14 +85,17 @@ class Host:
     def systemctl(self, action, *names):
         if action == 'start' and 'caddy' in names:
             self.unverified_ingress = True
+            self.edge_cancelled = False
         result = self.user('systemctl', '--user', action, *['trachuan-' + name + '.service' for name in names])
         if action == 'stop' and 'caddy' in names:
             self.unverified_ingress = False
         return result
 
     def cancel_edge(self):
+        result = self.user('systemctl', '--user', 'stop', 'trachuan-caddy.service', timeout=10, cancel=True)
         self.unverified_ingress = False
-        return self.user('systemctl', '--user', 'stop', 'trachuan-caddy.service', timeout=10, cancel=True)
+        self.edge_cancelled = True
+        return result
 
     def hold(self):
         atomic(self.paths.hold, b'deployment held\n', 0o644)
@@ -121,7 +126,8 @@ class Host:
 
     def activator_psql(self, database, sql, options=SCHEMA_PATH):
         return self.activator(*activator_client(database, options),
-                              input=('SET standard_conforming_strings=on;\n' + sql).encode()).decode().strip()
+                              input=('SET standard_conforming_strings=on;\n' + sql).encode(),
+                              stdout_limit=JSON_LIMIT).decode().strip()
 
     def auth_psql(self, sql):
         return self.user(*auth_arguments(sql), stdout_limit=AUTH_OUTPUT_LIMIT,

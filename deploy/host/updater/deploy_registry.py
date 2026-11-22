@@ -1,23 +1,29 @@
 import hashlib
-import json
 from pathlib import Path
 import re
 
-from .deploy_io import atomic, command, CommandError
+from .deploy_io import atomic, command, CommandError, decode, JSON_LIMIT
 from .deploy_verify import match
 
 
+TAG_LIST_LIMIT = 10000 * (128 * 6 + 4) + 1024
+
+
 def layers(artifact, kind):
-    if artifact.get('artifactType') != 'application/vnd.trachuan.' + kind + '.v1':
+    if not isinstance(artifact, dict) or artifact.get('artifactType') != 'application/vnd.trachuan.' + kind + '.v1':
         raise ValueError('invalid artifact type')
     limits = {'manifest.json': 1024 * 1024, 'manifest.sigstore.json': 2 * 1024 * 1024}
     if kind == 'release':
         limits['host-bundle.tar.gz'] = 16 * 1024 * 1024
     descriptors = artifact.get('layers', [])
+    if not isinstance(descriptors, list):
+        raise ValueError('invalid artifact layers')
     result = {}
     for layer in descriptors:
-        name = layer.get('annotations', {}).get('org.opencontainers.image.title')
-        if name not in limits or name in result:
+        if not isinstance(layer, dict) or not isinstance(layer.get('annotations'), dict):
+            raise ValueError('invalid artifact layer')
+        name = layer['annotations'].get('org.opencontainers.image.title')
+        if not isinstance(name, str) or name not in limits or name in result:
             raise ValueError('invalid artifact layer title')
         match('sha256:[0-9a-f]{64}', layer.get('digest'), 'layer digest')
         if type(layer.get('size')) is not int or not 0 < layer['size'] <= limits[name]:
@@ -36,7 +42,10 @@ class Registry:
         return self.runner(['/usr/local/libexec/trachuan/bin/oras', *args], **kwargs)
 
     def tags(self, repository):
-        tags = json.loads(self.oras('repo', 'tags', '--format', 'json', repository))['tags'] or []
+        value = decode(self.oras('repo', 'tags', '--format', 'json', repository, stdout_limit=TAG_LIST_LIMIT), 'registry tags')
+        if not isinstance(value, dict) or 'tags' not in value:
+            raise ValueError('invalid artifact tags')
+        tags = [] if value['tags'] is None else value['tags']
         if not isinstance(tags, list) or len(tags) > 10000:
             raise ValueError('invalid artifact tags')
         for tag in tags:
@@ -60,10 +69,10 @@ class Registry:
         digest = self.oras('resolve', repository + ':' + tag).decode().strip()
         match('sha256:[0-9a-f]{64}', digest, 'artifact digest')
         reference = repository + '@' + digest
-        raw = self.oras('manifest', 'fetch', reference)
+        raw = self.oras('manifest', 'fetch', reference, stdout_limit=JSON_LIMIT)
         if len(raw) > 1024 * 1024:
             raise ValueError('artifact manifest too large')
-        descriptors = layers(json.loads(raw), kind)
+        descriptors = layers(decode(raw, 'artifact manifest'), kind)
         directory = Path(directory)
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         for name, layer in descriptors.items():

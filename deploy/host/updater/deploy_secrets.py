@@ -1,13 +1,13 @@
 import base64
 import copy
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 import re
 import time
 from urllib.parse import quote
 
-from .deploy_io import CommandError, Result, interrupted
+from .deploy_io import CommandError, decode, interrupted
+from .deploy_result import Result, ResultTooLarge
 from .deploy_secrets_state import raw_pending, SecretsState
 
 
@@ -96,7 +96,7 @@ class Secrets:
     def equal(self, name, value):
         raw = self.host.user('podman', 'secret', 'inspect', '--showsecret', name,
                              timeout=30, stdout_limit=4 * 1024 * 1024)
-        records = json.loads(raw)
+        records = decode(raw, 'secret inspection')
         if (not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict)
                 or not isinstance(records[0].get('SecretData'), str)):
             raise ValueError('invalid Podman secret inspection')
@@ -166,6 +166,13 @@ class Secrets:
             raise
         return bool(work)
 
+    def secure_ingress(self):
+        for action in (self.host.hold, self.host.cancel_edge):
+            try:
+                action()
+            except Exception:
+                pass
+
     def run(self, force=False):
         result = Result(self.host.paths.result.with_name('secrets.json'), self.host.paths.log)
         try:
@@ -180,10 +187,16 @@ class Secrets:
             changed = self.reconcile(bundles)
             result.write('ok' if changed else 'current', 'secrets', 'Vault secrets reconciled')
             return True
+        except ResultTooLarge:
+            if self.data and self.data['pending']:
+                self.secure_ingress()
+            raise
         except (OSError, ValueError, TypeError, CommandError, InterruptedError) as error:
+            pending = bool(self.data and self.data['pending']) or (
+                self.storage is None and raw_pending(self.host.paths.state / 'secrets-state.json'))
+            if pending:
+                self.secure_ingress()
             if interrupted(error):
-                if self.data and self.data['pending']:
-                    self.host.hold()
                 raise
             self.failed = True
             code = error.code if isinstance(error, CommandError) and error.code else 'ReconcileError'
@@ -192,17 +205,8 @@ class Secrets:
             elif isinstance(error, ValueError) and 'REPLACE' in self.rules['vault_id'].upper():
                 code = 'PlaceholderVault'
             result.write('failed', 'secrets', self.name + ': ' + code)
-            if (self.data and self.data['pending']) or (
-                    self.storage is None and raw_pending(self.host.paths.state / 'secrets-state.json')):
-                self.host.hold()
-                try:
-                    self.host.systemctl('stop', 'caddy')
-                except (OSError, CommandError) as error:
-                    if interrupted(error):
-                        raise
-                return False
-            return True
+            return not pending
         except BaseException:
             if self.data and self.data['pending']:
-                self.host.hold()
+                self.secure_ingress()
             raise

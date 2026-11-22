@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import time
 
-from .deploy_io import atomic, canonical
+from .deploy_io import atomic, canonical, JSON_LIMIT, read_json_bytes
 
 
 VERSION = 1
@@ -136,9 +136,11 @@ class Record:
     def load(self):
         self.data, self.written = None, None
         try:
-            raw = self.path.read_bytes()
+            raw = read_json_bytes(self.path, 'activation record')
         except FileNotFoundError:
             return 'missing'
+        except ValueError:
+            return 'unreadable'
         try:
             self.data = parse(raw, self.check)
         except Unreadable:
@@ -154,6 +156,8 @@ class Record:
         self.data['alerts'] = self.recent(self.data['alerts'])
         validate(self.data, self.check)
         raw = canonical(self.data) + b'\n'
+        if len(raw) > JSON_LIMIT:
+            raise ValueError('activation record too large')
         if raw != self.written:
             atomic(self.path, raw)
             self.written = raw
@@ -162,8 +166,8 @@ class Record:
         data = self.data
         if data is None:
             try:
-                data = parse(self.path.read_bytes(), self.check)
-            except (OSError, Unreadable):
+                data = parse(read_json_bytes(self.path, 'activation record'), self.check)
+            except (OSError, ValueError):
                 return []
         return sorted(self.recent(data['alerts']))
 
