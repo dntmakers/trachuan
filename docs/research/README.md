@@ -46,5 +46,8 @@ Observations and experiments. Not project authority.
 - [compliary survey](compliary-survey-2026-11.md): what the archived framework
   corpus held, how it gated licensed text, and the text layer of each private
   document.
+- [Licensed framework parser measurements](frameworks-parsers-2026-11.md).
 - [Write-path detection and reviewed inputs](write-path-findings-2026-11.md):
   what the pipeline detects and applies today, and four defects it missed.
+- [Text detector inputs](detector-inputs-2026-11.md): OCR item locations and
+  tree/transcription threshold counts on `vn/20261121_1`.

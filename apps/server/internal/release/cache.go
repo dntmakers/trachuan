@@ -72,6 +72,10 @@ func (r *Resolver) load(ctx context.Context, country, name string) (*cacheEntry,
 	entry.opening = true
 	entry.openingDone = make(chan struct{})
 	r.mu.Unlock()
+	status := "failed"
+	if !hadEngine && r.Frameworks != nil && r.Logger != nil {
+		defer func() { r.Logger.Info("frameworks release", "release", entry.name, "status", status) }()
+	}
 	var err error
 	if hadEngine {
 		if entry.pool != nil {
@@ -140,6 +144,7 @@ func (r *Resolver) load(ctx context.Context, country, name string) (*cacheEntry,
 			}
 		})
 	}
+	status = "opened"
 	r.mu.Unlock()
 	return entry, nil
 }

@@ -18,8 +18,25 @@ func (f *fakeClient) StreamPages(_ context.Context, visit func([]anthropic.Messa
 	if created.IsZero() {
 		created = time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
-	return visit([]anthropic.MessageBatch{{ID: "batch_synthetic", ProcessingStatus: "ended", CreatedAt: created}}, "")
+	batch := anthropic.MessageBatch{ID: "batch_synthetic", ProcessingStatus: "ended", CreatedAt: created}
+	batch.RequestCounts.Succeeded = int64(len(f.results))
+	data := []anthropic.MessageBatch{batch}
+	return visit(data, fakeListingRaw(data))
 }
+func fakeListingRaw(data []anthropic.MessageBatch) string {
+	var first, last string
+	if len(data) > 0 {
+		first, last = data[0].ID, data[len(data)-1].ID
+	}
+	b, _ := json.Marshal(struct {
+		Data    []anthropic.MessageBatch `json:"data"`
+		HasMore bool                     `json:"has_more"`
+		FirstID string                   `json:"first_id"`
+		LastID  string                   `json:"last_id"`
+	}{data, false, first, last})
+	return string(b)
+}
+
 func (f *fakeClient) Cancel(context.Context, string) error { return nil }
 
 func TestRebuild_RestoresUncertainOrKnownBatch(t *testing.T) {
@@ -66,7 +83,8 @@ func TestReconcile_AttachesOnlyMatchingPrefixAndWaitsBeforeAbandon(t *testing.T)
 	id := m.rows[0].ID
 	candidate := "batch_unrelated"
 	r.Client = &providerFault{fakeClient: f, stream: f.StreamResults, pages: func(_ context.Context, visit func([]anthropic.MessageBatch, string) error) error {
-		return visit([]anthropic.MessageBatch{{ID: candidate, CreatedAt: m.rows[0].CreatedAt, ProcessingStatus: "ended"}}, "")
+		data := []anthropic.MessageBatch{{ID: candidate, CreatedAt: m.rows[0].CreatedAt, ProcessingStatus: "ended"}}
+		return visit(data, fakeListingRaw(data))
 	}}
 	f.results = []batchapi.Result{{CustomID: strings.Repeat("b", 32) + "-000000", Type: "expired"}}
 	if err := r.Reconcile(context.Background(), id, true); err == nil || m.rows[0].State != "uncertain" {

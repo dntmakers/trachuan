@@ -31,6 +31,9 @@ MISSING = 'secret missing: server_frameworks_key'
 class SecretPresenceTest(fixture.SecretsFixture, unittest.TestCase):
     def setUp(self):
         super().setUp()
+        server = self.paths.quadlet / 'trachuan-server.container'
+        server.write_text('\n'.join(line for line in server.read_text().splitlines()
+                                    if not line.startswith('Secret=server_frameworks_key,')) + '\n')
         self.paths.lock.parent.mkdir(parents=True, exist_ok=True)
         self.paths.backup_lock.parent.mkdir(parents=True, exist_ok=True)
         self.paths.backup_lock.touch()

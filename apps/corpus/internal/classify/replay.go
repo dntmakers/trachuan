@@ -130,7 +130,7 @@ func (r *Runner) replay(s Submission, item Item, h keyHistory, retained retained
 		if found && a.Outcome == "final" {
 			return resultOutcome(s, item, msg, true), keyReplay, nil
 		}
-		if !prior.Settled || prior.State == "abandoned" {
+		if !prior.Settled {
 			held = r.holdKey(held, prior, priced)
 		}
 		if found {

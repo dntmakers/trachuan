@@ -201,7 +201,7 @@ func (r *Runner) screen(ctx context.Context, o Options, docs []Document, familie
 		return summary, err
 	}
 	dispatched = true
-	b, err := r.Client.Create(ctx, requests)
+	b, err := r.providerCreate(ctx, s.ID, requests)
 	if b.ID != "" {
 		if !b.CreatedAt.IsZero() {
 			s.SubmittedAt = &b.CreatedAt

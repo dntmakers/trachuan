@@ -49,26 +49,38 @@ func rawResult(v batchapi.Result) (string, error) {
 
 func parseAttempt(s Submission, i int, raw string) (attemptRecord, anthropic.Message, error) {
 	a := attemptRecord{SubmissionID: s.ID, BatchID: s.BatchID, Index: i, Key: s.Items[i].RequestHash, Outcome: "failed", Raw: raw, PriceVersion: s.priceVersion()}
-	var v providerResult
-	if err := json.Unmarshal([]byte(raw), &v); err != nil {
-		return a, anthropic.Message{}, fmt.Errorf("decode classification provider result: %w", err)
+	typeFields, err := batchapi.DecodeEvidenceProjection([]byte(raw), "type")
+	if err != nil {
+		return a, anthropic.Message{}, nil
+	}
+	var kind string
+	if len(typeFields["type"]) == 0 || typeFields["type"][0] != '"' || json.Unmarshal(typeFields["type"], &kind) != nil {
+		return a, anthropic.Message{}, nil
 	}
 	var msg anthropic.Message
-	switch v.Type {
+	switch kind {
 	case "expired", "canceled":
 		a.Cost = new(int64)
 	case "errored":
 	case "succeeded":
-		if v.Message == nil {
-			break
+		fields, bodyErr := providerEvidenceBody([]byte(raw))
+		if bodyErr != nil || fields["message"] == nil {
+			return a, msg, nil
 		}
-		msg = *v.Message
+		usageFields, usageErr := batchapi.DecodeEvidenceProjection(fields["message"], "usage")
+		if usageErr == nil {
+			a.Usage, a.Cost = priceUsage(s, string(usageFields["usage"]))
+		}
+		var contentErr error
+		msg, _, contentErr = decodeMessageEvidence(fields["message"])
+		if contentErr != nil {
+			return a, anthropic.Message{}, nil
+		}
 		if finalResponse(msg, s.Recipe.Article != nil) {
 			a.Outcome = "final"
 		}
-		a.Usage, a.Cost = priceUsage(s, msg.Usage.RawJSON())
 	default:
-		return a, msg, fmt.Errorf("unknown classification result type; reservation retained")
+		return a, msg, nil
 	}
 	return a, msg, nil
 }
@@ -78,8 +90,19 @@ func (r *Runner) attemptPath(s Submission, i int) string {
 }
 
 func (r *Runner) writeAttempt(s Submission, i int, a attemptRecord) error {
-	if !validID(s.ID) || !validKey(a.Key) || r.IntentDir == "" {
+	if !validID(s.ID) || i < 0 || i >= len(s.Items) || !validKey(a.Key) || r.IntentDir == "" {
 		return fmt.Errorf("invalid classification attempt path")
+	}
+	existing, _, found, err := r.readAttempt(s, i)
+	if err != nil {
+		return err
+	}
+	if found {
+		usageMatches := (existing.Cost == nil && a.Cost == nil) || existing.Usage == a.Usage
+		if existing.SubmissionID != a.SubmissionID || existing.BatchID != a.BatchID || existing.Index != a.Index || existing.Key != a.Key || existing.Raw != a.Raw || existing.Outcome != a.Outcome || existing.PriceVersion != a.PriceVersion || !usageMatches || !equalCost(existing.Cost, a.Cost) {
+			return fmt.Errorf("existing classification attempt differs")
+		}
+		return nil
 	}
 	b, err := json.Marshal(a)
 	if err != nil {
@@ -101,6 +124,9 @@ func (r *Runner) readAttempt(s Submission, i int) (attemptRecord, anthropic.Mess
 	if err != nil {
 		return a, msg, false, fmt.Errorf("read classification attempt: %w", err)
 	}
+	if err = validateRetainedJSON(b, &a); err != nil {
+		return a, msg, false, fmt.Errorf("decode classification attempt: %w", err)
+	}
 	if err = json.Unmarshal(b, &a); err != nil {
 		return a, msg, false, fmt.Errorf("decode classification attempt: %w", err)
 	}
@@ -108,8 +134,9 @@ func (r *Runner) readAttempt(s Submission, i int) (attemptRecord, anthropic.Mess
 	if err != nil {
 		return a, msg, false, err
 	}
+	usageMatches := (a.Cost == nil && want.Cost == nil) || a.Usage == want.Usage
 	if a.SubmissionID != want.SubmissionID || a.BatchID != want.BatchID || a.Index != want.Index || a.Key != want.Key || a.Outcome != want.Outcome ||
-		a.PriceVersion != want.PriceVersion || a.Usage != want.Usage || !equalCost(a.Cost, want.Cost) {
+		a.PriceVersion != want.PriceVersion || !usageMatches || !equalCost(a.Cost, want.Cost) {
 		return a, msg, false, fmt.Errorf("classification attempt does not match provider evidence")
 	}
 	return a, msg, true, nil

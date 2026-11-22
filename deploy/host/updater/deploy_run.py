@@ -9,7 +9,7 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import atomic, Busy, command, CommandError, Lock, remove, Result
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, interrupted, Lock, remove, Result, stop
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
 from .deploy_secrets_state import raw_pending, SecretsState
@@ -179,13 +179,15 @@ class Updater:
     def failure(self, result, state, error):
         status = None
         recovery_message = None
-        if state and self.step != 'recovery' and not self.secret_pending():
+        stop_seen = interrupted(error) or stop.requested()
+        if state and not stop_seen and self.step != 'recovery' and not self.secret_pending():
             try:
                 activator = Activator(state, self.store, self.host)
                 status = activator.recover()
                 if status == 'stopped':
                     recovery_message = activator.recovery_message
-            except (OSError, ValueError, CommandError, InterruptedError):
+            except (OSError, ValueError, CommandError, InterruptedError, StopRequested) as recovery_error:
+                stop_seen = interrupted(recovery_error) or stop.requested()
                 status = 'failed'
         if isinstance(error, ValueError):
             reason = str(error)
@@ -195,6 +197,13 @@ class Updater:
             reason = 'command failed or run interrupted'
         if recovery_message:
             reason += '; ' + recovery_message
+        if (stop_seen or stop.requested()) and self.host.unverified_ingress:
+            self.host.hold()
+            try:
+                self.host.cancel_edge()
+                reason += '; caddy stopped'
+            except (OSError, CommandError):
+                reason += '; caddy stop failed'
         result.write(status or 'failed', self.step, reason, self.hash, self.manifest)
         return 1
 
@@ -230,7 +239,9 @@ class Updater:
             failed = False
             with tempfile.TemporaryDirectory(prefix='run-', dir=self.paths.state) as directory:
                 for phase in self.phases:
+                    check_stop()
                     outcome = getattr(self, phase)(state, Path(directory), mode, result)
+                    check_stop()
                     if outcome == INTERRUPTED:
                         return 1
                     if outcome is False:
@@ -238,7 +249,7 @@ class Updater:
                             return 1
                         failed = True
             return int(failed or self.secrets_failed)
-        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError) as error:
+        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
             return self.failure(result, state, error)
 
     def bootstrap(self, hash_value, release_floor=None):
@@ -275,7 +286,7 @@ class Updater:
                         self.runner(['systemctl', 'enable', '--now', 'trachuan-deploy.timer'])
                         result.write('bootstrapped', 'complete', 'bootstrap verified; mode verify', hash_value, candidate.manifest)
                         return 0
-                except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError) as error:
+                except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
                     return self.failure(result, None, error)
         except Busy:
             return 1

@@ -69,3 +69,14 @@ func TestScreen_CreateFailureKeepsProviderSummary(t *testing.T) {
 		t.Fatalf("create failure state %q error %q", ledger.rows[0].State, err)
 	}
 }
+
+func TestProviderError_RejectsAmbiguousRawFields(t *testing.T) {
+	api := &anthropic.Error{StatusCode: 400}
+	if err := api.UnmarshalJSON([]byte(`{"error":{"type":"rate_limit_error","TYPE":"invalid_request_error","details":{"error_code":"usage_limit_reached"}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	got := providerError(api).Error()
+	if !strings.Contains(got, "type=unknown") || !strings.Contains(got, "code=none") {
+		t.Fatalf("ambiguous error evidence used: %s", got)
+	}
+}

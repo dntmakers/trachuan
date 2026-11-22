@@ -98,12 +98,18 @@ schema-check: ## Fail when the web API client drifts
 	  awk '/TokenInput: \{/ {inside=1; next} inside && /^        };/ {exit} inside {print}' packages/schema/gen/openapi.ts | grep -Eq 'days\?: number \| null;'
 
 sqlc-check: ## Fail when generated data layer files drift
-	@for app in corpus server; do \
+	@set -e; tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; \
+	for app in corpus server; do \
 	  if [ -f apps/$$app/sqlc.yaml ]; then \
-	    (cd apps/$$app && sqlc generate && \
-	      { [ -z "$$(git status --porcelain -- internal/store)" ] || \
-	        { echo "generated data layer drifts; run make generate" >&2; \
-	          git status --porcelain -- internal/store; exit 1; }; }) || exit $$?; \
+	    mkdir -p "$$tmp/$$app/checked"; \
+	    cp -R "apps/$$app/sqlc.yaml" "apps/$$app/sql" "apps/$$app/migrations" "$$tmp/$$app/"; \
+	    (cd "$$tmp/$$app" && sqlc generate); \
+	    for file in apps/$$app/internal/store/*.sql.go apps/$$app/internal/store/db.go \
+	      apps/$$app/internal/store/models.go apps/$$app/internal/store/querier.go; do \
+	      [ ! -f "$$file" ] || cp "$$file" "$$tmp/$$app/checked/"; \
+	    done; \
+	    diff -ru "$$tmp/$$app/checked" "$$tmp/$$app/internal/store" || \
+	      { echo "generated data layer drifts; run make generate" >&2; exit 1; }; \
 	  fi; \
 	done
 

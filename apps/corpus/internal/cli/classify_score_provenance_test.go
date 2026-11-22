@@ -67,7 +67,7 @@ func TestClassifyScoreRejectsUntrustedLabels(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			articles, _ := writeArtifact("articles", classify.ArticleArtifact{Version: 1, Country: "vn", Release: "20261115_3", Recipe: articleRecipe, RecipeHash: articleRecipe.Hash(), TaxonomyHash: taxonomyHash, FamiliesHash: familyHash, LabelsHash: fmt.Sprintf("%x", sha256.Sum256(data))})
+			articles, _ := writeArtifact("articles", classify.ArticleArtifact{Version: 1, Country: "vn", Release: "20261115_3", Recipe: articleRecipe, RecipeHash: articleRecipe.Hash(), TaxonomyHash: taxonomyHash, FamiliesHash: familyHash, LabelsHash: fmt.Sprintf("%x", sha256.Sum256(data)), Articles: []classify.ArticleRecord{}})
 			args := []string{"vn", "20261115_3", "--labels", labels, "--families", families, "--articles", articles, "--out", filepath.Join(dir, "out")}
 			var stdout, stderr bytes.Buffer
 			code := runClassifyScoreWith(context.Background(), args, &stdout, &stderr, func(context.Context, string, string, taxonomy.Labels) (classificationEvidence, error) {

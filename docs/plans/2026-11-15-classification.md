@@ -58,10 +58,10 @@
 
 ### 8.6 Newest models (reopened 2026-11-22)
 
-Order: wait for the result-store follow-up and OpenAI provider to land, and freeze both independent references before the paid trials. The budget paragraph above names Anthropic's budgets only.
+Order: land the OpenAI provider and freeze both independent references before the paid trials. The budget paragraph above names Anthropic's budgets only.
 
 - [x] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the Anthropic `trial` budget (migration for the submission checks).
-- [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
+- [x] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, the evidence rule with `.settled` files (pilot imported once), key locks across releases in one transaction with admission, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
 - [ ] Trial `claude-fable-5-2` (cache-ordered prompts, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
 - [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
 - [ ] Verify the [OpenAI adapter](../design/classification-openai.md) and per-provider admission: project scope, count journal and count parity, Batch output and error shapes, and cache usage before starting the full trial population.

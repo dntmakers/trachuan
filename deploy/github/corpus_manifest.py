@@ -151,6 +151,9 @@ def validate_report(report, country, rel, previous_report=None, release_row=None
     elif report['version'] == 2:
         check_rejection_records(report['rejections'])
         check_floors(report)
+    rejections = report['rejections']
+    if len(rejections) != 3 or any(row.get('passed') is not True for row in rejections):
+        raise ValueError('rejection records do not pass the quality gate')
     if previous_report is not None:
         if previous_report.get('country') != country or previous_report.get('rel') != previous['rel']:
             raise ValueError('previous report identity differs from inputs')

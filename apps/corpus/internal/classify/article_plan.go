@@ -11,7 +11,7 @@ type TokenCounter func(context.Context, anthropic.MessageNewParams) (int64, erro
 
 func BuildArticlePlan(ctx context.Context, r Recipe, articles []Article, families map[string]Outcome, nodes []Node, count TokenCounter) (ArticlePlan, error) {
 	var plan ArticlePlan
-	if err := r.Validate(); err != nil {
+	if err := r.validate(true); err != nil {
 		return plan, err
 	}
 	if r.Article == nil || len(articles) == 0 {

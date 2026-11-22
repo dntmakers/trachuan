@@ -38,6 +38,9 @@ func TestResultStore_RejectsUnboundRetainedEvidence(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				if err := os.RemoveAll(filepath.Join(r.IntentDir, "evidence", s.ID, "responses")); err != nil {
+					t.Fatal(err)
+				}
 				bad = attempt
 			case "attempt_wrong_batch":
 				bad = attempt
@@ -51,7 +54,10 @@ func TestResultStore_RejectsUnboundRetainedEvidence(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				s.State, s.Settled = "abandoned", false
+				if err := os.RemoveAll(filepath.Join(r.IntentDir, "evidence", s.ID, "responses")); err != nil {
+					t.Fatal(err)
+				}
+				s.State, s.Settled, s.CostMicroUSD = "abandoned", false, 0
 				bad = base + ".batch"
 			case "unrecognized_file":
 				bad = filepath.Join(r.IntentDir, "unexpected")
@@ -97,7 +103,7 @@ func replaceEvidenceBatch(t *testing.T, path string) {
 	}
 }
 
-func TestResultStore_AbandonmentWithDispatchTraceDoesNotRetry(t *testing.T) {
+func TestResultStore_AbandonmentRequiresCreatorQuietEvidence(t *testing.T) {
 	for _, removed := range []string{"creator.dispatch", "creator.finished"} {
 		t.Run(removed, func(t *testing.T) {
 			ctx := context.Background()
@@ -120,15 +126,19 @@ func TestResultStore_AbandonmentWithDispatchTraceDoesNotRetry(t *testing.T) {
 				t.Fatal(err)
 			}
 			ledger.rows = nil
-			if err := r.Rebuild(ctx); err != nil {
+			err := r.Rebuild(ctx)
+			if removed == "creator.finished" {
+				if err == nil {
+					t.Fatal("accepted missing creator quiet evidence")
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
-			o.RunID++
-			o.Out = filepath.Join(t.TempDir(), "replacement")
-			f.createErr = nil
-			res, err := r.Screen(ctx, o, documents(), families())
-			if err != nil || res.Requests != 0 || res.UnknownKeys != 1 || f.creates != 1 || ledger.rows[0].Settled {
-				t.Fatalf("dispatch trace did not hold key: summary %+v creates %d error %v", res, f.creates, err)
+			retained, err := r.verifyStore(ledger.rows, nil)
+			if err != nil || !retained.retryAbandoned[s.ID] {
+				t.Fatalf("clean listing did not release key: %v", err)
 			}
 		})
 	}

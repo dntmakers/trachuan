@@ -163,6 +163,12 @@ later, which admits relation method `reviewed`, and that the
 [release floor](../design/release-floor.md) is at or above that image, so no
 rollback can reach an image that drops the warning.
 
+Before uploading the first release whose build's `knowledge-report.json` records
+an `applied` effect or relation, confirm that its selected `report.json` has a
+passing
+[`provision_effect` case](../design/evaluation-warning-cases.md#first-release)
+with `outcome:"applied"`. A `redundant` outcome does not qualify.
+
 ### Roll back a corpus release
 
 Request a lasting rollback by signing the older release again, within its

@@ -109,6 +109,7 @@ func TestReconcile_SettlesLateBatchOnAbandonedAttempt(t *testing.T) {
 func TestReconcile_UnknownCreatorRequiresObservedQuietWindow(t *testing.T) {
 	r, ledger, client, o := screenFixture(t)
 	s := Submission{ID: strings.Repeat("a", 32), RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, Items: []Item{{Key: "vn:vbpl:1", InputTokens: 100}}, State: "uncertain", CreatedAt: r.Now(), ReserveMicroUSD: 1029, Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD}
+	s.AccountFingerprint = client.AccountFingerprint()
 	s.ItemsHash = itemsHash(s.Items)
 	ledger.rows = []Submission{s}
 	if err := r.writeIntent(s); err != nil {
