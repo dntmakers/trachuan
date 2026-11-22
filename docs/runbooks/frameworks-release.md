@@ -29,9 +29,12 @@ each step before the next:
    podman secret ls --format '{{.Name}}' | grep -x server_frameworks_key
    ```
 
-   No output means the secret is missing: image B would fail every run at step
-   `secrets` with `secret missing: server_frameworks_key` and leave the serving
-   image in place. Do not tag image B until this prints the name.
+   No output means image A's updater has not created it yet. Each updater run
+   reconciles secrets before it checks the mounts of a new image, so image B
+   activates once the secret exists; if it is still absent after that
+   reconciliation, activation fails at step `secrets` with
+   `secret missing: server_frameworks_key` and the serving image stays. Do not
+   tag image B until this prints the name.
 
 3. **Image B** is live: `deploy/host/deploy-policy.json` has the `frameworks`
    block, the server Quadlet mounts the key and `server.env` sets
@@ -125,19 +128,31 @@ clears it.
 The flag stays off until this measurement fits
 [host budgets](../design/budgets-host.md#host-memory-estimates). It needs the
 host, so the coordinator runs it. Check that at least 3 GB is free first
-(`free -m`): the probe runs beside the serving server.
+(`free -m`): the probe runs beside the serving server. It shares the auth
+database and background work with the serving server for its short life; mail,
+report and retention workers claim rows with `FOR UPDATE SKIP LOCKED`, so each
+row is handled once.
 
-On the host, as `trachuan`, start a one-off server from the serving image on a
-loopback port that Caddy does not route, with the flag on:
+Create a personal token for the probe at `https://trachuan.vn/account` with the
+shortest expiry, and revoke it when the probe ends. On the host, as `trachuan`,
+with shell tracing off, start a one-off server from the serving image on a free
+loopback port that Caddy does not route, with the flag on and the server
+Quadlet's limits (no swap, no core dumps, four CPUs, 2,500 MB):
 
 ```sh
 sudo -iu trachuan
+set +x
 export XDG_RUNTIME_DIR=/run/user/$(id -u)
+PORT=18080
+NAME=trachuan-server-memcheck
+ss -Hltn "sport = :$PORT" | grep -q . && { echo "port $PORT is in use"; exit 1; }
 SERVER_IMAGE=$(grep '^SERVER_IMAGE=' /srv/trachuan/host/images.env | cut -d= -f2-)
-podman run -d --rm --name trachuan-server-memcheck --network host \
+trap 'podman rm -f "$NAME" >/dev/null 2>&1' EXIT
+podman run -d --name "$NAME" --timeout 900 --network host \
   --user 65532:65532 --cap-drop=ALL --security-opt=no-new-privileges --read-only \
-  --memory=2500m --env-file /srv/trachuan/host/server.env \
-  -e SERVER_LISTEN=127.0.0.1:18080 -e SERVER_FRAMEWORKS=true \
+  --cpus=4 --memory=2500m --memory-swap=2500m --memory-reservation=2000m \
+  --ulimit core=0 --env-file /srv/trachuan/host/server.env \
+  -e SERVER_LISTEN="127.0.0.1:$PORT" -e SERVER_FRAMEWORKS=true \
   --secret google_client_secret,type=env,target=GOOGLE_CLIENT_SECRET \
   --secret server_auth_database_url,type=env,target=SERVER_AUTH_DATABASE_URL \
   --secret server_corpus_database_url,type=env,target=SERVER_CORPUS_DATABASE_URL \
@@ -148,43 +163,63 @@ podman run -d --rm --name trachuan-server-memcheck --network host \
   "$SERVER_IMAGE" serve
 ```
 
-Warm both kinds with one search each, using a personal token typed at a hidden
-prompt and passed to `curl` on standard input, never on the command line:
+`--memory-swap` equal to `--memory` gives the probe no swap, as
+`MemorySwapMax=0` does for the service; `--timeout` ends it after 15 minutes
+even if the shell dies. Before sending the token, wait for `/healthz` and
+confirm that the only listener on the port is the probe:
+
+```sh
+for i in $(seq 1 30); do
+  podman exec "$NAME" /app/healthcheck "http://127.0.0.1:$PORT/healthz" && break
+  sleep 2
+done
+test "$(ss -Hltn "sport = :$PORT" | wc -l)" -eq 1 && podman ps --filter name="$NAME" --format '{{.Status}}'
+```
+
+Warm both kinds with one search each. The token is typed at a hidden prompt and
+reaches `curl` on standard input, never on a command line; `-q` skips any curl
+configuration file and `--noproxy '*'` keeps the request local. Each call prints
+only `ok` or `fail`: `ok` needs a JSON-RPC result that is not an error and holds
+at least one hit. Retry a `fail` a few times while the frameworks engine opens:
 
 ```sh
 read -rs TOKEN
 mcp() {
   printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" |
-    curl -sS -K - -o /dev/null -w '%{http_code}\n' \
+    curl -q -sS --noproxy '*' -K - \
       -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-      --data "$1" http://127.0.0.1:18080/mcp
+      --data "$1" "http://127.0.0.1:$PORT/mcp" |
+    jq -e '.result and (.result.isError != true) and ((.result.structuredContent.hits // []) | length > 0)' >/dev/null &&
+    echo ok || echo fail
 }
 mcp '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search","arguments":{"country":"vn","query":"lãi suất cho vay"}}}'
 mcp '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search","arguments":{"corpus":"frameworks","query":"access control"}}}'
 unset TOKEN
 ```
 
-Both print `200`. Then record the probe's resident memory and stop it:
+Both must print `ok`. Then record the probe's resident memory and stop it:
 
 ```sh
-PID=$(podman inspect --format '{{.State.Pid}}' trachuan-server-memcheck)
+PID=$(podman inspect --format '{{.State.Pid}}' "$NAME")
 grep -E '^(VmRSS|VmHWM)' "/proc/$PID/status"
-podman stop trachuan-server-memcheck
+podman rm -f "$NAME"
 ```
 
-Compare `VmHWM` with the server row and its 2,500 MB container limit. Write the
-figures only to private evidence under `FRAMEWORKS_WORK_DIR` and give them to
-the coordinator; they are derived from licensed files and never enter Git, a
-pull request or a log.
+Revoke the probe token. Compare `VmHWM` with the server row and its 2,500 MB
+container limit. Write the figures only to private evidence under
+`FRAMEWORKS_WORK_DIR` and give them to the coordinator; they are derived from
+licensed files and never enter Git, a pull request or a log.
 
 ## Entitlement and flag
 
 **Owner decision.** The owner's entitlement is the only one until the licence
-terms review. On the host, as `trachuan`:
+terms review. On the host, as `trachuan`, set `OWNER_EMAIL` to the owner's
+account email:
 
 ```sh
+OWNER_EMAIL='...'
 podman exec trachuan-server /app/server admin frameworks allow \
-  --email <owner email> --scope '*' --by owner --note 'owner entitlement'
+  --email "$OWNER_EMAIL" --scope '*' --by owner --note 'owner entitlement'
 podman exec trachuan-server /app/server admin frameworks list
 ```
 
@@ -200,10 +235,19 @@ Dispatching `frameworks-release.yml` again for the same `rel`, with
 `report.sha256` from its signed `frameworks-<rel>` manifest, signs a new
 sequence and retries a failed activation. Dispatching it for an older retained
 `rel` with that release's signed report hash is a rollback; the host reactivates
-the retained database. A manual swap of `frameworks_release.active_db` leaves
-`frameworks-production` behind, and the next upload refuses until the two agree.
+the retained database. Set `REL` to the release and `REPORT_SHA256` to
+`report.sha256` of its signed manifest:
 
 ```sh
+REL='...'
+REPORT_SHA256='...'
 gh workflow run frameworks-release.yml --repo dntmakers/trachuan --ref main \
-  -f rel=<rel> -f report_sha256=<signed report SHA-256>
+  -f rel="$REL" -f report_sha256="$REPORT_SHA256"
 ```
+
+The uploader compares a new release's previous report with the signed
+`frameworks-production` manifest, not with the host's pointer. A manual swap of
+`frameworks_release.active_db` leaves the two apart: an upload can then pass and
+wait at activation, because its `previous` is not the active release. Before the
+next upload, the coordinator confirms that the host's active frameworks release
+and `frameworks-production` name the same `rel`.
