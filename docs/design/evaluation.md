@@ -209,6 +209,10 @@ is a reported diagnostic, not a run failure. Malformed fixture/map files,
 incomplete case execution or infrastructure failure fail the stage. CLI and
 status must distinguish completed evaluation from passed quality gates.
 
+Version 4 also requires the
+[reviewed warning gate](evaluation-warning-cases.md#report-and-release-gate) to
+pass for `quality_pass:true`.
+
 ## Cache and report format
 
 Cache exact dense and lexical arms to the study's maximum trial depths in
@@ -241,7 +245,7 @@ eligible for caching. No questions in logs or report copies. Cache key includes
 dump, fixtures, map, query vectors, all recipes, date, tie rules and software
 versions; mismatches invalidate reuse.
 
-`report.json` fields: `version:3`, `status`, `quality_pass`, `release_eligible`,
+`report.json` fields: `version:4`, `status`, `quality_pass`, `release_eligible`,
 `country`, `rel`, `build_artifact_sha256`, `dump_sha256`, `fixture_hashes`,
 `identity_map_sha256`, `recipes`, `evaluation_date`, `request_as_of`,
 `database_instance_kind`, `software`, `calibration`,
@@ -249,7 +253,7 @@ versions; mismatches invalidate reuse.
 `rejections`, `coverage`, `ann_loss`, `timings_ms`, `evidence_characters`,
 `cache_manifest`, `previous_diff` (with `previous:{country,rel,report_sha256}`
 naming the compared report and SHA-256 of its exact bytes), `not_run`,
-`limitations`, and the counts in
+`limitations`, `warning_cases`, and the counts in
 [scope adoption](scope-adoption.md#readers-and-evaluation). Each metric stores
 counts as well as the value. `coverage` lists each missing original/alternate
 document number and affected case/citation, including the five known omissions
