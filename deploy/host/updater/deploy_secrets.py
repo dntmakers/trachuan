@@ -1,13 +1,12 @@
 import base64
 import copy
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 import re
 import time
 from urllib.parse import quote
 
-from .deploy_io import CommandError, Result, interrupted
+from .deploy_io import CommandError, decode, Result, interrupted
 from .deploy_secrets_state import raw_pending, SecretsState
 
 
@@ -96,7 +95,7 @@ class Secrets:
     def equal(self, name, value):
         raw = self.host.user('podman', 'secret', 'inspect', '--showsecret', name,
                              timeout=30, stdout_limit=4 * 1024 * 1024)
-        records = json.loads(raw)
+        records = decode(raw, 'secret inspection')
         if (not isinstance(records, list) or len(records) != 1 or not isinstance(records[0], dict)
                 or not isinstance(records[0].get('SecretData'), str)):
             raise ValueError('invalid Podman secret inspection')

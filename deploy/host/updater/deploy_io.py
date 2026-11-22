@@ -13,6 +13,17 @@ import time
 import tempfile
 
 
+JSON_LIMIT = 1024 * 1024
+
+
+def read_json_bytes(path, what):
+    with Path(path).open('rb') as source:
+        data = source.read(JSON_LIMIT + 1)
+    if len(data) > JSON_LIMIT:
+        raise ValueError(what + ' too large')
+    return data
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
 
@@ -340,7 +351,7 @@ class Result:
         self.started = clock()
         self.previous = {}
         try:
-            self.previous = json.loads(self.path.read_bytes())
+            self.previous = decode(read_json_bytes(self.path, 'previous result'), 'previous result')
             if not isinstance(self.previous, dict):
                 self.previous = {}
         except (OSError, ValueError):

@@ -213,3 +213,13 @@ The host uses a 50 GB boot volume and a 60 GB data volume. Keep OS, images and
 model on boot; databases and pgBackRest spool on data. Both use Balanced
 performance. The existing estimates fit with margin; the 70% acceptance rule
 applies to each filesystem, including retained releases.
+
+## Updater input limits
+
+Every JSON document the updater reads from outside its own process (manifests,
+registry and attestation output, host state, results, journals) is parsed by
+`deploy_io.decode`, which turns a malformed or too deeply nested document into a
+recorded failure. Reads with no tighter bound stop at `JSON_LIMIT`, 1 MiB, in
+`deploy/host/updater/deploy_io.py`. Release SQL output and secret inspection
+keep 4 MiB, signature bundles 2 MiB, and a whole decompressed host bundle 64
+MiB.

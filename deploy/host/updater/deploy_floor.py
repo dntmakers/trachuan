@@ -1,4 +1,4 @@
-import json
+from .deploy_io import decode
 
 
 def release_floor(value):
@@ -13,7 +13,7 @@ def release_floor(value):
 
 
 def bundle_floor(files):
-    return release_floor(json.loads(files['deploy-policy.json']))
+    return release_floor(decode(files['deploy-policy.json'], 'bundle policy'))
 
 
 def check_floor(sequence, floor):

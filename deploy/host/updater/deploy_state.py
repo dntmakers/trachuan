@@ -1,8 +1,7 @@
-import json
 from pathlib import Path
 import re
 
-from .deploy_io import atomic, canonical
+from .deploy_io import atomic, canonical, decode, read_json_bytes
 from .deploy_floor import check_floor, release_floor
 
 
@@ -38,7 +37,7 @@ class State:
     def __init__(self, path, data=None):
         self.path = Path(path)
         try:
-            self.data = data if data is not None else json.loads(self.path.read_bytes())
+            self.data = data if data is not None else decode(read_json_bytes(self.path, 'state'), 'state')
             self.validate()
         except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
             raise ValueError('state missing or invalid; bootstrap required') from error

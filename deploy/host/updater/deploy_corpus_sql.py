@@ -2,6 +2,7 @@ import json
 import re
 
 from .deploy_corpus_heading import headings_approved
+from .deploy_io import decode
 
 
 COUNTRY = '[a-z]{2}'
@@ -77,7 +78,7 @@ def journal_row(row, check=database, country=COUNTRY, release=RELEASE):
 
 def journal_json(raw):
     try:
-        return json.loads(raw)
+        return decode(raw, 'release journal')
     except (ValueError, RecursionError):
         raise JournalRefused(REFUSED) from None
 

@@ -1,4 +1,3 @@
-import json
 import os
 from pathlib import Path
 import tempfile
@@ -9,7 +8,7 @@ from .deploy_corpus import Corpus
 from .deploy_corpus_kind import FRAMEWORKS
 from .deploy_host import Host
 from .deploy_floor import check_floor
-from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, interrupted, Lock, remove, Result, stop
+from .deploy_io import StopRequested, atomic, Busy, command, CommandError, check_stop, decode, interrupted, Lock, read_json_bytes, remove, Result, stop
 from .deploy_registry import Registry
 from .deploy_secrets import Secrets
 from .deploy_secrets_state import raw_pending, SecretsState
@@ -293,5 +292,5 @@ class Updater:
 
     def status(self):
         state = State(self.paths.state / 'state.json')
-        result = json.loads(self.paths.result.read_bytes()) if self.paths.result.exists() else None
+        result = decode(read_json_bytes(self.paths.result, 'result'), 'result') if self.paths.result.exists() else None
         return dict(mode=self.mode(), active=state.data['active'], journal=state.data['journal'], result=result)

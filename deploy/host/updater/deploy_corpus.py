@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 import hashlib
-import json
 import os
 from pathlib import Path
 import shutil
@@ -13,7 +12,7 @@ from .deploy_corpus_database import Database
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_result import ReleaseResult
 from .deploy_corpus_sql import JournalRefused, REFUSED, SUPERUSER_REFUSED
-from .deploy_io import atomic, canonical, CommandError, StopRequested, interrupted
+from .deploy_io import atomic, canonical, CommandError, StopRequested, decode, interrupted, read_json_bytes
 from .deploy_release_tables import PointerRefused
 from .deploy_release_target import Held, LockUnavailable, Waiting
 from .deploy_verify import match
@@ -233,7 +232,7 @@ class Corpus:
             return
         marker = self.host.paths.state / self.kind.marker
         day = datetime.fromtimestamp(self.clock(), timezone.utc).date().isoformat()
-        previous = json.loads(marker.read_bytes()) if marker.exists() else None
+        previous = decode(read_json_bytes(marker, 'marker'), 'marker') if marker.exists() else None
         if previous == day:
             return
         with self.db.lock():

@@ -39,6 +39,12 @@ class RegistryTest(unittest.TestCase):
             return b''
         raise AssertionError(args)
 
+    def test_registry_json_rejects_invalid_encoding_with_typed_failure(self):
+        def invalid(*args, **kwargs):
+            return b'\xff'
+        with self.assertRaisesRegex(ValueError, 'invalid registry tags JSON'):
+            r.Registry(self.policy, invalid).tags(self.policy['release_repository'])
+
     def test_fetch_pins_resolved_digest_and_uses_only_title_allowlist(self):
         registry = r.Registry(self.policy, self.command)
         path = registry.fetch(self.policy['release_repository'], 'production', self.directory, 'release')

@@ -6,7 +6,7 @@ import re
 
 from .deploy_corpus_heading import validate_headings
 from .deploy_corpus_sql import RELEASE
-from .deploy_io import canonical, decode
+from .deploy_io import canonical, decode, read_json_bytes
 from .deploy_verify import accepted, flags, match, positive
 
 
@@ -76,7 +76,7 @@ def manifest(data, rules):
 
 def verify(directory, rules, runner):
     path = Path(directory) / 'manifest.json'
-    data = path.read_bytes()
+    data = read_json_bytes(path, 'corpus manifest')
     obj = manifest(data, rules)
     runner(['/usr/local/libexec/trachuan/bin/cosign', 'verify-blob', '--bundle',
             str(Path(directory) / 'manifest.sigstore.json'),

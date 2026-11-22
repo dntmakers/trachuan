@@ -37,6 +37,18 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         secret_phase.start()
         self.addCleanup(secret_phase.stop)
 
+    def test_bad_manifest_records_failure(self):
+        for data, message in ((b'[' * 100000 + b']' * 100000, 'invalid release'),
+                              (b'\xff', 'invalid release manifest JSON'),
+                              (b' ' * (1024 * 1024 + 1), 'release manifest too large')):
+            with self.subTest(size=len(data)):
+                (self.new.directory / 'manifest.json').write_bytes(data)
+                self.assertEqual(self.app.run(), 1)
+                result = json.loads(self.paths.result.read_bytes())
+                self.assertEqual(result['status'], 'failed')
+                self.assertEqual(result['step'], 'manifest')
+                self.assertIn(message, result['message'])
+
     def test_verify_keeps_pending_without_activation_or_install(self):
         self.assertEqual(self.app.run(), 0)
         state = State(self.state.path)
@@ -116,6 +128,15 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         self.registry.latest_rollback.return_value = str(sequence)
         self.registry.fetch.side_effect = lambda repository, tag, path, kind: directory if kind == 'rollback' else self.new.directory
         return hashlib.sha256(data).hexdigest()
+
+    def test_bad_rollback_manifest_records_failure(self):
+        self.rollback_artifact(self.new.hash, self.old.hash)
+        path = self.paths.state / 'rollback-fixture' / 'manifest.json'
+        path.write_bytes(b'\xff')
+        self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual(result['status'], 'failed')
+        self.assertIn('invalid rollback manifest JSON', result['message'])
 
     def test_authorized_rollback_is_consumed_before_activation_and_not_replayed_by_timer(self):
         self.paths.mode.write_text('activate\n')

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from updater.deploy_io import atomic, command, CommandError, describe, failure_reason, Result
+from updater.deploy_io import atomic, command, CommandError, decode, describe, failure_reason, Result
 
 
 class IOTest(unittest.TestCase):
@@ -17,6 +17,18 @@ class IOTest(unittest.TestCase):
                     atomic(path, b'next')
             self.assertEqual(path.read_bytes(), b'previous')
             self.assertEqual(list(Path(directory).iterdir()), [path])
+
+    def test_decode_wraps_recursion_error(self):
+        with mock.patch('updater.deploy_io.json.loads', side_effect=RecursionError):
+            with self.assertRaisesRegex(ValueError, 'invalid manifest JSON'):
+                decode(b'[]', 'manifest')
+
+    def test_oversized_previous_result_is_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'result.json'
+            path.write_bytes(b'{"last_success_at":"' + b'x' * (1024 * 1024) + b'"}')
+            result = Result(path, Path(directory) / 'deploy.log')
+            self.assertEqual(result.previous, {})
 
     def test_invalid_previous_result_does_not_block_failure_reporting(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -3,7 +3,7 @@ import re
 from . import deploy_corpus_sql, deploy_frameworks_sql
 from .deploy_corpus_sql import (AUTH_ACTIVE_DATABASE, AUTH_SCHEMA_VERSION, CATALOG_PATH, PREWARM, PREWARM_SKIPPED,
                                 SCHEMA_PATH, database_owner)
-from .deploy_io import atomic, command, CommandError, remove, Result
+from .deploy_io import atomic, command, CommandError, JSON_LIMIT, remove, Result
 from .deploy_transfer import program
 from .deploy_verify import as_user, pull_image
 
@@ -121,7 +121,8 @@ class Host:
 
     def activator_psql(self, database, sql, options=SCHEMA_PATH):
         return self.activator(*activator_client(database, options),
-                              input=('SET standard_conforming_strings=on;\n' + sql).encode()).decode().strip()
+                              input=('SET standard_conforming_strings=on;\n' + sql).encode(),
+                              stdout_limit=JSON_LIMIT).decode().strip()
 
     def auth_psql(self, sql):
         return self.user(*auth_arguments(sql), stdout_limit=AUTH_OUTPUT_LIMIT,

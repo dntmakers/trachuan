@@ -1,7 +1,7 @@
 import hashlib
-import json
 import time
 
+from .deploy_io import decode, read_json_bytes
 from .deploy_activation_record import RETENTION_SECONDS, Record, blank, moment
 from .deploy_corpus_kind import FRAMEWORKS, LAW
 
@@ -57,13 +57,13 @@ class Records:
 
     def manifest(self, kind, digest):
         try:
-            raw = (self.directory / kind.artifacts / digest / 'manifest.json').read_bytes()
-        except OSError:
+            raw = read_json_bytes(self.directory / kind.artifacts / digest / 'manifest.json', 'retained manifest')
+        except (OSError, ValueError):
             return None
         if hashlib.sha256(raw).hexdigest() != digest:
             return None
         try:
-            value = json.loads(raw)
+            value = decode(raw, 'retained manifest')
         except (ValueError, RecursionError):
             return None
         return value if isinstance(value, dict) else None

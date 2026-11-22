@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-import json
 from pathlib import Path
 import shutil
 
 from .deploy_bundle import bundle
 from .deploy_host import pins
-from .deploy_io import atomic
+from .deploy_io import atomic, decode, read_json_bytes
 from .deploy_verify import verify_manifest
 from .deploy_state import digest
 
@@ -82,7 +81,7 @@ class Store:
         bundles = {state.data['installed_bundle']}
         for path in self.directory.iterdir():
             if path.name in keep:
-                bundles.add(json.loads((path / 'manifest.json').read_bytes())['host_bundle']['sha256'])
+                bundles.add(decode(read_json_bytes(path / 'manifest.json', 'retained manifest'), 'retained manifest')['host_bundle']['sha256'])
             elif digest(path.name) and path.is_dir() and not path.is_symlink():
                 shutil.rmtree(path)
         if self.paths.bundles.exists():

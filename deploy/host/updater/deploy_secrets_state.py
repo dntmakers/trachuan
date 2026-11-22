@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
-import json
 from pathlib import Path
 
-from .deploy_io import atomic, canonical
+from .deploy_io import atomic, canonical, decode, read_json_bytes
 from .deploy_vault import names, retired
 
 
@@ -10,7 +9,7 @@ class SecretsState:
     def __init__(self, path):
         self.path = Path(path)
         try:
-            self.data = json.loads(self.path.read_bytes())
+            self.data = decode(read_json_bytes(self.path, 'secrets state'), 'secrets state')
         except FileNotFoundError:
             self.data = dict(versions={}, pending={}, last_success_at=None, held=False)
         self.prune_retired()
@@ -55,7 +54,7 @@ class SecretsState:
 
 def raw_pending(path):
     try:
-        raw = json.loads(Path(path).read_bytes())
+        raw = decode(read_json_bytes(path, 'secrets state'), 'secrets state')
     except (OSError, ValueError):
         return False
     pending = raw.get('pending') if isinstance(raw, dict) else None

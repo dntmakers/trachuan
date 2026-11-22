@@ -1,9 +1,8 @@
 import hashlib
-import json
 from pathlib import Path
 import re
 
-from .deploy_io import atomic, command, CommandError
+from .deploy_io import atomic, command, CommandError, decode, JSON_LIMIT
 from .deploy_verify import match
 
 
@@ -36,7 +35,7 @@ class Registry:
         return self.runner(['/usr/local/libexec/trachuan/bin/oras', *args], **kwargs)
 
     def tags(self, repository):
-        tags = json.loads(self.oras('repo', 'tags', '--format', 'json', repository))['tags'] or []
+        tags = decode(self.oras('repo', 'tags', '--format', 'json', repository, stdout_limit=JSON_LIMIT), 'registry tags')['tags'] or []
         if not isinstance(tags, list) or len(tags) > 10000:
             raise ValueError('invalid artifact tags')
         for tag in tags:
@@ -60,10 +59,10 @@ class Registry:
         digest = self.oras('resolve', repository + ':' + tag).decode().strip()
         match('sha256:[0-9a-f]{64}', digest, 'artifact digest')
         reference = repository + '@' + digest
-        raw = self.oras('manifest', 'fetch', reference)
+        raw = self.oras('manifest', 'fetch', reference, stdout_limit=JSON_LIMIT)
         if len(raw) > 1024 * 1024:
             raise ValueError('artifact manifest too large')
-        descriptors = layers(json.loads(raw), kind)
+        descriptors = layers(decode(raw, 'artifact manifest'), kind)
         directory = Path(directory)
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         for name, layer in descriptors.items():
