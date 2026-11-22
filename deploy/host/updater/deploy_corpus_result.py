@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
-from .deploy_io import Result
+from .deploy_activation_record import ALERTS
+from .deploy_result import Result, overflow_receipt
 
 
 class ReleaseResult(Result):
@@ -8,6 +9,11 @@ class ReleaseResult(Result):
         super().__init__(paths.result.with_name(name + '.json'), paths.log.with_name(name + '.log'),
                          lambda: datetime.fromtimestamp(clock(), timezone.utc).isoformat().replace('+00:00', 'Z'))
         self.integrity = integrity
+
+    def overflow(self, value=None):
+        codes = (value or {}).get('integrity', [])
+        safe = [code for code in codes if isinstance(code, str) and code in ALERTS] if isinstance(codes, list) else []
+        return overflow_receipt(self.started, self.clock(), self.previous, None, list(dict.fromkeys(safe)))
 
     def write(self, status, step, message, digest=None, manifest=None, mode=None):
         manifest = manifest or {}

@@ -10,6 +10,7 @@ import unittest
 from unittest import mock
 
 from updater import deploy_io as io
+from updater.deploy_result import Result
 
 
 class ProcessTest(unittest.TestCase):
@@ -152,7 +153,7 @@ class ProcessTest(unittest.TestCase):
             main.interrupted(signal.SIGTERM, None)
             return real_killpg(pid, sig)
         with tempfile.TemporaryDirectory() as directory:
-            result = io.Result(Path(directory) / 'result', Path(directory) / 'log')
+            result = Result(Path(directory) / 'result', Path(directory) / 'log')
             with mock.patch.object(io.os, 'killpg', side_effect=killpg), \
                     mock.patch.object(io.subprocess, 'Popen', side_effect=spawn):
                 try:

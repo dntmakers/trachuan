@@ -11,7 +11,8 @@ import tempfile
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from updater.deploy_io import canonical, command, CommandError, Lock, Result
+from updater.deploy_io import canonical, command, CommandError, Lock
+from updater.deploy_result import Result
 from updater.deploy_state import State
 from updater.deploy_store import Paths, Store
 from updater.deploy_verify import envelopes, flags, match, policy, provenance, release, SubjectMismatch, Verifier

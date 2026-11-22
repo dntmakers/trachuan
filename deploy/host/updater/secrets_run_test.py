@@ -9,6 +9,7 @@ from updater import deploy_secrets_state
 from updater import secrets_test as fixture
 from updater.deploy_activate import Activator
 from updater.deploy_io import canonical, stop, StopRequested
+from updater.deploy_result import ResultTooLarge
 from updater.deploy_state import State
 
 
@@ -28,6 +29,40 @@ class SecretsRunTest(fixture.SecretsFixture, unittest.TestCase):
         patch = mock.patch('updater.deploy_run.Verifier.images')
         patch.start()
         self.addCleanup(patch.stop)
+
+    def test_pending_detection_secures_ingress_before_log_failure(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        with mock.patch.object(self.app.host, 'note', side_effect=OSError('log unavailable')):
+            self.assertTrue(self.app.secret_pending())
+        self.assertTrue(self.paths.hold.exists())
+        self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                            'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
+
+    def test_unreadable_state_stops_ingress_before_receipt_failure(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        self.reconcile.storage = None
+        self.reconcile.data = None
+        for target, error in (('write', OSError('result unavailable')),
+                              ('write', ResultTooLarge('result too large')),
+                              ('append', OSError('log unavailable'))):
+            with self.subTest(target=target, error=type(error).__name__):
+                self.paths.hold.unlink(missing_ok=True)
+                self.secret_calls.clear()
+                with mock.patch('updater.deploy_secrets.Result.' + target, side_effect=error):
+                    with self.assertRaises(type(error)):
+                        self.reconcile.run()
+                self.assertTrue(self.paths.hold.exists())
+                self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                                    'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
+
+    def test_caddy_stop_is_attempted_when_hold_write_fails(self):
+        (self.paths.state / 'secrets-state.json').write_bytes(b'{')
+        self.reconcile.storage = None
+        self.reconcile.data = None
+        with mock.patch.object(self.host, 'hold', side_effect=OSError('hold unavailable')):
+            self.reconcile.run()
+        self.assertTrue(any(args[:3] == ['systemctl', '--user', 'stop'] and
+                            'trachuan-caddy.service' in args for args, _, _ in self.secret_calls))
 
     def test_stop_on_secrets_edge_probe_stops_caddy(self):
         self.addCleanup(stop.clear)

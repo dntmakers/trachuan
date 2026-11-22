@@ -9,6 +9,9 @@ import tempfile
 from .signals import fresh
 
 
+MAX_RESULT_BYTES = 65536
+
+
 def read(path):
     try:
         descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -17,8 +20,8 @@ def read(path):
     with os.fdopen(descriptor, 'rb') as source:
         if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
             raise ValueError('invalid watch input')
-        raw = source.read(65537)
-    if len(raw) > 65536:
+        raw = source.read(MAX_RESULT_BYTES + 1)
+    if len(raw) > MAX_RESULT_BYTES:
         raise ValueError('invalid watch input')
     value = json.loads(raw)
     if not isinstance(value, dict):

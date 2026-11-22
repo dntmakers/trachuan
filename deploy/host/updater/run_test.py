@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
@@ -14,6 +15,7 @@ from updater.deploy_io import canonical
 from updater.deploy_io import CommandError
 from updater.deploy_state import State
 from updater.deploy_host import pins
+from updater.io_test import METRICS
 from watch import observations, signals
 
 
@@ -39,16 +41,48 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         secret_phase.start()
         self.addCleanup(secret_phase.stop)
 
+    def test_interruption_stops_caddy_even_when_hold_raises(self):
+        self.app.host.unverified_ingress = True
+        with mock.patch.object(self.app.host, 'hold', side_effect=ValueError('hold failed')), \
+                mock.patch.object(self.app.host, 'cancel_edge') as cancel:
+            self.assertEqual(self.app.failure(mock.Mock(), None, r.StopRequested('stopped')), 1)
+        cancel.assert_called_once()
+
+    def test_final_activation_save_failure_recovers_from_persisted_journal(self):
+        self.paths.mode.write_text('activate\n')
+        original = State.save
+        failed = []
+        def save(state):
+            journal = state.data['journal'] or {}
+            if journal.get('status') == 'activated' and state.data['active'] == self.new.hash and not failed:
+                failed.append(True)
+                raise ValueError('state too large')
+            return original(state)
+        with mock.patch.object(State, 'save', save):
+            self.assertEqual(self.app.run(), 1)
+        self.assertTrue(failed)
+        state = State(self.state.path)
+        self.assertEqual(state.data['active'], self.old.hash)
+        self.assertEqual(state.data['journal']['status'], 'rolled_back')
+
     def test_status_rejects_wrong_result_shape(self):
         self.paths.result.write_bytes(b'[]')
         with self.assertRaisesRegex(ValueError, 'invalid result'):
             self.app.status()
 
     def test_oversized_success_receipt_stays_failed_through_handler(self):
-        with mock.patch('updater.deploy_io.JSON_LIMIT', 100):
+        self.paths.result.write_bytes(canonical({'last_success_at': '2026-01-01T00:00:00Z'}))
+        self.state.data['release_floor'] = 10
+        self.state.save()
+        with mock.patch('updater.deploy_result.RESULT_LIMIT', 256):
             self.assertEqual(self.app.run(), 1)
         result = json.loads(self.paths.result.read_bytes())
-        self.assertEqual(result, {'status': 'failed', 'step': 'result', 'message': 'result too large'})
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
+        observations.result(self.paths.result, 'deploy')
+        metrics = METRICS.deploy(self.paths.result, datetime(2026, 1, 2, tzinfo=timezone.utc))
+        self.assertIn(('deploy_release_floor', 10), metrics)
+        self.assertIn(('deploy_last_success_age_seconds', 86400), metrics)
 
     def test_oversized_failure_receipt_does_not_escape_failure_handler(self):
         self.images.side_effect = ValueError('x' * (1024 * 1024))

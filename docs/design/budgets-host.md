@@ -223,9 +223,10 @@ failure. The activation record parser also rejects duplicate keys; the
 attestation envelope parser accepts concatenated JSON. Reads with no tighter
 bound stop at `JSON_LIMIT`, 1 MiB, in `deploy/host/updater/deploy_io.py`. Host
 state uses `STATE_LIMIT`, 16 MiB, for both reads and writes in
-`deploy/host/updater/deploy_state.py`. Registry tag output uses
-`TAG_LIST_LIMIT`, 7,721,024 bytes, in `deploy/host/updater/deploy_registry.py`,
-enough for 10,000 escaped tags of 128 characters. Release SQL output and secret
-inspection keep 4 MiB, signature bundles 2 MiB, and a whole decompressed host
-bundle 64 MiB. The host-bundle policy file keeps the same 1 MiB limit during
-verification and installation.
+`deploy/host/updater/deploy_state.py`. Result files use `RESULT_LIMIT`, 65,536
+bytes, in `deploy/host/updater/deploy_result.py`, matching the watch and metrics
+read limits. Registry tag output uses `TAG_LIST_LIMIT`, 7,721,024 bytes, in
+`deploy/host/updater/deploy_registry.py`, enough for 10,000 escaped tags of 128
+characters. Release SQL output and secret inspection keep 4 MiB, signature
+bundles 2 MiB, and a whole decompressed host bundle 64 MiB. The host-bundle
+policy file keeps the same 1 MiB limit during verification and installation.

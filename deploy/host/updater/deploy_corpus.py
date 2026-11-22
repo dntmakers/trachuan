@@ -12,7 +12,8 @@ from .deploy_corpus_database import Database
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_result import ReleaseResult
 from .deploy_corpus_sql import JournalRefused, REFUSED, SUPERUSER_REFUSED
-from .deploy_io import atomic, canonical, CommandError, StopRequested, decode, interrupted, read_json_bytes, ResultTooLarge
+from .deploy_io import atomic, canonical, CommandError, StopRequested, decode, interrupted, read_json_bytes
+from .deploy_result import ResultTooLarge
 from .deploy_release_tables import PointerRefused
 from .deploy_release_target import Held, LockUnavailable, Waiting
 from .deploy_verify import match

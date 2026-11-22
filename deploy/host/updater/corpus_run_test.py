@@ -27,9 +27,11 @@ class CorpusRunTest(LawCase, unittest.TestCase):
                     self.phase.prune('activate')
 
     def test_oversized_corpus_result_remains_failed_after_handler(self):
-        with mock.patch('updater.deploy_io.JSON_LIMIT', 100):
+        with mock.patch('updater.deploy_result.RESULT_LIMIT', 256):
             self.assertFalse(self.run_phase('verify'))
-        self.assertEqual(self.result(), {'status': 'failed', 'step': 'result', 'message': 'result too large'})
+        result = self.result()
+        self.assertEqual((result['status'], result['step'], result['message']),
+                         ('failed', 'result', 'result too large'))
 
     def test_unpublished_corpus_package_is_current_until_a_manifest_was_accepted(self):
         self.state.data['accepted']['corpus'].clear()

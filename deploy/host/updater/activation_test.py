@@ -1,8 +1,12 @@
+import copy
 import hashlib
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
+
+from updater import deploy_state as state_module
 
 from updater import deploy_activate as a
 from updater.deploy_io import CommandError, canonical, command
@@ -102,6 +106,39 @@ class ActivationFixture:
 
 
 class ActivationTest(ActivationFixture, unittest.TestCase):
+    def test_resume_failure_stops_caddy_when_hold_write_fails(self):
+        with mock.patch.object(self.host, 'probe', side_effect=[None, ValueError('edge failed')]), \
+                mock.patch.object(self.host, 'hold', side_effect=OSError('hold unavailable')), \
+                mock.patch.object(self.host, 'cancel_edge') as cancel:
+            with self.assertRaises(ValueError):
+                self.engine.resume_ingress()
+        cancel.assert_called_once()
+
+    def test_preflight_rejects_oversized_final_commit_before_service_change(self):
+        projected = State(self.state.path, copy.deepcopy(self.state.data))
+        projected.data['retained'] = [self.old.hash]
+        projected.data['journal'] = dict(target=self.new.hash, previous=self.old.hash, baseline=7,
+                                         restart_postgres=False, status='activated', step='complete', authorization=None)
+        projected.save = lambda: None
+        projected.activate(self.new.hash, 9999999999999999999)
+        limit = len(canonical(projected.data))
+        self.calls.clear()
+        before = self.state.path.read_bytes()
+        with mock.patch.object(state_module, 'STATE_LIMIT', limit):
+            with self.assertRaisesRegex(ValueError, 'state too large'):
+                self.engine.activate(self.new)
+        self.assertEqual(self.state.path.read_bytes(), before)
+        self.assertFalse(any('systemctl' in args or 'install.sh' in ' '.join(args) for args, _ in self.calls))
+
+    def test_recovery_discards_unsaved_activated_state(self):
+        self.crash_step = 'migrate'
+        with self.assertRaises(Crash):
+            self.engine.activate(self.new)
+        self.state.data['journal'].update(status='activated', step='complete')
+        self.state.data['active'] = self.new.hash
+        self.assertEqual(self.engine.recover(), 'rolled_back')
+        self.assertEqual(State(self.state.path).data['active'], self.old.hash)
+
     def test_recovery_restores_previous_postgres_before_querying_schema(self):
         self.paths.postgres_unit.write_bytes(b'changed\n')
         self.crash_step = 'migrate'

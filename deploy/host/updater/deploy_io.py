@@ -13,6 +13,7 @@ import time
 import tempfile
 
 
+
 JSON_LIMIT = 1024 * 1024
 
 
@@ -342,59 +343,3 @@ def interrupted(error):
         seen.add(id(error))
         error = error.__cause__ or error.__context__
     return False
-
-
-class ResultTooLarge(ValueError):
-    pass
-
-
-class Result:
-    def __init__(self, path, log, clock=now, state=None):
-        self.path, self.log, self.clock = Path(path), Path(log), clock
-        self.state = state
-        self.started = clock()
-        self.previous = {}
-        self.unreadable_previous = False
-        try:
-            self.previous = decode(read_json_bytes(self.path, 'previous result'), 'previous result')
-            if not isinstance(self.previous, dict):
-                self.previous = {}
-                self.unreadable_previous = True
-        except FileNotFoundError:
-            pass
-        except (OSError, ValueError):
-            self.unreadable_previous = True
-
-    def write(self, status, step, message, digest=None, manifest=None):
-        manifest = manifest or {}
-        finished = self.clock()
-        success = finished if status in ('ok', 'verified', 'bootstrapped', 'current') else self.previous.get('last_success_at')
-        value = dict(status=status, manifest_hash=digest, release=manifest.get('release'),
-                     sequence=manifest.get('sequence'), step=step, message=message,
-                     release_floor=self.state.data.get('release_floor') if self.state else None,
-                     started_at=self.started, finished_at=finished, last_success_at=success)
-        self.publish(value)
-
-    def publish(self, value):
-        raw = canonical(value) + b'\n'
-        too_large = len(raw) > JSON_LIMIT
-        if too_large:
-            value = dict(status='failed', step='result', message='result too large')
-            raw = canonical(value) + b'\n'
-        atomic(self.path, raw, 0o640)
-        self.warn_previous()
-        self.append(value)
-        if too_large:
-            raise ResultTooLarge('result too large')
-
-    def warn_previous(self):
-        if self.unreadable_previous:
-            self.append(dict(level='warning', step='result', message='previous result unreadable'))
-            self.unreadable_previous = False
-
-    def append(self, value):
-        descriptor = os.open(self.log, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o640)
-        with os.fdopen(descriptor, 'ab') as output:
-            output.write(canonical(dict(timestamp=self.clock(), **value)) + b'\n')
-            output.flush()
-            os.fsync(output.fileno())
