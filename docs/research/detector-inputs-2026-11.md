@@ -24,21 +24,26 @@ treat checks added under other checker ids as run inputs.
 
 | Item kind         | Clean items | Flagged items | Rejected items | Flagged fires | Rejected fires |
 | ----------------- | ----------: | ------------: | -------------: | ------------: | -------------: |
-| `article_label`   |           0 |           396 |             14 |             8 |              1 |
+| `article_label`   |           0 |           396 |             14 |             9 |              1 |
 | `document_number` |           0 |           120 |              5 |            28 |              1 |
 | `amount`          |           0 |            36 |              0 |             0 |              0 |
 | `date`            |           0 |            23 |              0 |             0 |              0 |
 | `extra_text`      |           0 |            96 |              1 |             0 |              0 |
 | `missing_text`    |           0 |           126 |             19 |             0 |              0 |
-| Total             |           0 |           797 |             39 |            36 |              2 |
+| Total             |           0 |           797 |             39 |            37 |              2 |
 
-38 of 535 candidate items would fire across 25 documents. Of the remainder, 283
-had matches outside tail only, 212 had no classifiable main span, and two
-matched both inside and outside tail. Eight firing items matched more than once,
-with every match in tail. Requiring the main article sequence to pass would cut
-the queue to nine items, losing 29 with a parsed tail. `142/2026/NĐ-CP` fires
-for five items even though its OCR was served; `1528/QĐ-TTg` fires for one
-withheld item. These are location signals, not new readings of the PDFs.
+39 of 535 candidate items would fire across 25 documents. Of the remainder, 283
+had complete token matches outside tail only, 212 had no classifiable main span,
+and one remained ambiguous. Eight firing items had more than one complete match
+in tail. No item was unlocated because all matches were embedded, or because the
+scan reached its work bound.
+
+The whole-token rule raised the estimate from 38 to 39: one item for
+`30/VBHN-NHNN` became tail-only after embedded matches were ignored. Requiring
+the main article sequence to pass would cut the queue to nine items.
+`142/2026/NĐ-CP` fires for five items even though its OCR was served;
+`1528/QĐ-TTg` fires for one withheld item. These are location signals, not new
+readings of the PDFs.
 
 ## Tree and transcription volume
 
@@ -82,16 +87,84 @@ adjudication: volume disagreement alone does not establish a defect.
 
 ## Reproduction
 
-The session scratchpad contains `reports/detectors/run.sh`,
-`reports/detectors/measure_test.go` (the exact `SELECT` queries and Go probe),
-`reports/detectors/overlay.json`, and `reports/detectors/distribution.py`.
-`run.sh` uses the Go overlay, without installing a source file in the checkout,
-and writes no database rows. The query joins `run_item` and `artifact` for
-committed fetch and extract inputs, checks the extract hash against the release
-`document` row, and checks the observed `tree_text_partial` gaps. The OCR probe
-reads `run_ocr_selection`, `ocr_text`, and `ocr_check` and checks OCR text
-SHA-256 on disk. The output is `reports/detectors/measurement.log` with numeric
-per-document tree observations in `reports/detectors/tree.tsv`.
+Use `workshop` and `corpus_vn_20261121_1` on local PostgreSQL with
+`default_transaction_read_only=on`. Use the artifact root for the recorded paths
+and the OCR store for `text/<text_sha256>.txt`. Run the SQL below with read
+privileges in the named databases.
+
+```sql
+-- Release database: document inventory.
+SELECT d.key, d.number, d.text_source, COALESCE(d.extract_sha256, ''),
+       EXISTS (SELECT FROM coverage_gap g WHERE g.stage = 'build'
+               AND g.kind = 'baseline_served' AND g.item_key = d.key),
+       d.is_consolidated
+FROM document d ORDER BY d.key;
+
+-- Workshop: committed fetch/extract pairs and their frozen OCR decision.
+SELECT i.item_key, fa.path, fa.sha256, ea.path, ea.sha256, COALESCE(o.gap, ''),
+       o.item_key IS NOT NULL, COALESCE(o.ocr_check_id, 0)
+FROM run r
+JOIN run_item i ON i.run_id = r.id AND i.stage = 'extract' AND i.state = 'done'
+JOIN artifact ea ON ea.id = i.artifact_id
+JOIN run_item f ON f.run_id = r.id AND f.item_key = i.item_key
+               AND f.stage = 'fetch' AND f.state = 'done'
+JOIN artifact fa ON fa.id = f.artifact_id
+LEFT JOIN run_ocr_selection o ON o.run_id = r.id AND o.item_key = i.item_key
+WHERE r.country = 'vn' AND r.rel = '20261121_1'
+ORDER BY i.item_key;
+
+-- Workshop: coverage gap for each paired document key ($1).
+SELECT EXISTS (
+    SELECT FROM gap g JOIN run r ON r.id = g.run_id
+    WHERE r.country = 'vn' AND r.rel = '20261121_1' AND g.stage = 'extract'
+      AND g.item_key = $1 AND g.kind = 'tree_text_partial'
+);
+
+-- Workshop: OCR store lookup by array of candidate PDF digests ($1).
+SELECT id, pdf_sha256, engine_id, text_sha256, bytes, origin, pages, created_at
+FROM ocr_text WHERE pdf_sha256 = ANY($1::text[])
+ORDER BY pdf_sha256, engine_id;
+
+-- Workshop: completed result for the OCR text id ($1) and checker id ($2).
+SELECT id, ocr_text_id, checker_id, result_sha256, result, flagged, created_at
+FROM ocr_check WHERE ocr_text_id = $1 AND checker_id = $2;
+```
+
+1. Iterate the workshop item rows in key order. Skip absent and baseline release
+   rows; require the extract digest to equal the release row's digest. Verify
+   any `text.json` read against the committed extract manifest.
+2. For each VBPL document, verify and decode the fetch `tree.json`. Where the
+   tree is nonempty and the release serves tree or HTML, use `selectFiles` on
+   that fetch bundle with OCR disabled. Verify the file list and the selected
+   HTML unless it exceeds the size limit. Render the tree from `extractTree`;
+   use `partialTreeLengths` on those rows and the selected HTML. Keep usable
+   pairs with positive counts. Record `text_source`, accepted main scope,
+   existing `tree.rule` (or heading-agreement if `tree.set_aside` is true
+   without a rule), both counts and the `tree_text_partial` gap. For a
+   `partial_tree` rule assert that the counts equal the frozen `tree` record.
+   Bin by serving source and rule, treating HTML without a tree decision as
+   other HTML. Sort ratios for quantiles. For threshold `n/d`, count a shorter
+   tree if `d*T < n*H`, or shorter HTML if `d*H < n*T`.
+3. For OCR, include only workshop rows whose selection gap is empty,
+   `ocr_label_flagged` or `ocr_rejected`. Use `SelectCheckSource` on the frozen
+   fetch bundle with the checker named above and extract's engine order. The
+   function consults OCR only after the usual source selection. Select the one
+   distinct PDF or the only PDF with a store entry; choose the first installed
+   engine in `AcceptedEngines` order. Obtain the check with `GetOCRCheck`. For a
+   served selection require matching frozen check id and `text.json` text and
+   result digests. Decode with `DecodeCheck`, verify the stored OCR file with
+   `ReadText`, count its verdict and tabulate all item kinds per verdict.
+4. Parse the verified OCR with `ParagraphsFromText` and `ParseArticles`. Map
+   each paragraph ordinal to `ScopeIndex` using each provision's inclusive
+   ordinal span; unassigned paragraphs are outside tail. An item cannot fire if
+   `same_document` is false or the parser recognizes no main span. Join
+   paragraphs with a space and use the
+   [specified matching and work bound](../design/detector-inputs.md#locate-the-reading-in-the-stored-ocr-text),
+   caching classifications by NFC, whitespace-collapsed OCR reading. The probe
+   used Knuth–Morris–Pratt, binary search on paragraph start offsets, and a
+   prefix count of tail paragraphs to test span coverage. Count one fire per
+   tail-only item and one firing document per unique key. Also count physical
+   matches before the token boundary test to identify an embedded-only reading.
 
 Production functions at `7427e297`:
 

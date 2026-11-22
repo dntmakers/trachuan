@@ -122,10 +122,12 @@ explicit source-resume command. Neither is an acceptable coverage gap.
 - For `fetch` the input hash is the bundle's own manifest sha256, learned after
   download. [Byte stability](fetch-bundles.md#byte-stability) excludes
   observation times and run state, so unchanged source bytes under the same
-  recipe keep their hash. The fetch artifact sha256 is the input hash of
-  `extract` for a document with a source tree; for other documents
-  [text extraction](text-extraction.md#inputs-and-reuse) adds the frozen text
-  source selection. The `relate` input hash is the versioned pair
+  recipe keep their hash. Under
+  [legacy extract recipes](text-extraction.md#inputs-and-reuse), source trees
+  use the fetch artifact hash and other documents bind the selected text source.
+  [`detector-inputs/1`](detector-inputs.md#capture-the-check-before-choosing-what-to-serve)
+  also binds completed OCR checks for withheld text. The `relate` input hash is
+  the versioned pair
   `sha256("fetch:<fetch sha256>\nextract:<extract sha256 or ->")`, validated by
   one shared function in relate processing and in every build reader of relate
   artifacts ([relations from text](relations-text.md#inputs-and-identity)).
