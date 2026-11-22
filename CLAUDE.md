@@ -2,7 +2,7 @@
 
 ## Claude Code specifics
 
-- The primary session runs as `manager` (`.claude/settings.json`); duties are in AGENTS.md "Agents".
+- The primary session runs Claude Code's default prompt with this file and `CLAUDE.local.md`; the owner picks its model with `/model`. Duties are in AGENTS.md "Agents" and `instructions/workflow.md`.
 - Agent dispatch and model routes are in `instructions/workflow.md`. The CLI fallback reads `.codex/agents/<role>.toml` from the worker's worktree and saves its final message to the report file.
 - Codex CLI workers run offline unit checks in the sandbox: the launcher makes the Go build and lint caches writable, allows loopback listeners and sets `GOPROXY=off`; integration tests and proofs stay with the primary. Workers mount `.codex/` read-only; the primary edits role files.
 - When a CLI worker stops with a question, answer in a short file and resume it instead of starting a fresh worker; copy the previous report first, because `-o` overwrites it. Put standing answers for small ambiguities in the brief.
