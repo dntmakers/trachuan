@@ -7,6 +7,9 @@ func validateRecovery(s Submission, id string) error {
 		return fmt.Errorf("invalid submission intent identity or ordered item hash")
 	}
 	legacy := s.KeyVersion == 0 && s.PriceVersion == ""
+	if s.Recipe.Article != nil && s.Recipe.Article.PromptVersion == 4 && !legacy {
+		return fmt.Errorf("historical article prompt requires pilot versions")
+	}
 	current := s.KeyVersion == keyVersion && s.PriceVersion == batchPriceVersion
 	if !legacy && !current {
 		return fmt.Errorf("invalid classification intent versions")
@@ -18,6 +21,17 @@ func validateRecovery(s Submission, id string) error {
 	var paid int
 	var reserve int64
 	for _, item := range s.Items {
+		if item.Article != nil && (!legacy || s.Recipe.Article == nil || s.Recipe.Article.PromptVersion != 4) {
+			a := item.Article
+			if a.DocumentTitle != "" || len(a.DocumentCodes) != 0 || a.PromptVersion != 0 {
+				return fmt.Errorf("legacy article fields in nonhistorical intent")
+			}
+			for _, node := range a.Nodes {
+				if node.HasProvisions || node.Ordinal != 0 {
+					return fmt.Errorf("legacy node fields in nonhistorical intent")
+				}
+			}
+		}
 		if s.KeyVersion == keyVersion {
 			if !validKey(item.RequestHash) || keys[item.RequestHash] || item.Key == "" {
 				return fmt.Errorf("invalid or duplicate classification intent key")
