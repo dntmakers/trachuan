@@ -46,9 +46,10 @@ func databaseRecipe() map[string]any {
 	return map[string]any{
 		"schema_version": schema.SchemaVersion, "schema_sha256": hash,
 		"dense_recipe": denseRecipe(), "lexical_recipe": lexical.Recipe1(),
-		"gap_kinds": gapKinds(), "loader_version": 1,
-		"lexical_runtime":  lexicalRuntime(),
-		"retrieval_recipe": bootstrapRetrievalRecipe(), "calibration": "public-free-only-open/2",
+		"gap_kinds": gapKinds(), "loader_version": 2,
+		"source_provenance": "source-selection/2",
+		"lexical_runtime":   lexicalRuntime(),
+		"retrieval_recipe":  bootstrapRetrievalRecipe(), "calibration": "public-free-only-open/2",
 		"query_recipe_hash": embedding.QueryRecipe1().Hash(),
 	}
 }
