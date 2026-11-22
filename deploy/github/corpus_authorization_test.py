@@ -111,7 +111,8 @@ class AuthorizationBoundaryTest(unittest.TestCase):
     def test_upload_dry_run_rejects_old_fixture_at_local_main(self):
         args = ['corpus_upload.py', '--dry-run', '--repository', 'dannyota/trachuan', 'vn', self.report['rel'],
                 str(self.directory), str(self.report_path)]
-        with patch('sys.argv', args), self.assertRaisesRegex(ValueError, 'warning fixture differs'):
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'dannyota/trachuan'}), \
+                patch('sys.argv', args), self.assertRaisesRegex(ValueError, 'warning fixture differs'):
             corpus_upload.main()
 
     def test_unsigned_manifest_creation_rejects_old_fixture_at_workflow_commit(self):
