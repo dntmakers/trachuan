@@ -75,9 +75,9 @@ settles nothing; in classification, `failed` and `abandoned` in
 evidence. When results can never be complete, the submission stays unsettled for
 good: its reserve stays in the ledger, labelled an estimate in every report, and
 each item without evidence becomes an `unknown` attempt. An `unknown` key is
-never submitted again by any run; it stays a gap until its key changes or the
-operator records, in the intent log store, a decision naming the key and the
-reason it may run again.
+never submitted again by any run; it stays a gap until its key changes. An
+operator note may record reconciliation, but only provider evidence lets the
+same key run again.
 
 Each settlement, with its evidence, is written to `submissions/<id>.settled` in
 the intent log store, and `--rebuild` restores the ledger from those files. The
