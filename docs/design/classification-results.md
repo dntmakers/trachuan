@@ -52,27 +52,38 @@ attempt and costs nothing.
 ## Evidence rule
 
 One rule closes every case where it is unclear whether a paid request ran or
-what it cost: keys stay locked and reserves stay held until stored provider
-evidence settles them. Only two kinds of evidence settle a submission:
+what it cost: a key is never resubmitted and a reserve is never released without
+stored provider evidence. Each item settles from one of these:
 
-- downloaded results that give each item in the intent exactly one outcome with
-  usage counts, matched by `custom_id`; or
-- a stored listing of the provider's batches over the submission's time window
-  that shows no batch carrying the submission (Anthropic by `custom_id` prefix,
-  OpenAI by the submission id in batch metadata and the recorded input file id),
-  which records the submission `abandoned` at zero cost.
+- a returned result matched by `custom_id`: a model response with its usage
+  counts, priced by token kind; or a result the provider marks as not run or not
+  billed (an Anthropic `expired` or `canceled` item, an OpenAI `batch_expired`
+  error line), at zero cost;
+- for the whole submission, a provider batch that ended in validation failure
+  with no requests processed, at zero cost; or
+- for the whole submission, a stored, fully paginated listing of the provider's
+  batches in the key's workspace (Anthropic) or project (OpenAI) over the
+  submission's time window, in which every candidate batch was checked and none
+  carries the submission (Anthropic by `custom_id` prefix, OpenAI by the
+  submission id in batch metadata and the recorded input file id); this records
+  the submission `abandoned` at zero cost.
 
 A deadline, a timeout, a missing or expired result file, an item with no
 outcome, a duplicate or unknown `custom_id`, or usage that cannot be priced
 settles nothing; in classification, `failed` and `abandoned` in
-[batch submissions](batch-submissions.md) release keys and reserve only on this
-evidence. When results can never be complete, the operator may settle the
-submission at its full reserve: every item without a returned result becomes a
-`failed` attempt, so cost is never undercounted. Each settlement, with its
-evidence, is written to `submissions/<id>.settled` in the intent log store, and
-`--rebuild` restores the ledger from those files. The pilot submissions, settled
-before this note, get their `.settled` files from the current workshop database
-once; they have no result records and are never replayed.
+[batch submissions](batch-submissions.md) release keys and reserves only on this
+evidence. When results can never be complete, the submission stays unsettled for
+good: its reserve stays in the ledger, labelled an estimate in every report, and
+each item without evidence becomes an `unknown` attempt. An `unknown` key is
+never submitted again by any run; it stays a gap until its key changes or the
+operator records, in the intent log store, a decision naming the key and the
+reason it may run again.
+
+Each settlement, with its evidence, is written to `submissions/<id>.settled` in
+the intent log store, and `--rebuild` restores the ledger from those files. The
+pilot submissions, settled before this note, get their `.settled` files from the
+current workshop database once; they have no result records and are never
+replayed.
 
 ## Key locks and admission
 

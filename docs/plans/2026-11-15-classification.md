@@ -4,7 +4,7 @@
 
 **Goal:** every primary article in the release carries subject nodes: seeds from the 2023 codification package, then inheritance through consolidations, then an LLM layer in batches for the rest, gated by the floors in [taxonomy](../design/taxonomy.md#evaluation-gate).
 
-**Budget:** the owner approved paid use on both keys on 2026-11-22 with no per-run approval; the 150 USD cap is lifted. Budget names and amounts on the whole ledger: pilot 15 USD (closed at 9.54), trial 200 USD, and `full`, which the primary sets before the full run from the chosen trial's cost per article times the remaining articles plus 25 percent, adds to code, and raises when the ledger nears it (the standing approval covers a raise). Admission, reserves and settlement follow [classification results](../design/classification-results.md).
+**Budget:** the owner approved paid use on both keys on 2026-11-22 with no per-run approval; the 150 USD cap is lifted. Budget names and amounts on the whole ledger: pilot 15 USD (closed at 9.54), trial 200 USD, and `full`, which the primary sets before the full run as the ledger at that time plus the chosen trial's cost per article times the remaining articles plus 25 percent, adds to code, and raises when the ledger nears it (the standing approval covers a raise). Admission, reserves and settlement follow [classification results](../design/classification-results.md).
 
 **Spec:** [classification results](../design/classification-results.md), [taxonomy](../design/taxonomy.md) ("Classification layers", "Serving", "Evaluation gate"), [batch submissions](../design/batch-submissions.md), [evaluation](../design/evaluation.md) filter gate. The spec wins over this plan.
 
