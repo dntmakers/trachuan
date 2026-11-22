@@ -277,6 +277,17 @@ counts as a miss in its slice, so the denominator never shrinks; when more than
 5 percent of a set's entries fail, the slice is unavailable until the set is
 re-adjudicated and frozen again. A redraw is a reviewed change, never automatic.
 
+A model-adjudicated set gates a classifier only when its labeling model comes
+from a different provider than the classifier; `corpus eval` reads the provider
+from the set file and refuses the slice otherwise, so with no independent set
+the slice is unavailable and the classifier fails it. A second, independent set
+for a slice keeps the first set's frozen article list (no new draw and no
+replacement), is labeled blind under the same labeling rule with an empty label
+set kept as `no_node`, is read like the first and is frozen as
+`taxonomy-<slice>-<provider>.json`. Its labeling run is a paid corpus command
+under the plan's trial budget, with results kept as
+[classification results](classification-results.md) says.
+
 The report also lists assignment counts per node, unassigned counts, and the
 diff of node changes against the previous release. A failed floor blocks
 `release`.

@@ -54,12 +54,15 @@
 
 ### 8.5 Full batch (paid, after the coordinator confirms the estimate)
 
-- [ ] The cheapest model that passed the floors; unassigned gaps below threshold; evaluated corpus run; release.
+- [ ] Superseded by 8.6: unassigned gaps below threshold; evaluated corpus run; release.
 
 ### 8.6 Newest models (reopened 2026-11-22)
 
-- [ ] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget.
-- [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice. A pass on every applicable floor goes to the result store and the full run; a fail is recorded in ADR 0004 History.
-- [ ] Result store and reuse ([classification results](../design/classification-results.md)): request key, `results/<key>.json`, index, reuse before submission, retry count per key; prompt prefix first for caching.
-- [ ] OpenAI Batch provider on `/v1/responses` and `gpt-6.2-astra` trial on the seeded 300; Anthropic adjudication of the multi-family and post-2023 sets before they gate an OpenAI classifier.
+Order: no new paid call runs before the result store lands, whatever its outcome.
 
+- [ ] Classify accepts `claude-opus-5-5` and `claude-fable-5-2` at their Batch prices and the `trial` budget (migration for the submission checks).
+- [ ] Result store ([classification results](../design/classification-results.md)): request key, immutable attempt records, the `final` rule, three attempts per key, key locks across releases, settlement by token kind, replay; requests put the stable prefix first with cache markers; price table with all token kinds and a version.
+- [ ] Trial `claude-fable-5-2` (prompt v2, document then article requests, level 2) on the seeded 300 and the 200 model-adjudicated articles; score every slice; record the result in ADR 0004 History whether it passes or fails.
+- [ ] OpenAI Batch provider on `/v1/responses` (metadata and input file id for matching, output and error files merged by `custom_id`).
+- [ ] Anthropic adjudication of the multi-family and post-2023 article lists (taxonomy.md "Evaluation gate"), then a `gpt-6.2-astra` trial on every slice.
+- [ ] Full run with the model chosen by classification-results.md "Providers and models"; the `full` budget is set from the chosen trial's projection.
