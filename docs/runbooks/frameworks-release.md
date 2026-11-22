@@ -164,18 +164,37 @@ trap 'podman rm -f "$CID" >/dev/null 2>&1' EXIT
 `--memory-swap` equal to `--memory` gives the probe no swap, as
 `MemorySwapMax=0` does for the service, and `--timeout` ends it after 15 minutes
 even if the shell dies. Every later command uses the returned container ID,
-never a name. Wait up to five minutes: call `/readyz` until it answers 200, then
-require `mail_disabled`, `ready` postings and an `opened` frameworks release in
-the probe's own log; anything else ends the probe as failed:
+never a name. Set `LAW_REL` to `release` of
+`https://trachuan.vn/api/v1/public/status` and `FW_REL` to the active frameworks
+`rel` from `release-frameworks.json`. Within a five-minute deadline, call
+`/readyz` (each call bounded to 5 seconds) until it answers 200, then require in
+the probe's own log `mail_disabled`, `ready` postings for `LAW_REL` and an
+`opened` frameworks release for `FW_REL`; anything else ends the probe as
+failed. The log parser is the host's `python3`:
 
 ```sh
+LAW_REL='...'
+FW_REL='...'
+status() {
+  podman logs "$CID" 2>&1 | python3 -c '
+import json, sys
+msg, rel, out = sys.argv[1], sys.argv[2], ""
+for line in sys.stdin:
+    try:
+        record = json.loads(line)
+    except ValueError:
+        continue
+    if isinstance(record, dict) and record.get("msg") == msg and (not rel or record.get("release") == rel):
+        out = record.get("status") or msg
+print(out)' "$1" "$2"
+}
+end=$((SECONDS + 300))
 ready=
-for i in $(seq 1 60); do
-  code=$(curl -q -s --noproxy '*' -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/readyz")
-  logs=$(podman logs "$CID" 2>&1)
-  mail=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "mail_disabled") | .msg' | tail -n 1)
-  law=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "sparse postings") | .status' | tail -n 1)
-  fw=$(printf '%s\n' "$logs" | jq -Rr 'fromjson? | select(.msg == "frameworks release") | .status' | tail -n 1)
+while [ "$SECONDS" -lt "$end" ]; do
+  code=$(curl -q -s --max-time 5 --noproxy '*' -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/readyz")
+  mail=$(status mail_disabled '')
+  law=$(status 'sparse postings' "$LAW_REL")
+  fw=$(status 'frameworks release' "$FW_REL")
   if [ "$code" = 200 ] && [ -n "$mail" ] && [ "$law" = ready ] && [ "$fw" = opened ]; then ready=1; break; fi
   if [ -n "$fw" ] && [ "$fw" != opened ]; then break; fi
   sleep 5
