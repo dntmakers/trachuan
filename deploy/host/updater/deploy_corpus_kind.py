@@ -97,6 +97,8 @@ class Frameworks:
         return self.sql.activate(row, retire)
 
     def cause(self, error):
+        if error.detail == 'smoke container teardown failed':
+            return error.detail
         found = re.match(r'[^:]*: exit -?[0-9]+', error.detail or '')
         if not found:
             return None

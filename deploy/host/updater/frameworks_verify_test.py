@@ -161,12 +161,18 @@ class FrameworksVerificationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             calls = []
             def runner(args, **kwargs):
+                if args[:2] == ['podman', 'rm']:
+                    return b''
+                if args[:3] == ['podman', 'container', 'exists']:
+                    raise CommandError('absent', returncode=1)
                 calls.append(args)
                 return canonical(description(self.m))
             host = Host(Paths(Path(directory)), runner, user_prefix=[])
             self.assertEqual(Database(host, self.rules, FRAMEWORKS).describe('server-image'), description(self.m))
             Database(host, self.rules, LAW).describe('server-image')
             frameworks, law = calls
+            self.assertNotEqual(frameworks[3], law[3])
+            frameworks[3] = law[3]
             self.assertEqual(frameworks, law + ['--kind', 'frameworks'])
             self.assertEqual(law[-2:], ['server-image', 'release-check'])
 

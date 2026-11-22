@@ -54,7 +54,7 @@ class FrameworksSmokeTest(StepsFixture, unittest.TestCase):
         self.assertEqual(self.names(), ['schema', 'check', 'verify', 'release-check', 'verify'])
         self.assertIn("'relation corpus_reader SELECT'", self.sql('check'))
         args, kwargs = self.call('release-check')
-        self.assertEqual(args, ['podman', 'run', '--rm', '--network=host', '--read-only', '--cap-drop=ALL',
+        self.assertEqual(args, ['podman', 'run', '--name', args[3], '--label', 'trachuan.updater=smoke', '--network=host', '--read-only', '--cap-drop=ALL',
                                 '--security-opt=no-new-privileges', '--env-file', str(self.paths.host / 'server.env'),
                                 '--secret', 'server_corpus_database_url,type=env,target=SERVER_CORPUS_DATABASE_URL',
                                 'server-image', 'release-check', '--kind', 'frameworks', '--database', self.name])

@@ -260,8 +260,12 @@ def terminate(process):
 def command(args, input=None, timeout=300, stdout_limit=None, error_prefix=None, input_file=None, safe=None, cancel=False):
     if input is not None and input_file is not None:
         raise ValueError('conflicting command input')
-    if cancel and (args[-4:] != ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
-                   or timeout != 10 or input is not None or input_file is not None):
+    cleanup_name = args[-1] if args else ''
+    container_cleanup = (re.fullmatch(r'trachuan-updater-smoke-[0-9a-f]{32}', cleanup_name) and
+                         (args[-6:-1] == ['podman', 'rm', '--force', '--time', '0'] or
+                          args[-4:-1] == ['podman', 'container', 'exists']))
+    if cancel and ((args[-4:] != ['systemctl', '--user', 'stop', 'trachuan-caddy.service']
+                    and not container_cleanup) or timeout != 10 or input is not None or input_file is not None):
         raise ValueError('invalid cancellation command')
     check = (lambda: None) if cancel else check_stop
     check()
