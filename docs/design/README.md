@@ -30,6 +30,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [OCR cross-check version 5](ocr-check-v5.md)                                     | Proposed: empty items allowed, coverage field, placeholder items named                                           |
 | [fresh OCR requests](ocr-vision.md)                                              | Google Cloud Vision requests for PDFs the OCR store lacks: page images, limits, command                          |
 | [batch submissions](batch-submissions.md)                                        | Submission intent log and recovery for external batch services                                                   |
+| [classification results](classification-results.md)                              | Paid model calls in the write path only, stored and reused results, providers, prices, budgets                   |
 | [scope adoption](scope-adoption.md)                                              | Schema version 3, inventory version 2, build loading by final membership                                         |
 | [validity corrections](validity-status.md)                                       | Text rules, manual corrections and review queue for wrong or missing source validity                             |
 | [membership](membership.md)                                                      | Support supersession, retention, withdrawal, fetch drift and removal lifetime                                    |

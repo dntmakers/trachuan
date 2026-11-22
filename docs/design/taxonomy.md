@@ -95,9 +95,11 @@ under the corpus rules.
    the union. Any other case (no such article, an empty or different heading)
    inherits nothing, goes to the LLM layer and is counted. No LLM is involved.
 3. LLM in batches over public legal text, after `chunk` and `embed` have run,
-   for articles that hold no seed or inherited node and are not fragments (see
-   the evaluation gate); a fragment has no subject of its own, so it keeps seeds
-   and inheritance only:
+   with results stored and reused as
+   [classification results](classification-results.md) says, for articles that
+   hold no seed or inherited node and are not fragments (see the evaluation
+   gate); a fragment has no subject of its own, so it keeps seeds and
+   inheritance only:
    - One request per document (title, scope article, table of contents, VBPL
      field) chooses from a menu of active level-2 nodes, each shown as
      `<level-1 name> > <level-2 name>`; a level-2 node with no provisions and no
@@ -274,6 +276,19 @@ has the recorded SHA-256, and every code is an active node. An entry that fails
 counts as a miss in its slice, so the denominator never shrinks; when more than
 5 percent of a set's entries fail, the slice is unavailable until the set is
 re-adjudicated and frozen again. A redraw is a reviewed change, never automatic.
+
+A model-adjudicated set gates a classifier only when its labeling model comes
+from a different provider than the classifier; `corpus eval` reads the provider
+from the set file and refuses the slice otherwise, so with no independent set
+the slice is unavailable and the classifier fails it. A second, independent set
+for a slice keeps the first set's frozen article list (no new draw and no
+replacement) and is labeled blind under the same labeling rule. An article the
+second labeler leaves without any code goes to the coordinator, who labels it
+from its text under the same rule; the set is read like the first, frozen as
+`taxonomy-<slice>-<provider>.json`, and gates only when every article in the
+list has a label. Its labeling run is a paid corpus command under the plan's
+trial budget, with results kept as
+[classification results](classification-results.md) says.
 
 The report also lists assignment counts per node, unassigned counts, and the
 diff of node changes against the previous release. A failed floor blocks
