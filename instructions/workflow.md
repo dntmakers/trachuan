@@ -32,6 +32,8 @@ A reviewer never runs on the author's model. Astra and Fable never write code. T
 
 Security-relevant work beyond one line needs an adversarial pass before merge: login, sessions, OAuth, tokens, CIMD fetching, rate limits, corpus release activation, backups, deploy and release workflows. Model these attackers: an anonymous visitor; a signed-in user attacking another account; a hostile MCP client or CIMD document; a stolen token or cookie; a network position between client and edge; a compromised container on the host; a leaked backup.
 
+A corpus fix for a defect that a person or an outside report found and no detector opened merges only when a detector for its class exists, in that pull request or an earlier one, or when the pull request body says in one line why the class cannot be seen in data (`docs/design/knowledge-loop.md` "From finding to knowledge"); reviewers check it.
+
 Review output: Verdict (`merge`, `fix first`, `redesign`); Findings ordered blocker, major, minor as `R-nn. [severity] [category] file:line` for code, `S-nn.` for design, `A-nn. [attacker]` for adversarial; Checks read; Not checked. Quote the text, state the failure scenario, give one fix sentence. Do not write the fix.
 
 ## Briefs and reports
