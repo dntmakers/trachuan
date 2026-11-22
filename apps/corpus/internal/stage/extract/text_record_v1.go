@@ -12,24 +12,35 @@ type treeTranscriptionV1 = fetch.TreeTranscriptionV1
 type treeTranscriptionDetails = fetch.TreeTranscriptionDetails
 
 func marshalV1TextRecord(record *textRecord, selected selection, ocrText []byte) ([]byte, error) {
+	detector, err := deriveDetectorInputsV1(selected, ocrText)
+	if err != nil {
+		return nil, err
+	}
+	return marshalV1TextRecordWithInputs(record, selected, detector)
+}
+
+func deriveDetectorInputsV1(selected selection, ocrText []byte) (detectorInputsV1, error) {
+	ocr, err := buildOCRCheckObservation(selected, ocrText)
+	if err != nil {
+		return detectorInputsV1{}, err
+	}
+	if selected.source == "ocr" && ocr.State != "checked" {
+		return detectorInputsV1{}, fmt.Errorf("OCR source requires checked observation")
+	}
+	tree, err := marshalTreeTranscriptionValue(selected)
+	if err != nil {
+		return detectorInputsV1{}, err
+	}
+	return detectorInputsV1{Version: 1, OCRCheck: ocr, TreeTranscription: tree}, nil
+}
+
+func marshalV1TextRecordWithInputs(record *textRecord, selected selection, detector detectorInputsV1) ([]byte, error) {
 	if record == nil && selected.source != "source_tree" {
 		return nil, fmt.Errorf("missing extract text record")
 	}
 	if record != nil && record.TextSource != selected.source {
 		return nil, fmt.Errorf("extract text source mismatch")
 	}
-	ocr, err := buildOCRCheckObservation(selected, ocrText)
-	if err != nil {
-		return nil, err
-	}
-	if selected.source == "ocr" && ocr.State != "checked" {
-		return nil, fmt.Errorf("OCR source requires checked observation")
-	}
-	tree, err := marshalTreeTranscriptionValue(selected)
-	if err != nil {
-		return nil, err
-	}
-	detector := detectorInputsV1{Version: 1, OCRCheck: ocr, TreeTranscription: tree}
 	if record == nil {
 		return json.Marshal(struct {
 			TextSource string           `json:"text_source"`

@@ -44,6 +44,7 @@ func selectOCRFilesMode(ctx context.Context, dir, id string, files []fetch.Docum
 	}
 	selected.consulted = true
 	if source == nil {
+		selected.pdfNames = names
 		return selected, nil
 	}
 	entries, err := source.Lookup(ctx, hashes, engines, checker)
@@ -114,7 +115,10 @@ func observationInputHash(fetchHash string, selected selection) string {
 
 func parseOCR(selected selection, data []byte) ([]provision, []stage.Gap, *textRecord) {
 	entry := selected.entry
-	paragraphs, err := textparse.ParagraphsFromText(string(data))
+	paragraphs, err := selected.ocrParagraphs, selected.ocrParseErr
+	if !selected.ocrParsed {
+		paragraphs, err = textparse.ParagraphsFromText(string(data))
+	}
 	flagged := entry.Check.Flagged
 	record := &textRecord{TextSource: "ocr", FileName: selected.name, SHA256: selected.hash, EngineID: entry.Text.EngineID, TextSHA256: entry.Text.TextSha256, CheckerID: entry.Check.CheckerID, ResultSHA256: entry.Check.ResultSha256, Flagged: &flagged, Paragraphs: paragraphs}
 	rows, gaps, record := parseParagraphs(paragraphs, err, record)

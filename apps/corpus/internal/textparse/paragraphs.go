@@ -29,7 +29,31 @@ type LimitError struct {
 
 func (e *LimitError) Error() string { return fmt.Sprintf("%s exceeds limit %d", e.Limit, e.Maximum) }
 
-func normalize(s string) string { return norm.NFC.String(strings.Join(strings.Fields(s), " ")) }
+func normalize(s string) string {
+	var first string
+	count, size := 0, 0
+	for field := range strings.FieldsSeq(s) {
+		if count == 0 {
+			first = field
+		} else {
+			size++
+		}
+		count++
+		size += len(field)
+	}
+	if count < 2 {
+		return norm.NFC.String(first)
+	}
+	var joined strings.Builder
+	joined.Grow(size)
+	for field := range strings.FieldsSeq(s) {
+		if joined.Len() != 0 {
+			joined.WriteByte(' ')
+		}
+		joined.WriteString(field)
+	}
+	return norm.NFC.String(joined.String())
+}
 
 // ParagraphsFromText returns one paragraph per nonempty OCR line.
 func ParagraphsFromText(text string) ([]Paragraph, error) {

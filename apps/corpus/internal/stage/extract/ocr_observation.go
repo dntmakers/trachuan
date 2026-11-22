@@ -37,12 +37,13 @@ func buildOCRCheckObservation(selected selection, data []byte) (ocrCheckObservat
 		return ocrCheckObservation{}, fmt.Errorf("invalid OCR observation state")
 	}
 	entry := selected.entry
-	if err := ocrstore.VerifyStoredCheck(entry.Check.Result, entry.Check.ResultSha256, entry.Check.Flagged); err != nil {
-		return ocrCheckObservation{}, fmt.Errorf("verify OCR observation check: %w", err)
-	}
-	check, err := ocrstore.DecodeCheck(entry.Check.Result)
-	if err != nil {
-		return ocrCheckObservation{}, fmt.Errorf("decode OCR observation check: %w", err)
+	check := selected.verifiedCheck
+	if check == nil {
+		verified, err := ocrstore.VerifyStoredCheckResult(entry.Check.Result, entry.Check.ResultSha256, entry.Check.Flagged)
+		if err != nil {
+			return ocrCheckObservation{}, fmt.Errorf("verify OCR observation check: %w", err)
+		}
+		check = &verified
 	}
 	details := &ocrCheckDetails{
 		PDFSHA256: selected.hash, EngineID: entry.Text.EngineID, TextSHA256: entry.Text.TextSha256,
@@ -50,7 +51,10 @@ func buildOCRCheckObservation(selected selection, data []byte) (ocrCheckObservat
 		SameDocument: check.SameDocument, Verdict: check.Verdict, PageCount: check.PDFPages,
 		LineCount: strings.Count(string(data), "\n") + 1, Items: make([]ocrCheckItem, 0),
 	}
-	paragraphs, parseErr := textparse.ParagraphsFromText(string(data))
+	paragraphs, parseErr := selected.ocrParagraphs, selected.ocrParseErr
+	if !selected.ocrParsed {
+		paragraphs, parseErr = textparse.ParagraphsFromText(string(data))
+	}
 	var spans []textparse.ArticleScopeSpan
 	if parseErr == nil {
 		spans = textparse.ArticleScopeSpans(paragraphs)

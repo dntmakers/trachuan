@@ -87,14 +87,9 @@ backfill a digest or reconstruct ids. New inserts use version `1`, a non-null
 | `not_selected`    | `none`, `text_number_mismatch`; or `source_tree`, `tree_headings_only` when no OCR candidate was consulted | All null                                    |
 
 No row is needed for an ordinary deterministic choice that bypasses OCR. Version
-1 must not read version 0 selections. Process verifies the PDF, text and check
-identities and planned input hash, and hashes the stored text on read. Verify
-the check result using the store's canonical serialization, preserving the
-legacy omission of `dropped_equal`, not PostgreSQL's JSONB rendering
-([check.go:45–61](../../apps/corpus/internal/ocrstore/check.go#L45-L61),
-[check.go:167–179](../../apps/corpus/internal/ocrstore/check.go#L167-L179),
-[store.go:49–69](../../apps/corpus/internal/ocrstore/store.go#L49-L69),
-[store.go:168–174](../../apps/corpus/internal/ocrstore/store.go#L168-L174)).
+1 must not read version 0 selections. Use the same
+[frozen extract admission](detector-input-admission.md) for all extract
+artifacts.
 
 Compute the existing extract input hash as `base`. With a completed check, use
 `RecipeHash("extract-ocr-observation", "1", base, pdf_sha256, engine_id, text_sha256, checker_id, result_sha256)`

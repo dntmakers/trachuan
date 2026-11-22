@@ -12,7 +12,6 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/ocrstore"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
-	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
 	"danny.vn/trachuan/apps/corpus/internal/store"
 	"danny.vn/trachuan/apps/corpus/internal/vbpl"
@@ -213,6 +212,13 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if expectedHash != item.InputHash {
 		return stage.Output{}, stage.Retryable(fmt.Errorf("text selection changed for %q", item.Key))
 	}
+	var detector detectorInputsV1
+	if v1 {
+		detector, err = deriveDetectorInputsV1(selected, ocrData)
+		if err != nil {
+			return stage.Output{}, fmt.Errorf("derive detector inputs: %w", err)
+		}
+	}
 	var rows []provision
 	var gaps []stage.Gap
 	var record *textRecord
@@ -278,7 +284,7 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 			var b []byte
 			var marshalErr error
 			if v1 {
-				b, marshalErr = marshalV1TextRecord(record, selected, ocrData)
+				b, marshalErr = marshalV1TextRecordWithInputs(record, selected, detector)
 			} else {
 				b, marshalErr = json.Marshal(record)
 			}
@@ -295,8 +301,8 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 		return stage.Output{}, fmt.Errorf("publish extract artifact: %w", err)
 	}
 	if v1 && art.Adopted {
-		if err = fetch.CheckExtractLineageContract(env.Artifacts.Abs(art.Path), input.Sha256, item.InputHash, stage.ExtractRecordV1); err != nil {
-			return stage.Output{}, fmt.Errorf("adopted extract lineage: %w", err)
+		if err = admitExistingV1(env, art, input.Sha256, item.InputHash, selected.source, detector); err != nil {
+			return stage.Output{}, fmt.Errorf("adopted extract admission: %w", err)
 		}
 	}
 	return stage.Output{Artifact: &art, State: "done"}, nil

@@ -7,7 +7,6 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
-	"danny.vn/trachuan/apps/corpus/internal/stage/fetch"
 	"danny.vn/trachuan/apps/corpus/internal/store"
 )
 
@@ -28,11 +27,13 @@ func (s *Stage) VerifyReuse(ctx context.Context, env stage.Env, run stage.Run, i
 	if err != nil {
 		return err
 	}
-	if _, _, _, err = s.resolveFrozenV1(ctx, env, run, item, input, members); err != nil {
+	selected, _, data, err := s.resolveFrozenV1(ctx, env, run, item, input, members)
+	if err != nil {
 		return err
 	}
-	if err = fetch.CheckExtractLineageContract(env.Artifacts.Abs(art.Path), input.Sha256, item.InputHash, stage.ExtractRecordV1); err != nil {
-		return fmt.Errorf("cached extract lineage: %w", err)
+	detector, err := deriveDetectorInputsV1(selected, data)
+	if err != nil {
+		return fmt.Errorf("derive detector inputs: %w", err)
 	}
-	return nil
+	return admitExistingV1(env, art, input.Sha256, item.InputHash, selected.source, detector)
 }

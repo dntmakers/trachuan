@@ -200,7 +200,13 @@ func TestV1ReuseRejectsCachedRecordMismatch(t *testing.T) {
 
 type countedAuthorityOCR struct {
 	ocrReader
-	reads int
+	reads   int
+	lookups int
+}
+
+func (c *countedAuthorityOCR) Lookup(context.Context, []string, []string, string) (map[string]ocrstore.Entry, error) {
+	c.lookups++
+	return nil, fmt.Errorf("unexpected OCR reselection")
 }
 
 func (c *countedAuthorityOCR) ReadText(entry store.OcrText) ([]byte, error) {
@@ -231,10 +237,10 @@ func TestV1AuthorityReadsOCROncePerFreshOrReuse(t *testing.T) {
 	s := New().WithOCR(ocr, []string{"engine"}, "checker")
 	s.ocr = counted
 	out, err := s.Process(ctx, env, run, item)
-	if err != nil || out.Artifact == nil || counted.reads != 1 {
-		t.Fatalf("out=%+v reads=%d err=%v", out, counted.reads, err)
+	if err != nil || out.Artifact == nil || counted.reads != 1 || counted.lookups != 0 {
+		t.Fatalf("out=%+v reads=%d lookups=%d err=%v", out, counted.reads, counted.lookups, err)
 	}
-	if err = s.VerifyReuse(ctx, env, run, item, *out.Artifact); err != nil || counted.reads != 2 {
-		t.Fatalf("reuse reads=%d err=%v", counted.reads, err)
+	if err = s.VerifyReuse(ctx, env, run, item, *out.Artifact); err != nil || counted.reads != 2 || counted.lookups != 0 {
+		t.Fatalf("reuse reads=%d lookups=%d err=%v", counted.reads, counted.lookups, err)
 	}
 }

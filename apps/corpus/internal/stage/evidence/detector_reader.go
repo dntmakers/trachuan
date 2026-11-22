@@ -122,12 +122,12 @@ func loadDetectorInputs(ctx context.Context, in Inputs, rel releaseData, extract
 		if readErr != nil {
 			return detectorIncomplete("extract artifact failed verification for %s: %v", doc.Key, readErr)
 		}
-		if lineageErr := fetch.CheckExtractLineageV1Bytes(text, *fetchItem.ArtifactSHA256, *extractItem.InputHash); lineageErr != nil {
+		source, detector, lineageErr := fetch.VerifyExtractLineageV1Bytes(text, *fetchItem.ArtifactSHA256, *extractItem.InputHash)
+		if lineageErr != nil {
 			return detectorIncomplete("extract lineage mismatch for %s: %v", doc.Key, lineageErr)
 		}
-		detector, decodeErr := fetch.DecodeDetectorTextV1(text, doc.TextSource)
-		if decodeErr != nil {
-			return detectorIncomplete("invalid extract record for %s: %v", doc.Key, decodeErr)
+		if source != doc.TextSource {
+			return detectorIncomplete("extract text source mismatch for %s", doc.Key)
 		}
 		if (doc.Source == "vbpl" && detector.TreeTranscription.State == "not_applicable") || (doc.Source != "vbpl" && (detector.TreeTranscription.State != "not_applicable" || doc.TextSource == "source_tree")) {
 			return detectorIncomplete("tree observation and document source disagree for %s", doc.Key)

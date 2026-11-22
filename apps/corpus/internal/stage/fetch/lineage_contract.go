@@ -48,36 +48,41 @@ func checkExtractLineageV1(dir, fetchHash, inputHash string) error {
 }
 
 func CheckExtractLineageV1Bytes(data []byte, fetchHash, inputHash string) error {
+	_, _, err := VerifyExtractLineageV1Bytes(data, fetchHash, inputHash)
+	return err
+}
+
+func VerifyExtractLineageV1Bytes(data []byte, fetchHash, inputHash string) (string, DetectorInputsV1, error) {
 	fields, err := detectorObjectMode(data, true)
 	if err != nil {
-		return fmt.Errorf("decode extract text record: %w", err)
+		return "", DetectorInputsV1{}, fmt.Errorf("decode extract text record: %w", err)
 	}
 	source, err := lineageString(fields, "text_source")
 	if err != nil {
-		return err
+		return "", DetectorInputsV1{}, err
 	}
 	detector, err := DecodeDetectorInputsV1(fields["detector_inputs"], source)
 	if err != nil {
-		return fmt.Errorf("decode detector inputs: %w", err)
+		return "", DetectorInputsV1{}, fmt.Errorf("decode detector inputs: %w", err)
 	}
 	base := ExtractInputHash(fetchHash, source)
 	switch source {
 	case "none":
 		gap, gapErr := lineageString(fields, "gap")
 		if gapErr != nil {
-			return gapErr
+			return "", DetectorInputsV1{}, gapErr
 		}
 		switch gap {
 		case "needs_ocr", "text_source_ambiguous", "file_format_unsupported", "no_text_source", "ocr_rejected", "ocr_label_flagged", "text_number_mismatch":
 		default:
-			return fmt.Errorf("invalid absent text gap")
+			return "", DetectorInputsV1{}, fmt.Errorf("invalid absent text gap")
 		}
 		if detector.OCRCheck.State == "checked" {
 			if (gap == "ocr_rejected" && detector.OCRCheck.Verdict != "rejected") || (gap == "ocr_label_flagged" && detector.OCRCheck.Verdict != "flagged") || (gap != "ocr_rejected" && gap != "ocr_label_flagged") {
-				return fmt.Errorf("OCR gap and check disagree")
+				return "", DetectorInputsV1{}, fmt.Errorf("OCR gap and check disagree")
 			}
 		} else if gap == "ocr_rejected" || gap == "ocr_label_flagged" {
-			return fmt.Errorf("OCR gap requires a check")
+			return "", DetectorInputsV1{}, fmt.Errorf("OCR gap requires a check")
 		}
 		base = ExtractInputHash(fetchHash, source, gap)
 	case "ocr":
@@ -85,7 +90,7 @@ func CheckExtractLineageV1Bytes(data []byte, fetchHash, inputHash string) error 
 		for key, want := range map[string]string{"sha256": check.PDFSHA256, "engine_id": check.EngineID, "text_sha256": check.TextSHA256, "checker_id": check.CheckerID, "result_sha256": check.ResultSHA256} {
 			value, fieldErr := lineageString(fields, key)
 			if fieldErr != nil || value != want {
-				return fmt.Errorf("OCR lineage field %s disagrees with check", key)
+				return "", DetectorInputsV1{}, fmt.Errorf("OCR lineage field %s disagrees with check", key)
 			}
 		}
 		base = ExtractInputHash(fetchHash, source, check.TextSHA256, check.ResultSHA256)
@@ -96,9 +101,9 @@ func CheckExtractLineageV1Bytes(data []byte, fetchHash, inputHash string) error 
 		expected = ExtractObservationInputHash(base, check.PDFSHA256, check.EngineID, check.TextSHA256, check.CheckerID, check.ResultSHA256)
 	}
 	if expected != inputHash {
-		return fmt.Errorf("artifact input hash mismatch")
+		return "", DetectorInputsV1{}, fmt.Errorf("artifact input hash mismatch")
 	}
-	return nil
+	return source, detector, nil
 }
 
 func lineageString(fields map[string]json.RawMessage, name string) (string, error) {

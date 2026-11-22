@@ -37,7 +37,13 @@ type selection struct {
 	extraGap, extraReason   string
 	data                    []byte
 	tooLarge, parseLimit    bool
-	consulted               bool
+	consulted, ocrReachable bool
+	ocrHeadingOnly          bool
+	ocrParsed               bool
+	ocrParagraphs           []textparse.Paragraph
+	ocrParseErr             error
+	verifiedCheck           *ocrstore.CheckResult
+	pdfNames                map[string]string
 	entry                   *ocrstore.Entry
 	tree                    *treeComparison
 }
@@ -214,7 +220,7 @@ func chooseForCheckRaw(ctx context.Context, dir, key string, ocr ocrReader, engi
 				if selected.entry != nil && selected.entry.Check != nil {
 					state = "checked"
 				}
-				return selection{source: "source_tree", gap: "tree_headings_only", hash: selected.hash, entry: selected.entry, ocrState: state, consulted: selected.consulted || selected.source == "none"}, nodes, nil
+				return selection{source: "source_tree", gap: "tree_headings_only", hash: selected.hash, entry: selected.entry, ocrState: state, consulted: selected.consulted || selected.source == "none", ocrReachable: selected.consulted, ocrHeadingOnly: true, pdfNames: selected.pdfNames}, nodes, nil
 			}
 			transcription, selectErr := selectFiles(dir, parts[2], doc.Files, absentOCR{})
 			if selectErr != nil {
@@ -240,6 +246,7 @@ func chooseForCheckRaw(ctx context.Context, dir, key string, ocr ocrReader, engi
 		return selection{}, nil, fmt.Errorf("read fetch document: %w", err)
 	}
 	s, err := selectOCRFilesMode(ctx, dir, parts[2], doc.Files, ocr, engines, checker, unchecked, waivers...)
+	s.ocrReachable = s.consulted
 	return s, nil, err
 }
 
