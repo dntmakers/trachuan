@@ -4,9 +4,18 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 
 	"danny.vn/trachuan/apps/corpus/internal/taxonomy"
 )
+
+func VerifyScoreLabels(recipe Recipe, data []byte) (string, error) {
+	if _, ok := priceForModel(recipe.Model); !ok || !strings.HasPrefix(recipe.Model, "claude-") {
+		return "", fmt.Errorf("unknown classifier provider")
+	}
+	slice, _, _, err := taxonomy.VerifyScoringInput("anthropic", data)
+	return slice, err
+}
 
 type Metrics struct {
 	TruePositive      int     `json:"true_positive"`
@@ -42,6 +51,7 @@ type FragmentEntry struct {
 }
 
 type ScoreReport struct {
+	Slice              string          `json:"slice,omitempty"`
 	Status             string          `json:"status"`
 	RecipeHash         string          `json:"recipe_hash"`
 	LabelsHash         string          `json:"labels_sha256"`
