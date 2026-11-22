@@ -149,3 +149,23 @@ func extendFrameworkFixture(ctx context.Context, conn *pgx.Conn, changed bool) e
 	_, err = conn.Exec(ctx, `INSERT INTO quality_gap(kind,class,version_id,subject,detail,blocks) VALUES('text_incomplete','text',1,'A-1',$1,false)`, detail)
 	return err
 }
+
+func TestFrameworkFixture_ParseRecipeCompatibility(t *testing.T) {
+	_, pool, _ := frameworkFixture(t, false, "")
+	ctx := t.Context()
+	for _, tc := range []struct {
+		version int
+		valid   bool
+	}{{2, true}, {1, true}, {3, false}} {
+		t.Run(fmt.Sprint(tc.version), func(t *testing.T) {
+			_, err := pool.Exec(ctx, `UPDATE release SET parse_recipe = jsonb_set(parse_recipe, '{version}', to_jsonb($1::int)) WHERE singleton`, tc.version)
+			require.NoError(t, err)
+			_, err = frameworkserve.Open(ctx, pool, frameworkFixtureQuery{}, frameworkserve.Options{CursorKey: []byte(strings.Repeat("s", 32))})
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, frameworkserve.ErrUnavailable)
+			}
+		})
+	}
+}
