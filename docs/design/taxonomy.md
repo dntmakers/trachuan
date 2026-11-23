@@ -94,12 +94,9 @@ under the corpus rules.
    method `inherited` at `confidence = 0.9`. Several corresponding sources give
    the union. Any other case (no such article, an empty or different heading)
    inherits nothing, goes to the LLM layer and is counted. No LLM is involved.
-3. LLM in batches over public legal text, after `chunk` and `embed` have run,
-   with results stored and reused as
-   [classification results](classification-results.md) says, for articles that
-   hold no seed or inherited node and are not fragments (see the evaluation
-   gate); a fragment has no subject of its own, so it keeps seeds and
-   inheritance only:
+3. LLM in batches over public legal text, after `chunk` and `embed`, for primary
+   articles with no seed, inherited or manual row, excluding fragments.
+   [Publish](classification-publish.md) owns the build input and matching:
    - One request per document (title, scope article, table of contents, VBPL
      field) chooses from a menu of active level-2 nodes, each shown as
      `<level-1 name> > <level-2 name>`; a level-2 node with no provisions and no
@@ -134,9 +131,8 @@ under the corpus rules.
      request, is dropped and counted. A response that is truncated, fails the
      schema or misses an article yields no assignment for those articles and gap
      `unassigned` with detail `invalid_response`. The model, effort and prompt
-     are part of the classification recipe. The threshold per level is
-     calibrated on the seeded set to reach top-1 precision at least 0.85, then
-     frozen in the release; below it, no assignment and a gap "unassigned".
+     are part of the classification recipe. Serve every validated level-2 code
+     without a confidence cutoff.
    - The LLM layer assigns level-2 nodes only: an article's LLM assignment is
      the level-2 ancestor of each node it returns. Level 3 joins only when it
      passes its floors on every applicable slice; nodes deeper than level 2
@@ -176,20 +172,19 @@ every release that serves nodes must pass the filter gate in
 
 ## Evaluation gate
 
-Before a release may publish assignments, `corpus eval` measures on a labeled
-set of seeded articles:
+Before a release may publish LLM assignments, staged `eval` applies the
+[qualification gate](classification-publish.md#qualification).
 
 Recall is micro over (article, node) pairs. The seeded set holds one placement
 per article, while an article may take several nodes, so its precision is top-1
 precision: the model's highest-confidence node per article, mapped to the level
 measured, against the seed at that level. Precision over all pairs, which also
 judges additional nodes, is measured on the model-adjudicated multi-family set.
-The same sets tune prompts and thresholds and gate the release; every prompt or
-threshold change reruns them. Each slice scores what the LLM layer classifies:
-the fragment rule below, applied mechanically to an entry's own text in the
-release by whole-sentence matching, excludes fragments from the scored entries,
-and the floors apply to the remaining entries. Every report states each number
-over all entries and over non-fragment entries, with the fragments listed.
+The same sets measure each prompt and serving rule and gate the release. Apply
+the fragment rule below to the release's own text by whole-sentence matching
+only for entries that pass the reference checks below. Invalid references remain
+misses. Report all-entry and non-fragment metrics and list the excluded
+fragments.
 
 | Slice                                                  | Reference         | Metric                                                                               | Floor |
 | ------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------ | ----- |
@@ -257,8 +252,8 @@ with a hash; with fewer than 100 inherited articles the slice is unavailable.
 Build measures this slice against that frozen set, before it writes assignments;
 until the set exists the slice is unavailable: when the slice is unavailable or
 any inheritance row fails, build writes no `inherited` assignment and records
-why in the taxonomy stats, so the release serves seeds and overrides only;
-`corpus eval` reports the same rows.
+why in the taxonomy stats. This disables only inherited rows. `corpus eval`
+reports the same rows.
 
 The seeded labeled set is
 `apps/corpus/internal/evaluation/testdata/<cc>/taxonomy-labels.json`: for each

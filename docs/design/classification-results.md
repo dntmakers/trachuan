@@ -1,17 +1,20 @@
 # Classification results
 
-This note owns where paid model calls may run, how every paid result is kept,
-settled and reused, which providers and models may classify, and how runs are
-admitted. [Taxonomy](taxonomy.md) owns the classification layers, request shapes
-and the evaluation gate; [batch submissions](batch-submissions.md) owns the
-submission lifecycle and recovery, which this note tightens for classification.
+This note owns where paid model calls may run, which providers and models may
+classify, and the workshop classifier's paid attempts, admission and replay. The
+OpenAI trial command is an exception: its settled directories stay outside the
+workshop store and are the paid record for
+[publication](classification-publish.md). [Taxonomy](taxonomy.md) owns the
+classification layers, request shapes and evaluation floors;
+[batch submissions](batch-submissions.md) owns the submission lifecycle and
+recovery, which this note tightens for classification.
 
 ## Write path only
 
 Model calls run only in corpus commands on the operator machine: the `classify`
 stage and its screening and trial commands. The server, website, query embedder
 and host updater never call a generative model. A release carries assignments
-and the classification artifact, never a call.
+and binds any selected classification set by hash, never a call.
 
 ## Request key
 

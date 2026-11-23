@@ -28,6 +28,11 @@ the artifact store. `corpus start` freezes that choice as the
 [selected report](../design/release-evidence.md#selected-report) decision; a
 different previous release needs a new run and `rel`.
 
+To publish LLM subjects, run `corpus classify pack` and pass its digest as
+`--classification-set SHA256` to `corpus start` with the production comparison
+report. Review the `unassigned` gaps and the staged LLM gate before upload. See
+[Publish](../design/classification-publish.md#rollout).
+
 When the run is `evaluated`, accept its reviewed gaps with `corpus accept-gaps`.
 The report to upload is `report.json` of the run's `eval` artifact. A
 `corpus eval` report cannot publish. The upload requires completed quality

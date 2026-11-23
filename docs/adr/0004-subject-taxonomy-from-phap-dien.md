@@ -125,3 +125,9 @@ classifier. Hard-cut subject filtering.
   gate: the floors stay measured against the frozen references, which are not
   amended from classifier output. A higher precision floor needs an
   owner-labeled set.
+- 2026-11-23: serve every validated level-2 code without a confidence cutoff.
+  Pruning the `gpt-6.2-sol` baseline loses recall and does not reach the former
+  0.85 top-1 target. The settled OpenAI trial directories are the paid record
+  for [publication](../design/classification-publish.md); the Batch runner
+  wiring for OpenAI is deferred. The floors and the write-path restriction are
+  unchanged.

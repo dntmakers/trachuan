@@ -269,11 +269,11 @@ build one.
 ## Model trial command
 
 `corpus classify trial-openai CC REL --stage documents|articles --select labels:FILE|unseeded:I/N [--families FILE] --model M --effort E --out DIR --cap-usd N`
-compares OpenAI models on the frozen sets and runs the full LLM set. It is
-evaluation only: it reads the release, keeps every state file under `--out` and
-never touches the workshop ledger or the submissions store. Its artifacts feed
-`corpus classify score`, which scores an OpenAI recipe only against the seeded
-set and the Claude-labeled files.
+compares OpenAI models on frozen sets and runs the full LLM set. It reads the
+release and keeps every state file under `--out`, outside the workshop ledger
+and the submissions store. Frozen-set outputs feed `corpus classify score`,
+which scores an OpenAI recipe only against the seeded set and the Claude-labeled
+files; settled unseeded outputs feed [publication](classification-publish.md).
 
 - One directory holds one batch: the plan, counted requests, the uploaded input,
   each captured response, the output, the settled cost and a manifest of hashes.
