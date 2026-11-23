@@ -1,21 +1,20 @@
 package classify
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 func validateRecovery(s Submission, id string) error {
 	if (s.AccountFingerprint != "" && !validID(s.AccountFingerprint)) || s.ID != id || s.ItemsHash != itemsHash(s.Items) || s.Recipe.validate(true) != nil || s.ReserveMicroUSD < 0 || len(s.Items) == 0 || len(s.Items) > 100000 {
 		return fmt.Errorf("invalid submission intent identity or ordered item hash")
 	}
 	legacy := s.KeyVersion == 0 && s.PriceVersion == ""
+	if _, err := submissionProvider(s); err != nil {
+		return err
+	}
 	if s.Recipe.Article != nil && s.Recipe.Article.PromptVersion == 4 && !legacy {
 		return fmt.Errorf("historical article prompt requires pilot versions")
-	}
-	current := s.KeyVersion == keyVersion && s.PriceVersion == batchPriceVersion
-	if !legacy && !current {
-		return fmt.Errorf("invalid classification intent versions")
-	}
-	if amount := BudgetMicroUSD(s.Budget); amount == 0 || s.BudgetMicroUSD != amount {
-		return fmt.Errorf("invalid classification intent budget pair")
 	}
 	keys := make(map[string]bool, len(s.Items))
 	var paid int
@@ -47,6 +46,9 @@ func validateRecovery(s Submission, id string) error {
 		cost, err := s.Recipe.reserve(s.PriceVersion, item.InputTokens)
 		if err != nil {
 			return fmt.Errorf("validate recovered reservation: %w", err)
+		}
+		if cost > math.MaxInt64-reserve {
+			return fmt.Errorf("classification reservation overflows")
 		}
 		paid++
 		reserve += cost

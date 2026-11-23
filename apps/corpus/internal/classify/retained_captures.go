@@ -148,20 +148,11 @@ func captureProof(root, dir string, files []fs.DirEntry) (captureReference, erro
 }
 
 func (r *Runner) inspectCounts() error {
-	dir := filepath.Join(r.IntentDir, "counts")
-	files, err := readRetainedDirectory(dir)
+	s, err := openCountStore(r.IntentDir, false)
 	if err != nil {
 		return err
 	}
-	for _, f := range files {
-		key, found := strings.CutSuffix(f.Name(), ".json")
-		path := filepath.Join(dir, f.Name())
-		if !found || !validKey(key) || !f.Type().IsRegular() {
-			return fmt.Errorf("invalid classification count path %s", path)
-		}
-		if _, err = readCount(path, key); err != nil {
-			return err
-		}
-	}
-	return nil
+	defer s.close()
+	_, _, err = s.snapshot()
+	return err
 }

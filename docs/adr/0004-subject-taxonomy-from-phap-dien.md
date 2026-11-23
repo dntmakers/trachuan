@@ -96,3 +96,32 @@ classifier. Hard-cut subject filtering.
   and calls stay in the corpus write path
   ([classification results](../design/classification-results.md)). The floors
   are unchanged.
+- 2026-11-23: the level-2 floors move to the measured baseline of `gpt-6.2-sol`,
+  and it classifies both stages. The owner dropped the `claude-fable-5-2` and
+  `gpt-6.2-astra` trials and chose among OpenAI models, quality before price,
+  because each document is classified once and its result is reused. On the
+  seeded 300 and the two Claude-labeled sets of 100 (level 2, seeded
+  non-fragment / multi-family / post-2023): `gpt-6.2-sol` recall 0.915 / 0.871 /
+  0.865, pair precision 0.728 / 0.711 / 0.726, top-1 0.846 / 0.859 / 0.845,
+  family recall 0.960 / 0.914 / 0.904; `gpt-6.1-terra` recall 0.858 / 0.802 /
+  0.837, precision 0.782 / 0.823 / 0.798; `gpt-6-luna` recall 0.835 / 0.767 /
+  0.827, precision 0.781 / 0.802 / 0.811. The three trials cost 3.68 USD. No
+  model passed the old floors, and neither did Haiku or Sonnet. Dropping
+  additional nodes or raising their confidence threshold did not help: primary
+  nodes alone lost 10 to 22 points of recall and stayed below 0.85 precision.
+  The new floors are recall 0.85, top-1 precision 0.80, pair precision 0.70 and
+  family recall 0.90, all at level 2. Recall leads because an agent uses a
+  subject as a filter, where a missing node hides an article and an extra node
+  only widens the result. The deeper rows and the inheritance rows are
+  unchanged.
+- 2026-11-23: a blind recheck suggests the references miss labels, so measured
+  pair precision understates `gpt-6.2-sol`. Four `gpt-6.2-sol` agent sessions
+  judged every level-2 pair that either the reference or the classifier gave for
+  the 200 Claude-labeled articles, with the sources hidden. They accepted 161 of
+  191 pairs both sides gave, 44 of 75 pairs only the classifier gave and 11 of
+  29 pairs only the reference gave. Against those verdicts the classifier's
+  precision is 0.78 and the reference's is 0.80. The judge shares the
+  classifier's model and saw only proposed pairs, so this is evidence, not a
+  gate: the floors stay measured against the frozen references, which are not
+  amended from classifier output. A higher precision floor needs an
+  owner-labeled set.

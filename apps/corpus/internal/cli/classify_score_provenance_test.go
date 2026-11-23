@@ -19,10 +19,11 @@ func TestClassifyScoreRejectsUntrustedLabels(t *testing.T) {
 	root := filepath.Join("..", "evaluation", "testdata", "vn")
 	for _, tc := range []struct {
 		name, file, want string
-		alter            bool
+		alter, legacy    bool
 	}{
-		{"unpinned", "taxonomy-multi-family.json", "unpinned adjudicated labels", true},
-		{"same-provider", "taxonomy-multi-family-anthropic.json", "classifier and labeler providers must differ", false},
+		{"unpinned", "taxonomy-multi-family.json", "unpinned adjudicated labels", true, false},
+		{"legacy family", "taxonomy-multi-family.json", "unpinned adjudicated labels", true, true},
+		{"same-provider", "taxonomy-multi-family-anthropic.json", "classifier and labeler providers must differ", false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data, err := os.ReadFile(filepath.Join(root, tc.file))
@@ -41,6 +42,9 @@ func TestClassifyScoreRejectsUntrustedLabels(t *testing.T) {
 			recipe, err := classify.NewRecipe("claude-haiku-5-5", taxonomyHash)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if tc.legacy {
+				recipe.Provider = ""
 			}
 			writeArtifact := func(name string, value any) (string, string) {
 				t.Helper()

@@ -19,10 +19,16 @@ func NewArticleRecipe(base Recipe, familiesHash string) (Recipe, error) {
 	if base.Article != nil {
 		return Recipe{}, fmt.Errorf("article recipe requires a document recipe")
 	}
-	if err := base.Validate(); err != nil {
+	source := base.Hash()
+	if base.Provider == "" {
+		if base.PromptVersion != 3 || base.validate(true) != nil {
+			return Recipe{}, fmt.Errorf("invalid historical document recipe")
+		}
+		base.Provider = "anthropic"
+	} else if err := base.Validate(); err != nil {
 		return Recipe{}, err
 	}
-	base.Article = &ArticleRecipe{SourceRecipeHash: base.Hash(), FamiliesHash: familiesHash, PromptVersion: 5, SchemaVersion: 1, MaxTokens: 8192}
+	base.Article = &ArticleRecipe{SourceRecipeHash: source, FamiliesHash: familiesHash, PromptVersion: 5, SchemaVersion: 1, MaxTokens: 8192}
 	return base, base.Validate()
 }
 
@@ -31,7 +37,13 @@ func (r Recipe) documentRecipe() Recipe { r.Article = nil; return r }
 func (r Recipe) validateArticle(historical bool) error {
 	a := r.Article
 	h, err := hex.DecodeString(a.FamiliesHash)
-	if err != nil || len(h) != 32 || a.SourceRecipeHash != r.documentRecipe().Hash() || a.SchemaVersion != 1 || a.MaxTokens < 1 || a.MaxTokens > 32000 {
+	base := r.documentRecipe()
+	validSource := a.SourceRecipeHash == base.Hash()
+	if !validSource && base.Provider == "anthropic" {
+		base.Provider = ""
+		validSource = a.SourceRecipeHash == base.Hash()
+	}
+	if err != nil || len(h) != 32 || !validSource || a.SchemaVersion != 1 || a.MaxTokens < 1 || a.MaxTokens > 32000 {
 		return fmt.Errorf("invalid article classification recipe")
 	}
 	if (a.PromptVersion == 5 || (historical && (a.PromptVersion == 1 || a.PromptVersion == 4))) && a.Step == 0 && a.Step1Hash == "" {

@@ -18,7 +18,6 @@ import (
 	"danny.vn/trachuan/internal/testpg"
 	"github.com/anthropics/anthropic-sdk-go/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -125,7 +124,7 @@ func TestRepository_RestoreRequiresMatchingBudgetPair(t *testing.T) {
 		{"trial with pilot amount", "c", "trial", 15000000, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := Submission{ID: strings.Repeat(tc.digit, 32), RunID: runID, ScreenHash: strings.Repeat(tc.digit, 64), Recipe: recipe, Items: items, ItemsHash: itemsHash(items), State: "uncertain", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Budget: tc.budget, BudgetMicroUSD: tc.amount, ReserveMicroUSD: 82320}
+			s := Submission{Provider: "anthropic", KeyVersion: keyVersion, PriceVersion: batchPriceVersion, ID: strings.Repeat(tc.digit, 32), RunID: runID, ScreenHash: strings.Repeat(tc.digit, 64), Recipe: recipe, Items: items, ItemsHash: itemsHash(items), State: "uncertain", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Budget: tc.budget, BudgetMicroUSD: tc.amount, ReserveMicroUSD: 82320}
 			err := repo.Restore(ctx, []Submission{s})
 			if !tc.wantViolation {
 				if err != nil {
@@ -133,9 +132,8 @@ func TestRepository_RestoreRequiresMatchingBudgetPair(t *testing.T) {
 				}
 				return
 			}
-			var pgErr *pgconn.PgError
-			if !errors.As(err, &pgErr) || pgErr.Code != "23514" || pgErr.ConstraintName != "submission_budget_pair_check" {
-				t.Fatalf("restore error = %v; want submission_budget_pair_check violation", err)
+			if err == nil || !strings.Contains(err.Error(), "provider budget") {
+				t.Fatalf("restore error = %v; want invalid provider budget", err)
 			}
 		})
 	}

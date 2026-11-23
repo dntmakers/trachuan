@@ -8,6 +8,9 @@ import (
 )
 
 func BuildArticleRequest(r Recipe, req ArticleRequest) (anthropic.MessageNewParams, error) {
+	if r.Provider != "" && r.Provider != "anthropic" {
+		return anthropic.MessageNewParams{}, fmt.Errorf("anthropic recipe required")
+	}
 	if err := r.validate(true); err != nil {
 		return anthropic.MessageNewParams{}, err
 	}

@@ -66,7 +66,7 @@ func (r *Runner) prepareArticleBatch(ctx context.Context, o Options, history key
 	if err != nil {
 		return nil, err
 	}
-	s := Submission{KeyVersion: keyVersion, PriceVersion: batchPriceVersion, RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
+	s := Submission{Provider: o.Recipe.Provider, KeyVersion: keyVersion, PriceVersion: batchPriceVersion, RunID: o.RunID, Country: o.Country, Release: o.Release, ScreenHash: screenHash(o), Recipe: o.Recipe, State: "preparing", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, Results: map[string]Outcome{}}
 	meta := &ArticleMetadata{LabelsHash: w.labelsHash, Skipped: plan.Skipped, CountedRequests: counts}
 	if o.Recipe.Article.Step != 0 {
 		meta.InputHash = articleInputHash(o.Country, o.Release, w.labelsHash, w.articles)

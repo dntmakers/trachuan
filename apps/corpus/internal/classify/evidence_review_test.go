@@ -72,6 +72,7 @@ func TestEvidence_RejectsUnprovenListings(t *testing.T) {
 func TestRecovery_AcceptsHistoricalB1KeyVersion(t *testing.T) {
 	r, ledger, _, o := screenFixture(t)
 	s := seedUndispatchedScreen(t, r, o, documents())
+	s.Provider, s.Recipe.Provider = "", ""
 	s.Recipe.PromptVersion = 2
 	s.AccountFingerprint = ""
 	request, err := BuildRequest(s.Recipe, documents()[0], families())

@@ -138,7 +138,7 @@ func TestRebuild_DatabaseAbandonedReplacement(t *testing.T) {
 	if err = readRetainedFile(filepath.Join(resultDir, captures[0].Name(), "end.json"), &end); err != nil || end.Records != 0 || end.Error != "" {
 		t.Fatalf("candidate results end %+v error %v", end, err)
 	}
-	cost, err := retained.ledgerCost()
+	cost, err := retained.ledgerCostFor("anthropic")
 	if err != nil || cost != 7499520 {
 		t.Fatalf("ledger total %d error %v", cost, err)
 	}

@@ -94,7 +94,7 @@ func TestReview_UnpricedUsageDoesNotBlockIndependentSubmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || total != first.ReserveMicroUSD+ledger.rows[1].CostMicroUSD {
 		t.Fatalf("incorrect retained reserve %d: %v", total, err)
 	}

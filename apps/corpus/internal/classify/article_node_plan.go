@@ -6,7 +6,7 @@ import (
 	"sort"
 )
 
-func buildArticleNodePlan(ctx context.Context, r Recipe, articles []Article, choices map[string]Outcome, nodes []Node, count TokenCounter) (ArticlePlan, error) {
+func buildArticleNodePlan(ctx context.Context, r Recipe, articles []Article, choices map[string]Outcome, nodes []Node, count articleCounter) (ArticlePlan, error) {
 	var plan ArticlePlan
 	seen := map[string]bool{}
 	for start := 0; start < len(articles); {

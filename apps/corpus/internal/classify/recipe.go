@@ -18,10 +18,16 @@ type Recipe struct {
 	SchemaVersion int            `json:"schema_version"`
 	TaxonomyHash  string         `json:"taxonomy_hash"`
 	Article       *ArticleRecipe `json:"article,omitempty"`
+	Provider      string         `json:"provider,omitempty"`
 }
 
 func NewRecipe(model, taxonomyHash string) (Recipe, error) {
-	r := Recipe{Version: 1, Model: model, Effort: "medium", MaxTokens: 4096, InputBound: 90000, F: 5, PromptVersion: 3, SchemaVersion: 2, TaxonomyHash: taxonomyHash}
+	r := Recipe{Provider: "anthropic", Version: 1, Model: model, Effort: "medium", MaxTokens: 4096, InputBound: 90000, F: 5, PromptVersion: 3, SchemaVersion: 2, TaxonomyHash: taxonomyHash}
+	return r, r.Validate()
+}
+
+func NewOpenAIRecipe(model, taxonomyHash string) (Recipe, error) {
+	r := Recipe{Provider: "openai", Version: 1, Model: model, Effort: "medium", MaxTokens: 4096, InputBound: 90000, F: 5, PromptVersion: 3, SchemaVersion: 2, TaxonomyHash: taxonomyHash}
 	return r, r.Validate()
 }
 
@@ -30,8 +36,21 @@ func (r Recipe) Validate() error {
 }
 
 func (r Recipe) validate(historical bool) error {
-	if _, ok := priceForModel(r.Model); !ok {
-		return fmt.Errorf("unsupported classification model")
+	historical = historical && r.Provider == ""
+	switch r.Provider {
+	case "", "anthropic":
+		if r.Provider == "" && !historical {
+			return fmt.Errorf("explicit classification provider required")
+		}
+		if _, ok := priceForModel(r.Model); !ok {
+			return fmt.Errorf("unsupported Anthropic model")
+		}
+	case "openai":
+		if _, ok := openAIPriceForModel(r.Model); !ok || r.MaxTokens < 16 || r.outputTokens() < 16 {
+			return fmt.Errorf("unsupported OpenAI model or output bound")
+		}
+	default:
+		return fmt.Errorf("unsupported classification provider")
 	}
 	if r.Effort != "low" && r.Effort != "medium" && r.Effort != "high" && r.Effort != "xhigh" && r.Effort != "max" {
 		return fmt.Errorf("invalid classification effort")

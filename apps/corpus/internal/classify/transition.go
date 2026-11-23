@@ -19,6 +19,10 @@ func (r *Runner) transition(ctx context.Context, id string, update func(*Submiss
 		if s.ID != id {
 			continue
 		}
+		provider, identityErr := submissionProvider(s)
+		if identityErr != nil || provider != "anthropic" {
+			return Submission{}, fmt.Errorf("unsupported provider for Anthropic runtime")
+		}
 		changed, updateErr := update(&s)
 		if updateErr != nil {
 			return Submission{}, updateErr

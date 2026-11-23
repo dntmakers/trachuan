@@ -52,6 +52,9 @@ func TestPilotV4_LegacyItemsRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	recipe.Article.PromptVersion = 4
+	recipe.Provider = ""
+	recipe.Article.SourceRecipeHash = recipe.documentRecipe().Hash()
+	s.Provider = ""
 	s.Recipe = recipe
 	s.KeyVersion, s.PriceVersion = 0, ""
 	s.Items = items

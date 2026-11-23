@@ -87,6 +87,7 @@ func TestReconcile_DatabaseCancellationDuringProviderCalls(t *testing.T) {
 				t.Fatal(err)
 			}
 			stalled := Submission{ID: strings.Repeat("f", 32), RunID: id, Country: o.Country, Release: rel, ScreenHash: strings.Repeat("b", 64), Recipe: o.Recipe, Families: families(), Items: []Item{{Key: "vn:vbpl:1", InputTokens: 100}}, State: "uncertain", CreatedAt: r.Now(), Budget: o.Budget, BudgetMicroUSD: o.BudgetMicroUSD, ReserveMicroUSD: 1029}
+			stalled.Recipe.Provider = ""
 			stalled.ItemsHash = itemsHash(stalled.Items)
 			unlock, err := r.Repository.Lock(ctx)
 			if err != nil {

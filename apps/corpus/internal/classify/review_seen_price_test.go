@@ -62,7 +62,7 @@ func TestReview_SeenBatchWithoutReceiptBlocksAbandonedReplacement(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || store.retryAbandoned[s.ID] || total != s.ReserveMicroUSD {
 		t.Fatalf("seen batch did not hold key and reserve: total=%d error=%v", total, err)
 	}
@@ -110,7 +110,7 @@ func TestReview_B1PricedAttemptIgnoresUnrelatedMetadataDuplicates(t *testing.T) 
 	if err != nil {
 		t.Fatalf("B1 priced attempt blocked store: %v", err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || total != s.ReserveMicroUSD {
 		t.Fatalf("unsettled reserve changed: %d %v", total, err)
 	}
@@ -178,7 +178,7 @@ func TestReview_ObservedIncompleteIDAfterAbandonmentKeepsReserve(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || store.retryAbandoned[s.ID] || total != s.ReserveMicroUSD {
 		t.Fatalf("incomplete ID did not hold reserve: total=%d error=%v", total, err)
 	}
@@ -201,7 +201,7 @@ func TestReview_SeenIDBlocksTraceFreeAbandonment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	total, err := store.ledgerCost()
+	total, err := store.ledgerCostFor("anthropic")
 	if err != nil || store.retryAbandoned[s.ID] || total != s.ReserveMicroUSD {
 		t.Fatalf("trace-free abandonment released a seen batch: %d %v", total, err)
 	}

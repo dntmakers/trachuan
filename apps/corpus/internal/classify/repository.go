@@ -91,6 +91,12 @@ func (p *PGRepository) List(ctx context.Context) ([]Submission, error) {
 	var result []Submission
 	for _, v := range rows {
 		s := Submission{KeyVersion: int(v.KeyVersion), ID: v.ID, RunID: v.RunID, Country: v.Country, Release: v.Rel, ScreenHash: v.ScreenHash, ItemsHash: v.ItemListHash, State: v.State, CreatedAt: v.CreatedAt, SubmittedAt: v.SubmittedAt, DeadlineAt: v.DeadlineAt, Budget: v.Budget, BudgetMicroUSD: v.BudgetMicroUsd, ReserveMicroUSD: v.ReservedMicroUsd, CostMicroUSD: v.CostMicroUsd, Settled: v.CostSettled}
+		if v.Provider != nil {
+			s.Provider = *v.Provider
+		}
+		if v.ProjectID != nil {
+			s.ProjectID = *v.ProjectID
+		}
 		if v.PriceVersion != nil {
 			s.PriceVersion = *v.PriceVersion
 		}
@@ -115,6 +121,12 @@ func (p *PGRepository) List(ctx context.Context) ([]Submission, error) {
 			if err = json.Unmarshal(entry.raw, entry.dst); err != nil {
 				return nil, fmt.Errorf("decode submission ledger: %w", err)
 			}
+		}
+		if s.Provider == "anthropic" && s.Recipe.Provider == "" {
+			s.Provider = ""
+		}
+		if _, err = submissionProvider(s); err != nil {
+			return nil, fmt.Errorf("decode submission ledger identity: %w", err)
 		}
 		if err = validateLegacyItems(v.ItemList, s, v.PriceVersion != nil); err != nil {
 			return nil, fmt.Errorf("decode submission ledger: %w", err)
@@ -162,6 +174,9 @@ func (p *PGRepository) Restore(ctx context.Context, submissions []Submission) er
 }
 
 func saveSubmission(ctx context.Context, q *store.Queries, s Submission) error {
+	if _, err := submissionProvider(s); err != nil {
+		return fmt.Errorf("save submission identity: %w", err)
+	}
 	var recipe, families, items, results []byte
 	for _, entry := range []struct {
 		src any
@@ -181,7 +196,14 @@ func saveSubmission(ctx context.Context, q *store.Queries, s Submission) error {
 	if s.PriceVersion != "" {
 		version = &s.PriceVersion
 	}
-	err := q.SaveClassificationSubmission(ctx, store.SaveClassificationSubmissionParams{ID: s.ID, RunID: s.RunID, ScreenHash: s.ScreenHash, Recipe: recipe, Families: families, ItemList: items, ItemListHash: s.ItemsHash, ProviderJobID: batch, State: s.State, CreatedAt: s.CreatedAt, SubmittedAt: s.SubmittedAt, DeadlineAt: s.DeadlineAt, Budget: s.Budget, BudgetMicroUsd: s.BudgetMicroUSD, ReservedMicroUsd: s.ReserveMicroUSD, CostMicroUsd: s.CostMicroUSD, CostSettled: s.Settled, Results: results, KeyVersion: int32(s.KeyVersion), PriceVersion: version})
+	var provider, project *string
+	if s.Provider != "" {
+		provider = &s.Provider
+	}
+	if s.ProjectID != "" {
+		project = &s.ProjectID
+	}
+	err := q.SaveClassificationSubmission(ctx, store.SaveClassificationSubmissionParams{Provider: provider, ProjectID: project, ID: s.ID, RunID: s.RunID, ScreenHash: s.ScreenHash, Recipe: recipe, Families: families, ItemList: items, ItemListHash: s.ItemsHash, ProviderJobID: batch, State: s.State, CreatedAt: s.CreatedAt, SubmittedAt: s.SubmittedAt, DeadlineAt: s.DeadlineAt, Budget: s.Budget, BudgetMicroUsd: s.BudgetMicroUSD, ReservedMicroUsd: s.ReserveMicroUSD, CostMicroUsd: s.CostMicroUSD, CostSettled: s.Settled, Results: results, KeyVersion: int32(s.KeyVersion), PriceVersion: version})
 	if err != nil {
 		return fmt.Errorf("save submission ledger: %w", err)
 	}

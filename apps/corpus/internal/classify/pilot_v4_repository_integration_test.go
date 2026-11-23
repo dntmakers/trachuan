@@ -39,7 +39,7 @@ func TestPilotV4_WorkshopListRejectsLegacyPresence(t *testing.T) {
 		t.Fatal(err)
 	}
 	items := []Item{{Key: "synthetic", RequestHash: strings.Repeat("a", 64), InputTokens: 100, Article: &ArticleRequest{DocumentKey: "synthetic", Articles: []Article{}, Nodes: []Node{{Code: "A"}}}}}
-	s := Submission{ID: strings.Repeat("a", 32), RunID: runID, ScreenHash: strings.Repeat("a", 64), Recipe: recipe, Items: items, ItemsHash: itemsHash(items), State: "uncertain", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Budget: "trial", BudgetMicroUSD: 200000000, ReserveMicroUSD: 82320, KeyVersion: keyVersion, PriceVersion: batchPriceVersion}
+	s := Submission{Provider: "anthropic", ID: strings.Repeat("a", 32), RunID: runID, ScreenHash: strings.Repeat("a", 64), Recipe: recipe, Items: items, ItemsHash: itemsHash(items), State: "uncertain", CreatedAt: time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC), Budget: "trial", BudgetMicroUSD: 200000000, ReserveMicroUSD: 82320, KeyVersion: keyVersion, PriceVersion: batchPriceVersion}
 	if err = repo.Restore(ctx, []Submission{s}); err != nil {
 		t.Fatal(err)
 	}

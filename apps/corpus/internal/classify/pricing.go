@@ -21,6 +21,28 @@ type tokenUsage struct {
 
 type batchPrice struct{ input, write, read, output int64 }
 
+type openAIPriceRow struct{ input, read, write30m, write12h, output int64 }
+
+const (
+	openAIBatchPriceVersion = "openai-batch-2026-11-22"
+	openAIBatchPriceSource  = "https://developers.openai.com/api/docs/pricing"
+)
+
+func openAIPriceForModel(model string) (openAIPriceRow, bool) {
+	switch model {
+	case "gpt-6.2-sol":
+		return openAIPriceRow{2000, 100, 2500, 5000, 10000}, true
+	case "gpt-6.2-astra":
+		return openAIPriceRow{8000, 400, 10000, 20000, 40000}, true
+	case "gpt-6.1-terra":
+		return openAIPriceRow{1000, 50, 1250, 2500, 5000}, true
+	case "gpt-6-luna":
+		return openAIPriceRow{100, 10, 125, 250, 500}, true
+	default:
+		return openAIPriceRow{}, false
+	}
+}
+
 func priceForModel(model string) (batchPrice, bool) {
 	switch model {
 	case "claude-haiku-5-5":
@@ -40,12 +62,24 @@ func (r Recipe) Reserve(input int64) (int64, error) {
 	if err := r.Validate(); err != nil {
 		return 0, err
 	}
+	if r.Provider == "openai" {
+		return r.reserve(openAIBatchPriceVersion, input)
+	}
 	return r.reserve(batchPriceVersion, input)
 }
 
 func (r Recipe) reserve(version string, input int64) (int64, error) {
+	if r.Provider == "openai" {
+		return openAIReserve(r.Model, version, input, r.InputBound, r.outputTokens())
+	}
+	if r.Provider != "" && r.Provider != "anthropic" {
+		return 0, fmt.Errorf("unknown classification provider")
+	}
 	if input < 1 || input > r.InputBound {
 		return 0, fmt.Errorf("counted input exceeds classification recipe bound or is empty")
+	}
+	if r.Provider == "anthropic" && version != batchPriceVersion {
+		return 0, fmt.Errorf("explicit provider requires the current price version")
 	}
 	if version == "" || version == pilotPriceVersion {
 		return r.cost(pilotPriceVersion, tokenUsage{Input: input, Output: r.outputTokens()})
@@ -68,7 +102,7 @@ func (r Recipe) reserve(version string, input int64) (int64, error) {
 
 func (r Recipe) cost(version string, u tokenUsage) (int64, error) {
 	price, ok := priceForModel(r.Model)
-	if !ok || (version != batchPriceVersion && version != pilotPriceVersion) {
+	if (r.Provider != "" && r.Provider != "anthropic") || !ok || (version != batchPriceVersion && version != pilotPriceVersion) {
 		return 0, fmt.Errorf("unknown classification model or price table")
 	}
 	if version == pilotPriceVersion && (u.CacheRead != 0 || u.CacheWrite != 0) {

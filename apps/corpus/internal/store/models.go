@@ -357,7 +357,7 @@ type Submission struct {
 	ID               string
 	RunID            int64
 	Stage            string
-	Provider         string
+	Provider         *string
 	ScreenHash       string
 	Recipe           json.RawMessage
 	Families         json.RawMessage
@@ -376,4 +376,5 @@ type Submission struct {
 	Results          json.RawMessage
 	KeyVersion       int32
 	PriceVersion     *string
+	ProjectID        *string
 }

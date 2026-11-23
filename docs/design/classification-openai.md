@@ -68,6 +68,11 @@ use the long-context Standard rate for the full count
 estimate and the number of calls with unknown cost separately from Batch spend;
 neither enters a budget cap check.
 
+Before the first OpenAI count, provision the configured intent store under an
+existing durable parent. The adapter does not create the store root or its
+ancestors. It syncs the parent before dispatching a count or using a recovered
+count. An estimate for a missing store is zero and does not create the store.
+
 Before widening the trial, verify count-to-usage parity for both request shapes
 in the retained Batch results. A result outside the bound or supported price
 tier stops new admissions for the adapter and retains its usage and reserve for
@@ -121,6 +126,11 @@ during recovery
 ([authentication and project scope](https://developers.openai.com/api/reference/overview)).
 If the original project and key cannot read evidence, keep the reserve and
 locks.
+
+Bind the OpenAI creator guard to the admitted intent. Open its lockfile without
+following symlinks and keep the descriptor that acquired the lock until the
+guard closes. Before publishing evidence, confirm that descriptor still refers
+to the intent's current lockfile. Never replace a lockfile to clear the guard.
 
 After admission and durable intent, write JSONL only for submitted items, using
 their original intent item indices in `custom_id`. Do not renumber after replay
@@ -255,3 +265,24 @@ historical `gpt-6-astra` labeler format. Reject unknown or inconsistent
 provenance. A paid Batch adjudication would add a new request and result type,
 spend classification credit and differ from the first labeling method, so do not
 build one.
+
+## Model trial command
+
+`corpus classify trial-openai CC REL --stage documents|articles --select labels:FILE [--families FILE] --model M --effort E --out DIR --cap-usd N`
+compares OpenAI models on the frozen sets before the production path exists. It
+is evaluation only: it reads the release, keeps every state file under `--out`
+and never touches the workshop ledger or the submissions store. Its artifacts
+feed `corpus classify score`, which scores an OpenAI recipe only against the
+seeded set and the Claude-labeled files.
+
+- One directory holds one batch: the plan, counted requests, the uploaded input,
+  each captured response, the output, the settled cost and a manifest of hashes.
+  A rerun on the same directory resumes it and never creates a second batch.
+- The cap is 40 USD at most and covers every sibling directory of `--out`. A new
+  batch is created only when each sibling is undispatched, dispatched and not
+  yet terminal, or settled with a complete cost and no unpriced usage. Any other
+  state stops admission.
+- Collecting and pricing a batch that was already paid for needs neither the
+  database nor room under the cap.
+- The article stage takes the families file of the document stage and uses the
+  same model and effort.
