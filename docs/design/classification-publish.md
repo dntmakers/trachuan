@@ -160,8 +160,10 @@ Do not rerun the backfill to fill gaps.
 
 Keep the source builds and paid evidence. After all 32 parts settle, pack the
 set and start a new release with its digest and the production comparison
-report. Deploy the worker first. Review coverage gaps and run staged quality and
-evidence checks before the existing
+report. Deploy the worker first. Finish existing runs whose `detector-inputs/1`
+snapshot already freezes evidence before that deploy; otherwise start a new
+`REL` after it. Review coverage gaps and run staged quality and evidence checks
+before the existing
 [signed release procedure](../runbooks/release-restore.md#release-a-corpus). A
 failed pack leaves paid evidence intact. A failing eval keeps the local build
 and failing report with no upload or pointer change. Fix the input or start a
