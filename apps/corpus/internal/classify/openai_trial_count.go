@@ -61,36 +61,15 @@ func (t *openAITrial) loadCounts() error {
 	if err != nil {
 		return fmt.Errorf("read trial count journal: %w", err)
 	}
-	known := map[string]int64{}
+	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		base, dispatch := strings.CutSuffix(entry.Name(), ".dispatch.json")
-		id, count := strings.CutPrefix(base, "count-")
-		if !dispatch || !count {
-			continue
-		}
-		var d openAICountDispatch
-		found, err := readTrialJSON(t.path(entry.Name()), &d)
-		if err != nil || !found || !openAIDispatchValid(d) || d.ID != id || d.Model != t.state.Model || d.Version != t.state.PriceVersion || d.Project != t.state.Project || d.Fingerprint != t.state.Fingerprint {
-			return fmt.Errorf("invalid OpenAI trial count dispatch")
-		}
-		var result openAICountResult
-		found, err = readTrialJSON(t.path(base+".result.json"), &result)
-		if err != nil {
-			return err
-		}
-		if !found {
-			continue
-		}
-		if result.ID != id || result.Key != d.Key || result.InputTokens < 0 || result.Unknown != (result.InputTokens == 0) {
-			return fmt.Errorf("invalid OpenAI trial count result")
-		}
-		if result.Unknown {
-			continue
-		}
-		if prior := known[d.Key]; prior != 0 && prior != result.InputTokens {
-			return fmt.Errorf("conflicting OpenAI trial counts")
-		}
-		known[d.Key] = result.InputTokens
+		names = append(names, entry.Name())
+	}
+	known, err := readTrialCountJournal(t.state, names, func(name string, dst any) (bool, error) {
+		return readTrialJSON(t.path(name), dst)
+	})
+	if err != nil {
+		return err
 	}
 	for key, n := range t.counts {
 		if n < 1 || known[key] != n {
@@ -102,4 +81,39 @@ func (t *openAITrial) loadCounts() error {
 		return t.writeJSON("counts.json", known)
 	}
 	return nil
+}
+
+func readTrialCountJournal(state openAITrialState, names []string, read func(string, any) (bool, error)) (map[string]int64, error) {
+	known := map[string]int64{}
+	for _, name := range names {
+		base, dispatch := strings.CutSuffix(name, ".dispatch.json")
+		id, count := strings.CutPrefix(base, "count-")
+		if !dispatch || !count {
+			continue
+		}
+		var d openAICountDispatch
+		found, err := read(name, &d)
+		if err != nil || !found || !openAIDispatchValid(d) || d.ID != id || d.Model != state.Model || d.Version != state.PriceVersion || d.Project != state.Project || d.Fingerprint != state.Fingerprint {
+			return nil, fmt.Errorf("invalid OpenAI trial count dispatch")
+		}
+		var result openAICountResult
+		found, err = read(base+".result.json", &result)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
+		if result.ID != id || result.Key != d.Key || result.InputTokens < 0 || result.Unknown != (result.InputTokens == 0) {
+			return nil, fmt.Errorf("invalid OpenAI trial count result")
+		}
+		if result.Unknown {
+			continue
+		}
+		if prior := known[d.Key]; prior != 0 && prior != result.InputTokens {
+			return nil, fmt.Errorf("conflicting OpenAI trial counts")
+		}
+		known[d.Key] = result.InputTokens
+	}
+	return known, nil
 }

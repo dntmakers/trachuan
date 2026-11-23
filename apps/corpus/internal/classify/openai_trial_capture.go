@@ -59,11 +59,17 @@ func readTrialCapture(path string) (openAITrialCapture, []byte, bool, error) {
 	if err != nil || !found {
 		return c, nil, found, err
 	}
+	c, raw, err := decodeTrialCapture(data)
+	return c, raw, err == nil, err
+}
+
+func decodeTrialCapture(data []byte) (openAITrialCapture, []byte, error) {
+	var c openAITrialCapture
 	header, raw, ok := bytes.Cut(data, []byte{'\n'})
 	if !ok || len(header) > 4096 || len(raw) > openAITrialResultLimit || validateRetainedJSON(header, &c) != nil || json.Unmarshal(header, &c) != nil || c.Hash != digest(raw) {
-		return c, nil, false, fmt.Errorf("invalid retained OpenAI trial capture")
+		return c, nil, fmt.Errorf("invalid retained OpenAI trial capture")
 	}
-	return c, raw, true, nil
+	return c, raw, nil
 }
 
 func (t *openAITrial) raw(name string, raw []byte) error {

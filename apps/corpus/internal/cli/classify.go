@@ -76,6 +76,8 @@ func runClassify(ctx context.Context, args []string, stdout, stderr io.Writer) i
 			return runClassifyArticles(ctx, args[1:], stdout, stderr)
 		case "trial-openai":
 			return runClassifyTrialOpenAI(ctx, args[1:], stdout, stderr)
+		case "pack":
+			return runClassifyPack(ctx, args[1:], stdout, stderr)
 		case "score":
 			return runClassifyScore(ctx, args[1:], stdout, stderr)
 		}

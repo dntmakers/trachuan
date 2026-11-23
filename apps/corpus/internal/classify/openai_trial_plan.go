@@ -101,6 +101,14 @@ func (t *openAITrial) restorePlan() error {
 	if err := t.readBound("plan.json", t.state.PlanHash, &plan); err != nil {
 		return err
 	}
+	input, err := t.boundBytes("input.jsonl", t.state.InputHash)
+	if err != nil {
+		return err
+	}
+	return t.restoreBoundPlan(plan, input, false)
+}
+
+func (t *openAITrial) restoreBoundPlan(plan openAITrialPlan, input []byte, strict bool) error {
 	if plan.Recipe.Hash() != t.state.RecipeHash || plan.Recipe.Model != t.state.Model || plan.Recipe.Effort != t.state.Effort || (plan.Recipe.Article != nil) != (t.state.Stage == "article") || len(plan.Items) == 0 {
 		return fmt.Errorf("retained trial plan recipe mismatch")
 	}
@@ -112,11 +120,7 @@ func (t *openAITrial) restorePlan() error {
 	}
 	t.o.Recipe, t.nodes = plan.Recipe, plan.Nodes
 	t.result = Submission{Country: t.state.Country, Release: t.state.Release, Recipe: plan.Recipe, Items: plan.Items, Families: plan.Families, Results: map[string]Outcome{}}
-	var err error
-	t.input, err = t.boundBytes("input.jsonl", t.state.InputHash)
-	if err != nil {
-		return err
-	}
+	t.input = input
 	var reserve int64
 	rest := t.input
 	for i, item := range plan.Items {
@@ -133,6 +137,11 @@ func (t *openAITrial) restorePlan() error {
 			Method string          `json:"method"`
 			URL    string          `json:"url"`
 			Body   json.RawMessage `json:"body"`
+		}
+		if strict {
+			if _, err := closedObject(line, []string{"custom_id", "method", "url", "body"}); err != nil || packCheckJSON(line) != nil {
+				return fmt.Errorf("invalid retained trial JSONL envelope")
+			}
 		}
 		if !found || json.Unmarshal(line, &req) != nil || req.ID != strconv.Itoa(i) || req.Method != "POST" || req.URL != "/v1/responses" || openAICountKey(req.Body) != item.RequestHash {
 			return fmt.Errorf("retained trial JSONL differs from plan")

@@ -120,7 +120,7 @@ func renderOpenAI(r Recipe, p anthropic.MessageNewParams, name string) ([]byte, 
 	if len(source.System) != 2 || len(source.Messages) != 1 || len(source.Messages[0].Content) != 1 || len(source.Output.Format.Schema) == 0 {
 		return nil, nil, fmt.Errorf("source request cannot be represented")
 	}
-	request := openAIRequest{Model: r.Model, Input: []openAIMessage{{Role: "developer", Content: []openAIContent{{Type: "input_text", Text: source.System[0].Text}, {Type: "input_text", Text: source.System[1].Text, Breakpoint: map[string]string{"mode": "explicit", "ttl": "30m"}}}}, {Role: "user", Content: []openAIContent{{Type: "input_text", Text: source.Messages[0].Content[0].Text}}}}, Reasoning: map[string]string{"effort": r.Effort}, Text: map[string]any{"format": map[string]any{"type": "json_schema", "name": name, "strict": true, "schema": source.Output.Format.Schema}}, Truncation: "disabled", MaxOutputTokens: p.MaxTokens, Store: false, PromptCacheOptions: map[string]string{"mode": "explicit", "ttl": "30m"}}
+	request := openAIRequestContract(r, name, source.System[0].Text, source.System[1].Text, source.Messages[0].Content[0].Text, source.Output.Format.Schema, p.MaxTokens)
 	body, err := json.Marshal(request)
 	if err != nil {
 		return nil, nil, fmt.Errorf("encode OpenAI request: %w", err)
@@ -137,4 +137,8 @@ func renderOpenAI(r Recipe, p anthropic.MessageNewParams, name string) ([]byte, 
 		return nil, nil, fmt.Errorf("encode OpenAI count: %w", err)
 	}
 	return body, countBody, nil
+}
+
+func openAIRequestContract(r Recipe, name, instruction, menu, payload string, schema any, limit int64) openAIRequest {
+	return openAIRequest{Model: r.Model, Input: []openAIMessage{{Role: "developer", Content: []openAIContent{{Type: "input_text", Text: instruction}, {Type: "input_text", Text: menu, Breakpoint: map[string]string{"mode": "explicit", "ttl": "30m"}}}}, {Role: "user", Content: []openAIContent{{Type: "input_text", Text: payload}}}}, Reasoning: map[string]string{"effort": r.Effort}, Text: map[string]any{"format": map[string]any{"type": "json_schema", "name": name, "strict": true, "schema": schema}}, Truncation: "disabled", MaxOutputTokens: limit, Store: false, PromptCacheOptions: map[string]string{"mode": "explicit", "ttl": "30m"}}
 }
