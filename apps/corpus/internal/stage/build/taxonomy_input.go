@@ -86,6 +86,8 @@ func ReadTaxonomy(dir, packagePath string) (TaxonomyInput, error) {
 	return input, nil
 }
 
+func (input TaxonomyInput) Version() string { return input.version }
+
 func (input TaxonomyInput) pinned() error {
 	if input.dir == "" {
 		return nil

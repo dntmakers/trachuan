@@ -2,6 +2,7 @@ package classify
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -184,6 +185,10 @@ func TestPackRepeatIsByteIdentical(t *testing.T) {
 		if digest(raw) != hash || (i == 1 && !bytes.Equal(raw, first)) || bytes.Contains(raw, []byte("own text")) || bytes.Contains(raw, []byte("Luật thử nghiệm")) {
 			t.Fatalf("invalid packed artifact: %s", hash)
 		}
+		set, err := ReadClassificationSet(t.Context(), store, hash, b.Country, b.Taxonomy)
+		if err != nil || len(set.Articles) != 1 || len(set.References) != 1 {
+			t.Fatalf("pack reader returned %d articles and %d references: %v", len(set.Articles), len(set.References), err)
+		}
 		first = raw
 	}
 }
@@ -219,5 +224,28 @@ func TestPackRefusesExistingDifferentSet(t *testing.T) {
 	}
 	if !bytes.Equal(trialRead(t, dir, ClassificationSetFilename), existing) {
 		t.Fatal("changed existing set")
+	}
+}
+
+func TestPackPolicy_HashesJSONObjectTuple(t *testing.T) {
+	menu := []Family{{Code: "2.1"}, {Code: "1.1"}}
+	policy, got, err := packPolicy(Recipe{Model: "model"}, Recipe{Article: &ArticleRecipe{FamiliesHash: strings.Repeat("a", 64)}}, menu)
+	if err != nil {
+		t.Fatal(err)
+	}
+	document, err := json.Marshal(policy.Document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	orderedMenu, err := json.Marshal(menu)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(policy.Article, []byte(`{`)) || bytes.Contains(policy.Article, []byte(`"families_sha256"`)) {
+		t.Fatalf("article policy is not an object stripped of the family file hash: %s", policy.Article)
+	}
+	want := digest([]byte(fmt.Sprintf("[%s,%s,%s]", document, policy.Article, orderedMenu)))
+	if got != want {
+		t.Fatalf("policy hash=%s, want canonical object tuple %s", got, want)
 	}
 }

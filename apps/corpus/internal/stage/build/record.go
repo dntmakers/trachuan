@@ -10,36 +10,39 @@ import (
 	"time"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
+	"danny.vn/trachuan/apps/corpus/internal/classify"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/internal/corpusdb"
 )
 
 type BuildRecord struct {
-	Version                 int              `json:"version"`
-	Country                 string           `json:"country"`
-	Rel                     string           `json:"rel"`
-	DatabaseName            string           `json:"database_name"`
-	SchemaVersion           int              `json:"schema_version"`
-	BuildInputHash          string           `json:"build_input_hash"`
-	BuildRecipeHash         string           `json:"build_recipe_hash"`
-	SourceManifestHash      string           `json:"source_manifest_hash"`
-	IdentityInventoryHash   string           `json:"identity_inventory_hash"`
-	ProvenanceSHA256        string           `json:"provenance_sha256,omitempty"`
-	CorrectionsSHA256       string           `json:"corrections_sha256,omitempty"`
-	HeadingExclusionsSHA256 string           `json:"heading_exclusions_sha256"`
-	HeadingScanSHA256       string           `json:"heading_scan_sha256"`
-	IdentityMapSHA256       string           `json:"identity_map_sha256"`
-	DevelopmentCasesSHA256  *string          `json:"development_cases_sha256"`
-	DenseRecipe             json.RawMessage  `json:"dense_recipe"`
-	ChunkRecipe             json.RawMessage  `json:"chunk_recipe"`
-	LexicalRecipe           json.RawMessage  `json:"lexical_recipe"`
-	RetrievalRecipe         json.RawMessage  `json:"retrieval_recipe"`
-	LexicalStats            json.RawMessage  `json:"lexical_stats"`
-	Taxonomy                *TaxonomyStats   `json:"taxonomy"`
-	Summary                 SummaryStats     `json:"summary"`
-	TaxonomyVersion         string           `json:"taxonomy_version"`
-	Counts                  map[string]int64 `json:"counts"`
-	Dump                    struct {
+	Version                    int              `json:"version"`
+	Country                    string           `json:"country"`
+	Rel                        string           `json:"rel"`
+	DatabaseName               string           `json:"database_name"`
+	SchemaVersion              int              `json:"schema_version"`
+	BuildInputHash             string           `json:"build_input_hash"`
+	BuildRecipeHash            string           `json:"build_recipe_hash"`
+	ClassificationSetSHA256    string           `json:"classification_set_sha256,omitempty"`
+	ClassificationPolicySHA256 string           `json:"classification_policy_sha256,omitempty"`
+	SourceManifestHash         string           `json:"source_manifest_hash"`
+	IdentityInventoryHash      string           `json:"identity_inventory_hash"`
+	ProvenanceSHA256           string           `json:"provenance_sha256,omitempty"`
+	CorrectionsSHA256          string           `json:"corrections_sha256,omitempty"`
+	HeadingExclusionsSHA256    string           `json:"heading_exclusions_sha256"`
+	HeadingScanSHA256          string           `json:"heading_scan_sha256"`
+	IdentityMapSHA256          string           `json:"identity_map_sha256"`
+	DevelopmentCasesSHA256     *string          `json:"development_cases_sha256"`
+	DenseRecipe                json.RawMessage  `json:"dense_recipe"`
+	ChunkRecipe                json.RawMessage  `json:"chunk_recipe"`
+	LexicalRecipe              json.RawMessage  `json:"lexical_recipe"`
+	RetrievalRecipe            json.RawMessage  `json:"retrieval_recipe"`
+	LexicalStats               json.RawMessage  `json:"lexical_stats"`
+	Taxonomy                   *TaxonomyStats   `json:"taxonomy"`
+	Summary                    SummaryStats     `json:"summary"`
+	TaxonomyVersion            string           `json:"taxonomy_version"`
+	Counts                     map[string]int64 `json:"counts"`
+	Dump                       struct {
 		SHA256 string `json:"sha256"`
 		Bytes  int64  `json:"bytes"`
 		Format string `json:"format"`
@@ -53,6 +56,7 @@ type BuildRecord struct {
 	RelationBytes   int64            `json:"relation_bytes"`
 	IndexBytes      int64            `json:"index_bytes"`
 	BuiltAt         time.Time        `json:"built_at"`
+	classification  *classify.ClassificationSet
 }
 
 func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Run, cfg Config) (BuildRecord, string, error) {
@@ -73,6 +77,9 @@ func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Ru
 	}
 	var record BuildRecord
 	if err = read("build.json", &record); err != nil {
+		return record, "", err
+	}
+	if err = verifyClassificationRecord(store, run, &record); err != nil {
 		return record, "", err
 	}
 	if record.DevelopmentCasesSHA256 == nil {
@@ -112,7 +119,9 @@ func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Ru
 	if err != nil {
 		return record, "", err
 	}
-	if record.Version != 1 || record.Country != run.Country || record.Rel != run.Rel || record.DatabaseName != final || record.SchemaVersion != corpusdb.SchemaVersion || inventory.Country != run.Country || inventory.SourceListHash != run.Snapshot.SourceListHash || record.BuildInputHash != art.InputHash || record.BuildInputHash != withReports(withKnowledge(recordInputHash(run.Country, run.Rel, inventory, record.IdentityMapSHA256, record.ProvenanceSHA256, record.CorrectionsSHA256, *record.DevelopmentCasesSHA256, record.TaxonomyVersion, record.HeadingExclusionsSHA256), knowledgeHash), reportsHash) || *record.DevelopmentCasesSHA256 != cfg.Suite.Hashes.Development || record.BuildRecipeHash != recipeHash || record.SourceManifestHash != inventory.SourceManifestHash() || record.IdentityInventoryHash != inventory.IdentityHash() || record.Dump.Format != "custom" || record.PostgresVersion != cfg.Versions.PostgreSQLMajor || record.PGVectorVersion != cfg.Versions.PGVector || record.LtreeVersion != cfg.Versions.Ltree || record.PgDumpVersion != cfg.Versions.PgDump || record.WorkerVersion != run.Snapshot.WorkerVersion || record.BuiltAt.IsZero() {
+	inputHash := recordInputHash(run.Country, run.Rel, inventory, record.IdentityMapSHA256, record.ProvenanceSHA256, record.CorrectionsSHA256, *record.DevelopmentCasesSHA256, record.TaxonomyVersion, record.HeadingExclusionsSHA256)
+	inputHash = withClassificationSet(withReports(withKnowledge(inputHash, knowledgeHash), reportsHash), run.Snapshot.ClassificationSetSHA256)
+	if record.Version != 1 || record.Country != run.Country || record.Rel != run.Rel || record.DatabaseName != final || record.SchemaVersion != corpusdb.SchemaVersion || inventory.Country != run.Country || inventory.SourceListHash != run.Snapshot.SourceListHash || record.BuildInputHash != art.InputHash || record.BuildInputHash != inputHash || *record.DevelopmentCasesSHA256 != cfg.Suite.Hashes.Development || record.BuildRecipeHash != recipeHash || record.SourceManifestHash != inventory.SourceManifestHash() || record.IdentityInventoryHash != inventory.IdentityHash() || record.Dump.Format != "custom" || record.PostgresVersion != cfg.Versions.PostgreSQLMajor || record.PGVectorVersion != cfg.Versions.PGVector || record.LtreeVersion != cfg.Versions.Ltree || record.PgDumpVersion != cfg.Versions.PgDump || record.WorkerVersion != run.Snapshot.WorkerVersion || record.BuiltAt.IsZero() {
 		return record, "", fmt.Errorf("build artifact identity mismatch")
 	}
 	if record.Taxonomy == nil || record.Taxonomy.Nodes < 0 || record.Taxonomy.Served < 0 || record.Taxonomy.Seeds < 0 || record.Taxonomy.Overrides < 0 || record.Taxonomy.Excluded < 0 || record.Taxonomy.MissingArticles < 0 || record.Taxonomy.MissingOverrideTargets < 0 || record.Taxonomy.Inherited < 0 || record.Taxonomy.UnmatchedConsolidated < 0 || (record.Taxonomy.Inherited > 0 && record.Taxonomy.Inheritance.Status != "pass") || (record.Taxonomy.Inheritance.Status != "" && !validInheritanceGate(record.Taxonomy.Inheritance)) {

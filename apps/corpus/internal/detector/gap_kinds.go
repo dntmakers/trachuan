@@ -19,7 +19,7 @@ func gapKinds() []string {
 		"seed_article_missing", "source_identity_ambiguous", "source_provenance_missing", "source_replaced", "source_unavailable",
 		"source_withdrawn_retained", "structure_uncertain", "summary_field_capped", "summary_outline_capped", "summary_row_capped",
 		"table_text", "text_limit", "text_number_mismatch", "text_source_ambiguous", "tree_headings_only", "tree_headings_partial",
-		"tree_text_partial", "tree_too_large", "unknown_node_kind", "unknown_relation_code", "unknown_status", "unknown_target",
+		"tree_text_partial", "tree_too_large", "unassigned", "unknown_node_kind", "unknown_relation_code", "unknown_status", "unknown_target",
 		"unresolved_provision_relation", "withdrawn",
 	}
 }

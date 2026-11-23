@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
+	"danny.vn/trachuan/apps/corpus/internal/classify"
 	"danny.vn/trachuan/apps/corpus/internal/config"
 	"danny.vn/trachuan/apps/corpus/internal/run"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
@@ -49,7 +50,7 @@ func dependencies(ctx context.Context, needSources bool, cc string) (run.Deps, f
 	stages := registry.Names()
 	d := run.Deps{Artifacts: artifact.Store{Root: cfg.Artifacts}, BatchesInFlight: cfg.BatchesInFlight, FetchBatchesInFlight: cfg.FetchBatchesInFlight, HeartbeatTimeout: cfg.HeartbeatTimeout, DB: db, Temporal: temporalClient, Stages: stages, RecipesFor: func(snapshot stage.Snapshot) map[string]string {
 		return registry.Recipes(snapshot)
-	}}
+	}, TaxonomyVersion: index.Build.Taxonomy.Version()}
 	if needSources {
 		if !regexp.MustCompile(`^[a-z]{2}$`).MatchString(cc) {
 			closeDeps()
@@ -105,6 +106,7 @@ func lifecycle(ctx context.Context, name string, args []string, stdout, stderr i
 		allowed["--until"] = true
 		allowed["--previous-manifest"] = true
 		allowed["--previous-report"] = true
+		allowed["--classification-set"] = true
 		allowed["--no-previous-report"] = false
 	case "recover":
 		allowed["--terminate"] = false
@@ -123,6 +125,10 @@ func lifecycle(ctx context.Context, name string, args []string, stdout, stderr i
 	}
 	var choice run.ReportChoice
 	if name == "start" {
+		if selection, present := opts["--classification-set"]; present && !classify.ValidClassificationSetDigest(selection) {
+			_, _ = fmt.Fprintln(stderr, "--classification-set needs a SHA-256 digest")
+			return 2
+		}
 		choice, err = reportChoice(opts)
 		if err != nil {
 			_, _ = fmt.Fprintln(stderr, err)
@@ -138,6 +144,7 @@ func lifecycle(ctx context.Context, name string, args []string, stdout, stderr i
 	var result any
 	switch name {
 	case "start":
+		d.ClassificationSetSHA256 = opts["--classification-set"]
 		applyStartFlags(&d, choice, stdout)
 		err = run.Start(ctx, d, cc, rel, opts["--until"], opts["--previous-manifest"])
 	case "status":

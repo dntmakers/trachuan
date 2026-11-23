@@ -1,6 +1,7 @@
 package classify
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -85,9 +86,17 @@ func packPolicy(document, article Recipe, menu []Family) (ClassificationPolicy, 
 		return p, "", err
 	}
 	p = ClassificationPolicy{document, raw, menu}
-	tuple, err := json.Marshal([3]any{document, raw, menu})
-	if err != nil {
-		return p, "", err
+	hash, err := p.Hash()
+	return p, hash, err
+}
+
+func (p ClassificationPolicy) Hash() (string, error) {
+	if !bytes.HasPrefix(bytes.TrimSpace(p.Article), []byte("{")) || packCheckJSON(p.Article) != nil {
+		return "", fmt.Errorf("classification article policy must be a JSON object")
 	}
-	return p, digest(tuple), nil
+	tuple, err := json.Marshal([3]any{p.Document, p.Article, p.Menu})
+	if err != nil {
+		return "", fmt.Errorf("encode classification policy: %w", err)
+	}
+	return digest(tuple), nil
 }

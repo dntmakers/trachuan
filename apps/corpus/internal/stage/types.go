@@ -11,7 +11,6 @@ import (
 	"strings"
 )
 
-// Snapshot holds the frozen inputs for a run.
 type Snapshot struct {
 	SourceList                                       json.RawMessage
 	SourceListHash                                   string
@@ -20,6 +19,7 @@ type Snapshot struct {
 	ExtractRecordContract                            string `json:"extract_record_contract,omitempty"`
 	TaxonomyVersion, WorkerVersion, PreviousManifest string
 	PreviousReport                                   *PreviousReport `json:",omitempty"`
+	ClassificationSetSHA256                          string          `json:"classification_set_sha256,omitempty"`
 }
 
 const ExtractRecordLegacy = "legacy"

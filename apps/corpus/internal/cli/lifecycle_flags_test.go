@@ -53,3 +53,17 @@ func TestStartCLI_RefusesBothFlagsBeforeConnecting(t *testing.T) {
 		t.Fatalf("code=%d err=%s", code, errout.String())
 	}
 }
+
+func TestStartCLI_ClassificationSetAcceptsOnlyDigest(t *testing.T) {
+	for _, tc := range []struct{ choice, want string }{
+		{"/tmp/classification.json", "needs a SHA-256 digest"},
+		{"", "needs a SHA-256 digest"},
+		{strings.Repeat("a", 64), "use only one of --previous-report"},
+	} {
+		var out, errout bytes.Buffer
+		code := Run(context.Background(), []string{"start", "vn", "20990101", "--classification-set", tc.choice, "--previous-report", "r.json", "--no-previous-report"}, &out, &errout)
+		if code != 2 || !strings.Contains(errout.String(), tc.want) {
+			t.Fatalf("choice=%q code=%d err=%s", tc.choice, code, errout.String())
+		}
+	}
+}

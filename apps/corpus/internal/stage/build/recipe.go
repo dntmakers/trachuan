@@ -39,9 +39,11 @@ type buildRecipe struct {
 	PgRestoreVersion           string `json:"pg_restore_version"`
 }
 
-func (r buildRecipe) hash() string {
+func (r buildRecipe) hash() string { return r.hashVersion("corpus/6") }
+
+func (r buildRecipe) hashVersion(version string) string {
 	b, _ := json.Marshal(r)
-	return stage.RecipeHash("build", "corpus/6", string(b))
+	return stage.RecipeHash("build", version, string(b))
 }
 
 type Versions struct {
@@ -71,6 +73,9 @@ func (s *Stage) recipeForRetrieval(snapshot stage.Snapshot, policy retrieval.Rec
 		ChunkRecipeHash: chunk.Recipe2().Hash(), DocumentRecipeHash: embedding.DocumentRecipe1().Hash(), QueryRecipeHash: embedding.QueryRecipe1().Hash(), LexicalRecipeHash: lexical.Recipe1().Hash(), RetrievalPolicyHash: policy.Hash(), NormalizerVersion: normalizer.Version, LabelNormalizer: "corpus-labels/1", NumberNormalizationVersion: retrieval.NumberNormalizationVersion, StatusCodesSHA256: fmt.Sprintf("%x", sha256.Sum256(status)), ValidityRulesVersion: validityRulesVersion, CalibrationPolicy: "provisional-old-product/balanced/1", LegacyCasesSHA256: s.cfg.Suite.Hashes.Legacy, DevelopmentCasesSHA256: s.cfg.Suite.Hashes.Development, PostgreSQLMajor: s.cfg.Versions.PostgreSQLMajor, PGVectorVersion: s.cfg.Versions.PGVector, LtreeVersion: s.cfg.Versions.Ltree, PgDumpVersion: s.cfg.Versions.PgDump, PgRestoreVersion: s.cfg.Versions.PgRestore}
 	if len(s.cfg.Suite.Development) > 0 {
 		r.CalibrationPolicy = "old-product+development/balanced/1"
+	}
+	if snapshot.ClassificationSetSHA256 != "" {
+		return r.hashVersion("corpus/7")
 	}
 	return r.hash()
 }
