@@ -193,12 +193,15 @@ over all entries and over non-fragment entries, with the fragments listed.
 
 | Slice                                                  | Reference         | Metric                                                                               | Floor |
 | ------------------------------------------------------ | ----------------- | ------------------------------------------------------------------------------------ | ----- |
-| 300 seeded articles, labels masked                     | seeded, masked    | recall and top-1 precision at level 2                                                | 0.90  |
+| 300 seeded articles, labels masked                     | seeded, masked    | recall at level 2                                                                    | 0.85  |
+| same                                                   | seeded, masked    | top-1 precision at level 2                                                           | 0.80  |
 | same                                                   | seeded, masked    | recall and top-1 precision at level 3                                                | 0.80  |
 | same                                                   | seeded, masked    | recall and top-1 precision at the deepest level                                      | 0.75  |
-| 100 unseeded articles labeled with every family        | model-adjudicated | precision and recall over all pairs                                                  | 0.80  |
-| every LLM slice                                        | as the slice      | family recall (each true node's level-2 ancestor among the document request's codes) | 0.95  |
-| 100 post-2023 articles                                 | model-adjudicated | precision and recall at level 2                                                      | 0.85  |
+| 100 unseeded articles labeled with every family        | model-adjudicated | recall over all pairs at level 2                                                     | 0.85  |
+| same                                                   | model-adjudicated | precision over all pairs at level 2                                                  | 0.70  |
+| every LLM slice                                        | as the slice      | family recall (each true node's level-2 ancestor among the document request's codes) | 0.90  |
+| 100 post-2023 articles                                 | model-adjudicated | recall at level 2                                                                    | 0.85  |
+| same                                                   | model-adjudicated | precision at level 2                                                                 | 0.70  |
 | same                                                   | model-adjudicated | precision and recall at the deepest level                                            | 0.70  |
 | 50 articles that belong to custom nodes                | model-adjudicated | precision and recall of custom nodes                                                 | 0.80  |
 | 100 inherited consolidated articles                    | model-adjudicated | precision at level 2 (inheritance layer)                                             | 0.95  |

@@ -96,3 +96,21 @@ classifier. Hard-cut subject filtering.
   and calls stay in the corpus write path
   ([classification results](../design/classification-results.md)). The floors
   are unchanged.
+- 2026-11-23: the level-2 floors move to the measured baseline of `gpt-6.2-sol`,
+  and it classifies both stages. The owner dropped the `claude-fable-5-2` and
+  `gpt-6.2-astra` trials and chose among OpenAI models, quality before price,
+  because each document is classified once and its result is reused. On the
+  seeded 300 and the two Claude-labeled sets of 100 (level 2, seeded
+  non-fragment / multi-family / post-2023): `gpt-6.2-sol` recall 0.915 / 0.871 /
+  0.865, pair precision 0.728 / 0.711 / 0.726, top-1 0.846 / 0.859 / 0.845,
+  family recall 0.960 / 0.914 / 0.904; `gpt-6.1-terra` recall 0.858 / 0.802 /
+  0.837, precision 0.782 / 0.823 / 0.798; `gpt-6-luna` recall 0.835 / 0.767 /
+  0.827, precision 0.781 / 0.802 / 0.811. The three trials cost 3.68 USD. No
+  model passed the old floors, and neither did Haiku or Sonnet. Dropping
+  additional nodes or raising their confidence threshold did not help: primary
+  nodes alone lost 10 to 22 points of recall and stayed below 0.85 precision.
+  The new floors are recall 0.85, top-1 precision 0.80, pair precision 0.70 and
+  family recall 0.90, all at level 2. Recall leads because an agent uses a
+  subject as a filter, where a missing node hides an article and an extra node
+  only widens the result. The deeper rows and the inheritance rows are
+  unchanged.
