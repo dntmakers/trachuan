@@ -37,6 +37,9 @@ type Metrics struct {
 	TopOnePrecision   float64 `json:"top_1_precision"`
 	AdditionalCorrect int     `json:"additional_node_correct"`
 	AdditionalTotal   int     `json:"additional_node_total"`
+
+	topOneHits  int
+	topOneTotal int
 }
 
 type ThresholdMetrics struct {
@@ -76,6 +79,9 @@ type ScoreReport struct {
 	FamilyTotal        int             `json:"family_total"`
 	FamilyRecall       float64         `json:"family_recall"`
 	Levels             []LevelScore    `json:"levels"`
+
+	NonFragmentFamilyHits  int `json:"-"`
+	NonFragmentFamilyTotal int `json:"-"`
 }
 
 type scoredArticle struct {
@@ -116,6 +122,7 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 	for _, label := range labels.Articles {
 		key := label.Key + "/" + label.Anchor
 		valid := validation.valid[key]
+		fragment := valid && taxonomy.IsFragment(texts[key])
 		truthCodes := map[string]bool{}
 		for _, code := range label.Codes {
 			truthCodes[code] = true
@@ -123,8 +130,14 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 		family := families.Documents[label.Key]
 		for code := range truthCodes {
 			report.FamilyTotal++
+			if !fragment {
+				report.NonFragmentFamilyTotal++
+			}
 			if valid && family.Outcome == "ok" && containsCode(family.Codes, ancestor(code, 2, byCode)) {
 				report.FamilyHits++
+				if !fragment {
+					report.NonFragmentFamilyHits++
+				}
 			}
 		}
 		item := scoredArticle{noNode: label.NoNode, truth: [3]map[string]bool{{}, {}, {}}, predictions: [3]map[string]float64{{}, {}, {}}}
@@ -166,7 +179,7 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 			}
 		}
 		scored = append(scored, item)
-		if text, present := texts[key]; present && taxonomy.IsFragment(text) {
+		if fragment {
 			report.ExcludedFragments = append(report.ExcludedFragments, FragmentEntry{label.Key, label.Anchor})
 		} else {
 			nonFragment = append(nonFragment, item)
@@ -248,15 +261,14 @@ func containsCode(codes []string, code string) bool {
 
 func scoreAt(articles []scoredArticle, level int, threshold float64) Metrics {
 	var m Metrics
-	var topTotal, topCorrect int
 	for _, a := range articles {
 		if a.noNode && level > 0 {
 			continue
 		}
 		if a.topCode != "" && a.topConfidence >= threshold {
-			topTotal++
+			m.topOneTotal++
 			if a.truth[level][a.topMapped[level]] {
-				topCorrect++
+				m.topOneHits++
 			}
 		}
 		for code, confidence := range a.predictions[level] {
@@ -281,8 +293,8 @@ func scoreAt(articles []scoredArticle, level int, threshold float64) Metrics {
 			}
 		}
 	}
-	if topTotal > 0 {
-		m.TopOnePrecision = float64(topCorrect) / float64(topTotal)
+	if m.topOneTotal > 0 {
+		m.TopOnePrecision = float64(m.topOneHits) / float64(m.topOneTotal)
 	}
 	if m.TruePositive+m.FalsePositive > 0 {
 		m.Precision = float64(m.TruePositive) / float64(m.TruePositive+m.FalsePositive)
