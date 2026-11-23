@@ -192,3 +192,59 @@ func TestOpenAITrialBudget_TerminalReceiptBlocksEvenBeforePhaseWrite(t *testing.
 		t.Fatalf("persisted terminal receipt did not block Create: calls=%v err=%v", pending.calls, err)
 	}
 }
+
+func TestUnseededBudgetReportsSiblingSpendAboveCap(t *testing.T) {
+	o, docs, menu, _, wire := trialFixture(t)
+	o.Unseeded = true
+	o.Selection = "unseeded:1/8"
+	stopTrialAfterUpload(t, o, docs, menu, wire)
+	state := loadTrialFixtureState(t, o.Out)
+	state.ReserveMicroUSD = 10_000_000
+	if err := writeTrialJSON(filepath.Join(o.Out, "state.json"), state); err != nil {
+		t.Fatal(err)
+	}
+	other := o
+	other.Out = filepath.Join(filepath.Dir(o.Out), "other")
+	other.CapMicroUSD = 1_000_000
+	other.DryRun = true
+	candidate := &trialWire{t: t, out: other.Out}
+	summary, err := RunOpenAIDocumentTrial(t.Context(), other, candidate.client(), docs, menu)
+	if err == nil || summary.SiblingMicroUSD != 10_000_000 {
+		t.Fatalf("sibling spend %d, err %v", summary.SiblingMicroUSD, err)
+	}
+}
+
+func TestUnseededSiblingSpendSaturatesAtMaximum(t *testing.T) {
+	o, docs, menu, _, wire := trialFixture(t)
+	o.Unseeded = true
+	o.Selection = "unseeded:1/8"
+	stopTrialAfterUpload(t, o, docs, menu, wire)
+	state := loadTrialFixtureState(t, o.Out)
+	state.ReserveMicroUSD = 175_000_000
+	if err := writeTrialJSON(filepath.Join(o.Out, "state.json"), state); err != nil {
+		t.Fatal(err)
+	}
+	second := filepath.Join(filepath.Dir(o.Out), "second")
+	if err := os.Mkdir(second, 0700); err != nil {
+		t.Fatal(err)
+	}
+	state.Phase = trialReserved
+	state.FileID = ""
+	state.Upload = nil
+	state.ReserveMicroUSD = 1
+	if err := writeTrialJSON(filepath.Join(second, "state.json"), state); err != nil {
+		t.Fatal(err)
+	}
+	candidate := filepath.Join(filepath.Dir(o.Out), "candidate")
+	if err := os.Mkdir(candidate, 0700); err != nil {
+		t.Fatal(err)
+	}
+	o.Out = candidate
+	o.CapMicroUSD = 175_000_000
+	trial := openAITrial{o: o}
+	var summary OpenAITrialSummary
+	err := trial.withTrialBudget(&summary, nil)
+	if err == nil || summary.SiblingMicroUSD != 175_000_000 {
+		t.Fatalf("overflow sibling spend %d, err %v", summary.SiblingMicroUSD, err)
+	}
+}

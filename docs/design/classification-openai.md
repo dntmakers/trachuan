@@ -268,12 +268,12 @@ build one.
 
 ## Model trial command
 
-`corpus classify trial-openai CC REL --stage documents|articles --select labels:FILE [--families FILE] --model M --effort E --out DIR --cap-usd N`
-compares OpenAI models on the frozen sets before the production path exists. It
-is evaluation only: it reads the release, keeps every state file under `--out`
-and never touches the workshop ledger or the submissions store. Its artifacts
-feed `corpus classify score`, which scores an OpenAI recipe only against the
-seeded set and the Claude-labeled files.
+`corpus classify trial-openai CC REL --stage documents|articles --select labels:FILE|unseeded:I/N [--families FILE] --model M --effort E --out DIR --cap-usd N`
+compares OpenAI models on the frozen sets and runs the full LLM set. It is
+evaluation only: it reads the release, keeps every state file under `--out` and
+never touches the workshop ledger or the submissions store. Its artifacts feed
+`corpus classify score`, which scores an OpenAI recipe only against the seeded
+set and the Claude-labeled files.
 
 - One directory holds one batch: the plan, counted requests, the uploaded input,
   each captured response, the output, the settled cost and a manifest of hashes.
@@ -286,3 +286,11 @@ seeded set and the Claude-labeled files.
   database nor room under the cap.
 - The article stage takes the families file of the document stage and uses the
   same model and effort.
+- `--select unseeded:I/N` selects the release's LLM set instead of a frozen
+  file: primary articles with no seeded, inherited or manual assignment that are
+  not fragments. Documents are split into N parts (at most 64) by a hash of the
+  document key, so a document never spans two parts. The selection identity
+  binds the part, the selected articles and the release's build hashes; a rerun
+  with another part or another build fails as a changed selection. This mode has
+  no reference labels, is never scored, and allows a cap up to 175 USD; a
+  frozen-file directory keeps the 40 USD bound, also when it is a sibling.

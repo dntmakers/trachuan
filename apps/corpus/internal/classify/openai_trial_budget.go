@@ -11,8 +11,8 @@ import (
 )
 
 func (t *openAITrial) withTrialBudget(summary *OpenAITrialSummary, apply func() error) error {
-	if t.o.CapMicroUSD < 1 || t.o.CapMicroUSD > OpenAITrialMaxMicroUSD {
-		return fmt.Errorf("invalid OpenAI trial cap (maximum 40 USD)")
+	if t.o.CapMicroUSD < 1 || t.o.CapMicroUSD > OpenAITrialMaxCap(t.o.Unseeded) {
+		return fmt.Errorf("invalid OpenAI trial cap")
 	}
 	parent := filepath.Dir(t.o.Out)
 	unlock, err := trialLock(parent)
@@ -29,6 +29,8 @@ func (t *openAITrial) withTrialBudget(summary *OpenAITrialSummary, apply func() 
 		return fmt.Errorf("inspect current trial directory: %w", err)
 	}
 	summary.SiblingMicroUSD = 0
+	maximum := OpenAITrialMaxCap(t.o.Unseeded)
+	overflow := false
 	for _, entry := range entries {
 		if !entry.IsDir() || entry.Name() == filepath.Base(t.o.Out) {
 			continue
@@ -41,12 +43,16 @@ func (t *openAITrial) withTrialBudget(summary *OpenAITrialSummary, apply func() 
 			continue
 		}
 		charge, err := trialSiblingCharge(filepath.Join(parent, entry.Name()))
-		summary.SiblingMicroUSD += min(charge, OpenAITrialMaxMicroUSD+1-summary.SiblingMicroUSD)
+		remaining := maximum - summary.SiblingMicroUSD
+		if charge > remaining {
+			overflow = true
+		}
+		summary.SiblingMicroUSD += min(charge, remaining)
 		if err != nil {
 			return fmt.Errorf("OpenAI trial admission blocked by sibling directory %q: %w", entry.Name(), err)
 		}
 	}
-	if summary.ReserveMicroUSD > t.o.CapMicroUSD-summary.SiblingMicroUSD {
+	if overflow || summary.ReserveMicroUSD > t.o.CapMicroUSD-summary.SiblingMicroUSD {
 		return fmt.Errorf("OpenAI trial exceeds --cap-usd (%d trial + %d siblings micro-USD)", summary.ReserveMicroUSD, summary.SiblingMicroUSD)
 	}
 	if apply != nil {

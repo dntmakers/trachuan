@@ -40,26 +40,52 @@ type openAITrialIdentity struct {
 
 type openAITrialState struct {
 	openAITrialIdentity
-	Version         int                        `json:"version"`
-	Phase           string                     `json:"phase"`
-	SubmissionID    string                     `json:"submission_id"`
-	InputHash       string                     `json:"input_sha256"`
-	PlanHash        string                     `json:"plan_sha256"`
-	ReserveMicroUSD int64                      `json:"reserve_micro_usd"`
-	CostMicroUSD    int64                      `json:"cost_micro_usd"`
-	UnpricedResults int                        `json:"unpriced_results,omitempty"`
-	FileID          string                     `json:"input_file_id,omitempty"`
-	BatchID         string                     `json:"batch_id,omitempty"`
-	Upload          *openAITrialUploadIdentity `json:"upload,omitempty"`
-	TerminalHash    string                     `json:"terminal_sha256,omitempty"`
-	TerminalCapture string                     `json:"terminal_capture,omitempty"`
-	SiblingMicroUSD int64                      `json:"sibling_micro_usd,omitempty"`
-	Output          *openAITrialFileBinding    `json:"output,omitempty"`
-	Error           *openAITrialFileBinding    `json:"error,omitempty"`
+	SelectedDocuments int                        `json:"selected_documents,omitempty"`
+	SelectedArticles  int                        `json:"selected_articles,omitempty"`
+	SelectionMode     string                     `json:"selection_mode,omitempty"`
+	Selection         string                     `json:"selection,omitempty"`
+	Version           int                        `json:"version"`
+	Phase             string                     `json:"phase"`
+	SubmissionID      string                     `json:"submission_id"`
+	InputHash         string                     `json:"input_sha256"`
+	PlanHash          string                     `json:"plan_sha256"`
+	ReserveMicroUSD   int64                      `json:"reserve_micro_usd"`
+	CostMicroUSD      int64                      `json:"cost_micro_usd"`
+	UnpricedResults   int                        `json:"unpriced_results,omitempty"`
+	FileID            string                     `json:"input_file_id,omitempty"`
+	BatchID           string                     `json:"batch_id,omitempty"`
+	Upload            *openAITrialUploadIdentity `json:"upload,omitempty"`
+	TerminalHash      string                     `json:"terminal_sha256,omitempty"`
+	TerminalCapture   string                     `json:"terminal_capture,omitempty"`
+	SiblingMicroUSD   int64                      `json:"sibling_micro_usd,omitempty"`
+	Output            *openAITrialFileBinding    `json:"output,omitempty"`
+	Error             *openAITrialFileBinding    `json:"error,omitempty"`
+}
+
+func (s openAITrialState) maxCap() (int64, bool) {
+	switch s.SelectionMode {
+	case "", "labels":
+		return OpenAITrialMaxCap(false), true
+	case "unseeded":
+		return OpenAITrialMaxCap(true), true
+	default:
+		return 0, false
+	}
+}
+
+func (s openAITrialState) matchesSelection(o OpenAITrialOptions) bool {
+	if o.Unseeded {
+		return s.SelectionMode == "unseeded" && s.Selection == o.Selection && o.Selection != ""
+	}
+	return (s.SelectionMode == "" || s.SelectionMode == "labels") && s.Selection == ""
 }
 
 func (s openAITrialState) valid() bool {
-	if (s.Version != 2 && (s.Version != 1 || s.Phase != trialPreparing)) || (s.Version == 2 && s.Effort == "") || !validID(s.SubmissionID) || !validID(s.Fingerprint) || !openAIProjectValid(s.Project) || !validKey(s.LabelsHash) || !validKey(s.RecipeHash) || s.PriceVersion != openAIBatchPriceVersion || (s.Stage != "document" && s.Stage != "article") || s.Country == "" || s.Release == "" || s.ReserveMicroUSD < 0 || s.ReserveMicroUSD > OpenAITrialMaxMicroUSD || s.CostMicroUSD < 0 {
+	maximum, ok := s.maxCap()
+	if !ok || (s.SelectionMode == "unseeded") != (s.Selection != "") {
+		return false
+	}
+	if (s.Version != 2 && (s.Version != 1 || s.Phase != trialPreparing)) || (s.Version == 2 && s.Effort == "") || !validID(s.SubmissionID) || !validID(s.Fingerprint) || !openAIProjectValid(s.Project) || !validKey(s.LabelsHash) || !validKey(s.RecipeHash) || s.PriceVersion != openAIBatchPriceVersion || (s.Stage != "document" && s.Stage != "article") || s.Country == "" || s.Release == "" || s.ReserveMicroUSD < 0 || s.ReserveMicroUSD > maximum || s.CostMicroUSD < 0 {
 		return false
 	}
 	needsUpload := s.Phase != trialPreparing && s.Phase != trialReserved && s.ReserveMicroUSD > 0
@@ -73,7 +99,7 @@ func (s openAITrialState) valid() bool {
 	if s.UnpricedResults < 0 || (s.UnpricedResults > 0 && (s.BatchID == "" || (s.Phase != trialTerminal && s.Phase != trialSettled))) {
 		return false
 	}
-	if s.SiblingMicroUSD < 0 || s.SiblingMicroUSD > OpenAITrialMaxMicroUSD {
+	if s.SiblingMicroUSD < 0 || s.SiblingMicroUSD > maximum {
 		return false
 	}
 	hasTerminal := s.Phase == trialTerminal || s.Phase == trialSettled && s.BatchID != ""
@@ -165,7 +191,7 @@ func (t *openAITrial) load(identity openAITrialIdentity) error {
 		if t.state.Version == 1 {
 			t.state.Effort = identity.Effort
 		}
-		if t.state.openAITrialIdentity != identity {
+		if t.state.openAITrialIdentity != identity || !t.state.matchesSelection(t.o) {
 			return fmt.Errorf("trial state does not match stage, inputs, recipe or credentials")
 		}
 		if t.state.Version == 1 {
@@ -186,7 +212,11 @@ func (t *openAITrial) load(identity openAITrialIdentity) error {
 		if idErr != nil {
 			return idErr
 		}
-		t.state = openAITrialState{openAITrialIdentity: identity, Version: 2, Phase: trialPreparing, SubmissionID: id}
+		mode := "labels"
+		if t.o.Unseeded {
+			mode = "unseeded"
+		}
+		t.state = openAITrialState{openAITrialIdentity: identity, SelectionMode: mode, Selection: t.o.Selection, SelectedDocuments: t.o.SelectedDocuments, SelectedArticles: t.o.SelectedArticles, Version: 2, Phase: trialPreparing, SubmissionID: id}
 		if err = t.save(); err != nil {
 			return err
 		}
