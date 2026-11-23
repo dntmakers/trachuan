@@ -257,8 +257,7 @@ func readTrialState(path string, dst *openAITrialState) (bool, error) {
 	if err != nil || !found {
 		return found, err
 	}
-	fields, err := batchapi.DecodeEvidenceProjection(raw, "reserve_micro_usd", "cost_micro_usd")
-	if err != nil || fields["reserve_micro_usd"] == nil || fields["cost_micro_usd"] == nil || validateRetainedJSON(raw, dst) != nil || json.Unmarshal(raw, dst) != nil || !dst.valid() {
+	if err = decodeTrialState(raw, dst); err != nil {
 		return false, fmt.Errorf("invalid or unsupported trial state %s", path)
 	}
 	if dst.Phase == trialPreparing {
@@ -268,6 +267,14 @@ func readTrialState(path string, dst *openAITrialState) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+func decodeTrialState(raw []byte, dst *openAITrialState) error {
+	fields, err := batchapi.DecodeEvidenceProjection(raw, "reserve_micro_usd", "cost_micro_usd")
+	if err != nil || fields["reserve_micro_usd"] == nil || fields["cost_micro_usd"] == nil || validateRetainedJSON(raw, dst) != nil || json.Unmarshal(raw, dst) != nil || !dst.valid() {
+		return fmt.Errorf("invalid or unsupported trial state")
+	}
+	return nil
 }
 
 func trialTraces(dir string, includeCounts bool) (bool, error) {
@@ -304,6 +311,10 @@ func readTrialFile(path string) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, fmt.Errorf("open trial %s: %w", path, err)
 	}
+	return readTrialFD(fd, path)
+}
+
+func readTrialFD(fd int, path string) ([]byte, bool, error) {
 	f := os.NewFile(uintptr(fd), path)
 	defer func() { _ = f.Close() }()
 	info, err := f.Stat()

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
+	"danny.vn/trachuan/apps/corpus/internal/classify"
 	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/apps/corpus/internal/source"
 	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
@@ -24,6 +25,7 @@ type Counts struct {
 	LexicalStats                                                                                              lexical.StatsSummary
 	Taxonomy                                                                                                  TaxonomyStats
 	Summary                                                                                                   SummaryStats
+	inheritedRows                                                                                             int64
 	validity                                                                                                  validityResult
 	knowledge                                                                                                 knowledge.Report
 }
@@ -50,6 +52,7 @@ type LoadOptions struct {
 	Pins              []source.Pin
 	CentralIssuers    map[string]string
 	Taxonomy          TaxonomyInput
+	classification    *classify.ClassificationSet
 	Knowledge         KnowledgeInput
 	Durations         map[string]int64
 	verified          map[string]verifiedFetch
@@ -154,7 +157,7 @@ func Load(ctx context.Context, conn *pgx.Conn, inv Inventory, artifacts artifact
 	}
 	timings.observe("load_validity", phaseStart)
 	phaseStart = time.Now()
-	if err = l.loadTaxonomy(ctx, opts.Taxonomy); err != nil {
+	if err = l.loadTaxonomy(ctx, opts.Taxonomy, opts.classification); err != nil {
 		return Counts{}, err
 	}
 	timings.observe("load_taxonomy", phaseStart)

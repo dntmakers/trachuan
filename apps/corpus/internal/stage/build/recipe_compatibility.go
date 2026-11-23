@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Stage) acceptsRecipeHash(snapshot stage.Snapshot, hash string) bool {
-	return hash == s.Recipe(snapshot) || hash == s.recipeForRetrieval(snapshot, retrieval.Recipe2())
+	return hash == s.Recipe(snapshot) || (snapshot.ClassificationSetSHA256 == "" && hash == s.recipeForRetrieval(snapshot, retrieval.Recipe2()))
 }
 
 func (s *Stage) recordRecipeHash(snapshot stage.Snapshot, raw json.RawMessage) (string, error) {
@@ -21,6 +21,9 @@ func (s *Stage) recordRecipeHash(snapshot stage.Snapshot, raw json.RawMessage) (
 		return "", fmt.Errorf("unsupported retrieval recipe")
 	}
 	if recipe.Version == 2 {
+		if snapshot.ClassificationSetSHA256 != "" {
+			return "", fmt.Errorf("classification requires retrieval recipe 3")
+		}
 		return s.recipeForRetrieval(snapshot, retrieval.Recipe2()), nil
 	}
 	return s.Recipe(snapshot), nil

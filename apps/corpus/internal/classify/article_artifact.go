@@ -158,14 +158,14 @@ func validateArticleOutcome(out ArticleOutcome) error {
 	return nil
 }
 
-func writeArticles(dir string, s Submission) error {
+func renderArticleArtifact(s Submission) (ArticleArtifact, error) {
 	if s.Recipe.Article == nil {
-		return fmt.Errorf("article recipe is required")
+		return ArticleArtifact{}, fmt.Errorf("article recipe is required")
 	}
 	a := ArticleArtifact{Version: 1, Country: s.Country, Release: s.Release, Recipe: s.Recipe, RecipeHash: s.Recipe.Hash(), TaxonomyHash: s.Recipe.TaxonomyHash, FamiliesHash: s.Recipe.Article.FamiliesHash, Articles: []ArticleRecord{}}
 	if s.Recipe.Article.Step != 0 {
 		if !s.Settled && s.ReserveMicroUSD != 0 {
-			return fmt.Errorf("article submission has not settled")
+			return ArticleArtifact{}, fmt.Errorf("article submission has not settled")
 		}
 		a.Settled = true
 	}
@@ -200,6 +200,14 @@ func writeArticles(dir string, s Submission) error {
 		}
 		return a.Articles[i].Anchor < a.Articles[j].Anchor
 	})
+	return a, nil
+}
+
+func writeArticles(dir string, s Submission) error {
+	a, err := renderArticleArtifact(s)
+	if err != nil {
+		return err
+	}
 	b, err := json.MarshalIndent(a, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode articles artifact: %w", err)

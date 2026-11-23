@@ -42,6 +42,10 @@ func ReadLabels(path string) (taxonomy.Labels, string, error) {
 }
 
 func LoadNodes(ctx context.Context, db *pgxpool.Pool) ([]Node, error) {
+	return loadNodes(ctx, db)
+}
+
+func loadNodes(ctx context.Context, db packQueryer) ([]Node, error) {
 	rows, err := db.Query(ctx, `SELECT n.code,n.name,COALESCE(p.code,''),n.level,n.status='active',n.origin FROM taxonomy_node n LEFT JOIN taxonomy_node p ON p.id=n.parent_id ORDER BY n.path,n.code`)
 	if err != nil {
 		return nil, fmt.Errorf("read article taxonomy nodes: %w", err)

@@ -104,6 +104,9 @@ func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string)
 		}
 		oldStageCount = len(snap.Stages)
 	}
+	if err = freezeClassificationSet(ctx, d, cc, &snap, existing); err != nil {
+		return err
+	}
 	decisionNote, err := decide(ctx, decisionInput{Choice: d.PreviousReport, Existing: existing, Country: cc, Rel: rel, Snapshot: &snap, Artifacts: d.Artifacts, HasEvalItem: func(ctx context.Context) (bool, error) {
 		return hasEvalItem(ctx, q, row.ID)
 	}})
@@ -113,6 +116,9 @@ func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string)
 	snap, err = freezeStartSnapshot(snap, includedStages(d.Stages, until, oldStageCount), existing, d.RecipesFor)
 	if err != nil {
 		return err
+	}
+	if snap.ClassificationSetSHA256 != "" && snap.Recipes["build"] == "" {
+		return fmt.Errorf("classification set selection requires a frozen build recipe")
 	}
 	raw, err = json.Marshal(snap)
 	if err != nil {

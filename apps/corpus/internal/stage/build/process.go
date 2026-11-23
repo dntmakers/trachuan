@@ -33,6 +33,10 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if s.cfg.Now == nil {
 		return stage.Output{}, fmt.Errorf("missing build clock")
 	}
+	classification, err := readBuildClassification(ctx, env.Artifacts, run, s.cfg.Taxonomy.version)
+	if err != nil {
+		return stage.Output{}, err
+	}
 	adminCfg, err := pgx.ParseConfig(s.cfg.BuilderURL)
 	if err != nil {
 		return stage.Output{}, fmt.Errorf("parse builder connection: %w", err)
@@ -70,7 +74,7 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if err != nil {
 		return stage.Output{}, err
 	}
-	if s.inputHash(run.Country, run.Rel, inv, correction) != item.InputHash {
+	if s.frozenInputHash(run, inv, correction) != item.InputHash {
 		return stage.Output{}, temporal.NewNonRetryableApplicationError("inventory_changed", "inventory_changed", nil)
 	}
 	timings.observe("plan", phaseStart)
@@ -132,7 +136,7 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 		return stage.Output{}, temporal.NewNonRetryableApplicationError("inventory_changed", "inventory_changed", err)
 	}
 	phaseStart = time.Now()
-	counts, err := Load(ctx, conn.Conn(), inv, env.Artifacts, Recipes{Dense: embedding.DocumentRecipe1(), Lexical: lexical.Recipe1()}, codes.StatusCodes, entries, run.Rel[:4]+"-"+run.Rel[4:6]+"-"+run.Rel[6:8], LoadOptions{HeadingExclusions: exclusions, Pins: codes.VBPL.Pinned, CentralIssuers: codes.CentralIssuers, Taxonomy: s.cfg.Taxonomy, Knowledge: s.cfg.Knowledge, Durations: timings, verified: verified})
+	counts, err := Load(ctx, conn.Conn(), inv, env.Artifacts, Recipes{Dense: embedding.DocumentRecipe1(), Lexical: lexical.Recipe1()}, codes.StatusCodes, entries, run.Rel[:4]+"-"+run.Rel[4:6]+"-"+run.Rel[6:8], LoadOptions{HeadingExclusions: exclusions, Pins: codes.VBPL.Pinned, CentralIssuers: codes.CentralIssuers, Taxonomy: s.cfg.Taxonomy, classification: classification, Knowledge: s.cfg.Knowledge, Durations: timings, verified: verified})
 	if err != nil {
 		return stage.Output{}, err
 	}
@@ -217,6 +221,10 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 		timings.observe("dump_hash", phaseStart)
 		timings["total"] = time.Since(started).Milliseconds()
 		record := map[string]any{"version": 1, "country": run.Country, "rel": run.Rel, "database_name": final, "schema_version": corpusdb.SchemaVersion, "build_input_hash": item.InputHash, "build_recipe_hash": recipeHash, "source_manifest_hash": inv.SourceManifestHash(), "identity_inventory_hash": inv.IdentityHash(), "identity_map_sha256": s.cfg.Suite.Hashes.IdentityMap, "development_cases_sha256": s.cfg.Suite.Hashes.Development, "dense_recipe": release.DenseRecipe, "chunk_recipe": release.ChunkRecipe, "lexical_recipe": release.LexicalRecipe, "retrieval_recipe": release.RetrievalRecipe, "lexical_stats": release.LexicalStats, "taxonomy_version": release.TaxonomyVersion, "taxonomy": counts.Taxonomy, "counts": tableCounts, "postgres_version": s.cfg.Versions.PostgreSQLMajor, "pgvector_version": s.cfg.Versions.PGVector, "ltree_version": s.cfg.Versions.Ltree, "pg_dump_version": s.cfg.Versions.PgDump, "worker_version": run.Snapshot.WorkerVersion, "durations_ms": timings, "relation_bytes": relationBytes, "index_bytes": indexBytes, "dump": map[string]any{"sha256": fmt.Sprintf("%x", hasher.Sum(nil)), "bytes": size, "format": "custom"}, "built_at": release.BuiltAt}
+		if classification != nil {
+			record["classification_set_sha256"] = run.Snapshot.ClassificationSetSHA256
+			record["classification_policy_sha256"] = classification.PolicyHash
+		}
 		record["summary"] = counts.Summary
 		if inv.Version == 2 || correction.nonempty {
 			record["corrections_sha256"] = correction.hash

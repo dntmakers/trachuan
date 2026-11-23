@@ -22,7 +22,11 @@ func databaseMetrics(ctx context.Context, conn *pgx.Conn, loaded Counts) (map[st
 		return nil, 0, 0, fmt.Errorf("count omitted summaries: %w", err)
 	}
 	counts["document_summary_omitted"] = omitted
-	if counts["document_summary"]+omitted != loaded.Documents || counts["document"] != loaded.Documents || counts["source_file"] != loaded.SourceFiles || counts["provision"] != loaded.Provisions || counts["chunk"] != loaded.Chunks || counts["relation"] != loaded.Relations || counts["coverage_gap"] != loaded.Gaps || loaded.Chunks != loaded.DenseVectors || counts["taxonomy_node"] != loaded.Taxonomy.Nodes || counts["taxonomy_assignment"] != loaded.Taxonomy.Seeds+loaded.Taxonomy.Overrides+loaded.Taxonomy.Excluded || counts["release"] != 1 {
+	assignments := loaded.Taxonomy.Seeds + loaded.Taxonomy.Overrides + loaded.Taxonomy.Excluded + loaded.inheritedRows
+	if stats := loaded.Taxonomy.ClassificationStats; stats != nil {
+		assignments += stats.LLMRows
+	}
+	if counts["document_summary"]+omitted != loaded.Documents || counts["document"] != loaded.Documents || counts["source_file"] != loaded.SourceFiles || counts["provision"] != loaded.Provisions || counts["chunk"] != loaded.Chunks || counts["relation"] != loaded.Relations || counts["coverage_gap"] != loaded.Gaps || loaded.Chunks != loaded.DenseVectors || counts["taxonomy_node"] != loaded.Taxonomy.Nodes || counts["taxonomy_assignment"] != assignments || counts["release"] != 1 {
 		return nil, 0, 0, fmt.Errorf("corpus row counts differ")
 	}
 	var sparseOutOfLine int64

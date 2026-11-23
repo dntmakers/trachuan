@@ -31,7 +31,7 @@ func structuralSummaryGap(kind string) (bool, error) {
 		"source_replaced", "source_unavailable", "source_withdrawn_retained", "summary_field_capped",
 		"summary_outline_capped", "summary_row_capped",
 		"table_text", "text_limit", "tree_too_large", "unknown_relation_code", "unknown_status",
-		"unknown_target", "unresolved_provision_relation", "withdrawn":
+		"unknown_target", "unassigned", "unresolved_provision_relation", "withdrawn":
 		return false, nil
 	default:
 		return false, fmt.Errorf("unclassified summary gap kind %q", kind)

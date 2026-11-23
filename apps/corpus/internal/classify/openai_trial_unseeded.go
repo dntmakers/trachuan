@@ -43,25 +43,12 @@ func UnseededSelection(country, release string, input []taxonomy.LabelArticle, p
 func LoadUnseededSelection(ctx context.Context, db interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 }, country, release string, part, total int) (taxonomy.Labels, string, error) {
-	rows, err := db.Query(ctx, `SELECT d.key,p.anchor,p.text FROM document d JOIN provision p ON p.document_id=d.id WHERE d.class='primary' AND p.kind='dieu' AND NOT EXISTS (SELECT 1 FROM taxonomy_assignment a WHERE a.provision_id=p.id AND a.method IN ('phapdien_seed','inherited','manual')) ORDER BY d.key,p.anchor`)
-	if err != nil {
-		return taxonomy.Labels{}, "", fmt.Errorf("read unseeded articles: %w", err)
-	}
-	defer rows.Close()
 	var articles []taxonomy.LabelArticle
-	for rows.Next() {
-		var a taxonomy.LabelArticle
-		var text string
-		if err = rows.Scan(&a.Key, &a.Anchor, &text); err != nil {
-			return taxonomy.Labels{}, "", fmt.Errorf("decode unseeded article: %w", err)
-		}
-		if !taxonomy.IsFragment(text) {
-			a.OwnTextSHA256 = taxonomy.OwnTextSHA256(text)
-			articles = append(articles, a)
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return taxonomy.Labels{}, "", fmt.Errorf("read unseeded articles: %w", err)
+	if err := VisitEligibleArticles(ctx, db, func(_ int64, key, anchor, text string) error {
+		articles = append(articles, taxonomy.LabelArticle{Key: key, Anchor: anchor, OwnTextSHA256: taxonomy.OwnTextSHA256(text)})
+		return nil
+	}); err != nil {
+		return taxonomy.Labels{}, "", err
 	}
 	return UnseededSelection(country, release, articles, part, total)
 }

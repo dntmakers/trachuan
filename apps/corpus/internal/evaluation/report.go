@@ -204,6 +204,7 @@ type Report struct {
 	Targets                       []Target                      `json:"targets"`
 	NonRegression                 []NonRegression               `json:"non_regression"`
 	Inheritance                   any                           `json:"inheritance,omitempty"`
+	ClassificationGate            *ClassificationGate           `json:"classification_gate,omitempty"`
 	FilterGate                    FilterGate                    `json:"filter_gate"`
 	Floors                        []Floor                       `json:"floors"`
 	Rejections                    []Rejection                   `json:"rejections"`

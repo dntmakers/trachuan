@@ -16,6 +16,18 @@ import (
 //go:embed testdata/vn/*.json testdata/vn/development-previous/*.json
 var vnFixtures embed.FS
 
+func VNTaxonomyReferences() ([3][]byte, error) {
+	var out [3][]byte
+	for i, name := range [...]string{"taxonomy-labels.json", "taxonomy-multi-family-anthropic.json", "taxonomy-post-2023-anthropic.json"} {
+		b, err := vnFixtures.ReadFile("testdata/vn/" + name)
+		if err != nil {
+			return out, fmt.Errorf("read pinned taxonomy reference %s: %w", name, err)
+		}
+		out[i] = b
+	}
+	return out, nil
+}
+
 func VNSuite() (Suite, error) { return LoadSuiteFS(vnFixtures, "testdata/vn") }
 
 func readPreviousDevelopment(fsys fs.FS, dir string) (map[string][]byte, error) {

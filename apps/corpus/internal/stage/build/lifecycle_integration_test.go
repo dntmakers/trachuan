@@ -13,9 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"danny.vn/trachuan/apps/corpus/internal/classify"
 	"danny.vn/trachuan/apps/corpus/internal/evaluation"
 	"danny.vn/trachuan/apps/corpus/internal/stage/chunk"
 	"danny.vn/trachuan/apps/corpus/internal/stage/chunk/normalizer"
+	"danny.vn/trachuan/apps/corpus/internal/taxonomy"
 	"danny.vn/trachuan/internal/embedding"
 	"danny.vn/trachuan/internal/retrieval"
 	"danny.vn/trachuan/internal/retrieval/lexical"
@@ -119,6 +121,15 @@ func TestBuild_DumpCreatesArchive(t *testing.T) {
 }
 
 func TestBuild_ProcessCreatesTemporaryRelease(t *testing.T) {
+	processTemporaryRelease(t, false)
+}
+
+func TestBuild_ProcessRecordsVerifiedClassification(t *testing.T) {
+	processTemporaryRelease(t, true)
+}
+
+func processTemporaryRelease(t *testing.T, classified bool) {
+	t.Helper()
 	ctx := context.Background()
 	f := fixture(t)
 	f.indexed(t, "vn:vbpl:1", false)
@@ -133,6 +144,37 @@ func TestBuild_ProcessCreatesTemporaryRelease(t *testing.T) {
 	suite := evaluation.Suite{Legacy: []evaluation.Case{{ID: "one", Question: "ngân hàng", ExpectAbstain: true}, {ID: "two", Question: "abc", ExpectAbstain: true}, {ID: "three", Question: "def", ExpectAbstain: true}, {ID: "four", Question: "ghi", ExpectAbstain: true}}, Rejections: []string{"two", "three", "four"}, Hashes: evaluation.FixtureHashes{Legacy: "legacy"}, Map: evaluation.IdentityMap{Version: 1, LegacySHA256: "legacy", IdentityInventoryHash: inv.IdentityHash()}}
 	pinTestSuite(t, &suite)
 	cfg := Config{BuilderURL: builder.URL, Template: builder.Template, PgDump: testTool("CORPUS_PG_DUMP", "pg_dump"), PgRestore: testTool("CORPUS_PG_RESTORE", "pg_restore"), Suite: suite, Now: time.Now, Embedder: buildFakeEmbedder{}, DatabaseDiskPath: t.TempDir(), MinFreeBeforeBytes: 1, MinFreeDuringBytes: 1}
+	var policyHash string
+	if classified {
+		cfg.Taxonomy = taxonomyInputFixture()
+		set := matchSet()
+		set.Version = 1
+		set.Source.Country = "vn"
+		set.Taxonomy = cfg.Taxonomy.version
+		set.Policy.Menu = set.Policy.Menu[:1]
+		set.Policy.Article = json.RawMessage(`{}`)
+		set.Documents[0].Codes = []string{"1.1"}
+		set.Articles[0].OwnTextSHA256 = taxonomy.OwnTextSHA256("law")
+		set.Articles[0].Codes = []classify.CodeConfidence{{Code: "1.1.c1", Confidence: 0}}
+		tuple, marshalErr := json.Marshal([3]any{set.Policy.Document, set.Policy.Article, set.Policy.Menu})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		set.PolicyHash = hashBytes(tuple)
+		policyHash = set.PolicyHash
+		raw, marshalErr := json.Marshal(set)
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		f.run.Snapshot.ClassificationSetSHA256 = hashBytes(raw)
+		dir := filepath.Join(f.artifacts.Abs(classify.ClassificationSetNamespace), f.run.Snapshot.ClassificationSetSHA256)
+		if err = os.MkdirAll(dir, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(dir, classify.ClassificationSetFilename), raw, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	cfg.Versions, err = InspectVersions(ctx, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -165,6 +207,44 @@ func TestBuild_ProcessCreatesTemporaryRelease(t *testing.T) {
 	if err = db.QueryRow(ctx, `SELECT count(*) FROM release`).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("release rows %d: %v", count, err)
 	}
+	record, _, verifyErr := verifyBuildArtifact(f.artifacts, *out.Artifact, f.run, cfg)
+	if verifyErr != nil {
+		t.Fatal(verifyErr)
+	}
+	if !classified {
+		_, correction, pinErr := cfg.Corrections.pinned()
+		if pinErr != nil {
+			t.Fatal(pinErr)
+		}
+		if want := st.inputHash(f.run.Country, f.run.Rel, inv, correction); record.BuildInputHash != want {
+			t.Fatalf("no-set build input = %s, want legacy %s", record.BuildInputHash, want)
+		}
+		if record.ClassificationSetSHA256 != "" || record.ClassificationPolicySHA256 != "" || record.Taxonomy.ClassificationStats != nil {
+			t.Fatal("no-set build records a classification layer")
+		}
+	} else {
+		if record.ClassificationSetSHA256 != f.run.Snapshot.ClassificationSetSHA256 || record.ClassificationPolicySHA256 != policyHash || record.Taxonomy.ClassificationStats == nil || record.Taxonomy.LLMRows != 1 {
+			t.Fatalf("classification record: set=%q policy=%q stats=%+v", record.ClassificationSetSHA256, record.ClassificationPolicySHA256, record.Taxonomy.ClassificationStats)
+		}
+		if err = validateTaxonomy(ctx, db, record); err != nil {
+			t.Fatal(err)
+		}
+		t.Run("reopen_after_taxonomy_changes", func(t *testing.T) {
+			newCfg := cfg
+			newCfg.Taxonomy.version = "new-taxonomy-version"
+			if _, _, reopenErr := verifyBuildArtifact(f.artifacts, *out.Artifact, f.run, newCfg); reopenErr != nil {
+				t.Fatal(reopenErr)
+			}
+		})
+		path := filepath.Join(f.artifacts.Abs(classify.ClassificationSetNamespace), record.ClassificationSetSHA256, classify.ClassificationSetFilename)
+		if err = os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err = verifyBuildArtifact(f.artifacts, *out.Artifact, f.run, cfg); err == nil {
+			t.Fatal("missing frozen set accepted")
+		}
+	}
+
 }
 
 type buildFakeEmbedder struct{}

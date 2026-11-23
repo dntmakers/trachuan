@@ -18,7 +18,9 @@ func validateTaxonomy(ctx context.Context, db *pgx.Conn, record BuildRecord) err
 	}
 	actual.UnmatchedConsolidated = record.Taxonomy.UnmatchedConsolidated
 	actual.Inheritance = record.Taxonomy.Inheritance
-	if actual != *record.Taxonomy {
+	expected := *record.Taxonomy
+	expected.ClassificationStats = nil
+	if actual != expected {
 		return fmt.Errorf("taxonomy stats mismatch: %w", errInvalidDatabase)
 	}
 	const checks = `SELECT
@@ -47,5 +49,5 @@ func validateTaxonomy(ctx context.Context, db *pgx.Conn, record BuildRecord) err
 	if !ok {
 		return fmt.Errorf("invalid taxonomy counts: %w", errInvalidDatabase)
 	}
-	return nil
+	return validateClassificationDatabase(ctx, db, record)
 }

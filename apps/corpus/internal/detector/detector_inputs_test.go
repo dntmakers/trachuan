@@ -24,7 +24,7 @@ func TestDetectorInputsSpecs(t *testing.T) {
 func TestDetectorInputsLegacyHash(t *testing.T) {
 	var legacy []Detector
 	for _, spec := range All() {
-		if spec.ID != OCRLabelItemOutsideLabels && spec.ID != TreeTranscriptionDivergence {
+		if spec.ID != OCRLabelItemOutsideLabels && spec.ID != TreeTranscriptionDivergence && spec.ID != "unassigned" {
 			legacy = append(legacy, spec)
 		}
 	}

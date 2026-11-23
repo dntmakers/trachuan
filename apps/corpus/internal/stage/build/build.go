@@ -85,7 +85,7 @@ func (s *Stage) plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage
 	if _, _, err = s.cfg.HeadingExclusions.pinned(); err != nil {
 		return nil, nil, fmt.Errorf("verify heading exclusions: %w", err)
 	}
-	hash := s.inputHash(run.Country, run.Rel, inv, correction)
+	hash := s.frozenInputHash(run, inv, correction)
 	return []stage.Item{{Key: run.Country + "/" + run.Rel, InputHash: hash}}, verified, nil
 }
 

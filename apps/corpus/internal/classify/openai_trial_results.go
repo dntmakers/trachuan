@@ -30,22 +30,26 @@ func (t *openAITrial) collect(ctx context.Context, batch openAIBatchTerminal) er
 		}
 		return err
 	}
-	if isOpenAIBatchZeroWork(batch) {
-		lines := make([]openAICoveredResult, 0, len(t.parts))
-		for _, part := range t.parts {
-			lines = append(lines, openAICoveredResult{CustomID: part.ID, Result: openAIResultLine{Status: openAIResultFailed, ZeroCost: true}})
-		}
-		return t.finish(t.price(lines, true, batch))
-	}
-	ids := make([]string, 0, len(t.parts))
-	for _, part := range t.parts {
-		ids = append(ids, part.ID)
-	}
-	lines, err := verifyOpenAIBatchCoverage(batch, capture, ids, t.state.Stage)
+	lines, err := replayOpenAITrialCoverage(t.parts, t.state.Stage, batch, capture)
 	if err != nil {
 		lines = t.observedResults(capture)
 	}
 	return t.finish(t.price(lines, err == nil && batch.Status != "cancelled", batch))
+}
+
+func replayOpenAITrialCoverage(parts []openAITrialItem, stage string, batch openAIBatchTerminal, capture openAIBatchCapture) ([]openAICoveredResult, error) {
+	if isOpenAIBatchZeroWork(batch) {
+		lines := make([]openAICoveredResult, 0, len(parts))
+		for _, part := range parts {
+			lines = append(lines, openAICoveredResult{CustomID: part.ID, Result: openAIResultLine{Status: openAIResultFailed, ZeroCost: true}})
+		}
+		return lines, nil
+	}
+	ids := make([]string, 0, len(parts))
+	for _, part := range parts {
+		ids = append(ids, part.ID)
+	}
+	return verifyOpenAIBatchCoverage(batch, capture, ids, stage)
 }
 
 type openAITrialFileBinding struct {
@@ -112,12 +116,16 @@ func (t *openAITrial) download(ctx context.Context, id, part string) (*openAIFil
 			return nil, err
 		}
 	}
+	return trialFileCapture(raw), nil
+}
+
+func trialFileCapture(raw []byte) *openAIFileCapture {
 	raw = bytes.TrimSuffix(raw, []byte{'\n'})
 	capture := &openAIFileCapture{Complete: true}
 	if len(raw) > 0 {
 		capture.Lines = bytes.Split(raw, []byte{'\n'})
 	}
-	return capture, nil
+	return capture
 }
 
 func (t *openAITrial) recoverResultCapture(id, part string) (*openAITrialFileBinding, []byte, error) {

@@ -3,9 +3,12 @@ package build
 import (
 	"context"
 	"fmt"
+
+	"danny.vn/trachuan/apps/corpus/internal/classify"
 )
 
 type TaxonomyStats struct {
+	*ClassificationStats   `json:",omitempty"`
 	Nodes                  int64           `json:"nodes"`
 	Served                 int64           `json:"served"`
 	Seeds                  int64           `json:"seeds"`
@@ -46,9 +49,9 @@ func (l *loader) provision(key, anchor string) int64 {
 	return 0
 }
 
-func (l *loader) loadTaxonomy(ctx context.Context, input TaxonomyInput) error {
+func (l *loader) loadTaxonomy(ctx context.Context, input TaxonomyInput, classification *classify.ClassificationSet) error {
 	if input.version == "" {
-		return nil
+		return l.loadClassification(ctx, classification, nil, input.version)
 	}
 	nodes, err := l.loadTaxonomyNodes(ctx, input)
 	if err != nil {
@@ -101,10 +104,13 @@ func (l *loader) loadTaxonomy(ctx context.Context, input TaxonomyInput) error {
 			return fmt.Errorf("insert override: %w", err)
 		}
 	}
+	if err = l.loadClassification(ctx, classification, nodes, input.version); err != nil {
+		return err
+	}
 	if _, err = l.tx.Exec(ctx, taxonomyCountsSQL); err != nil {
 		return fmt.Errorf("count effective taxonomy: %w", err)
 	}
-	err = l.tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE method='phapdien_seed'), count(DISTINCT provision_id) FILTER (WHERE method='inherited'), count(*) FILTER (WHERE method='manual' AND NOT exclude), count(*) FILTER (WHERE exclude) FROM taxonomy_assignment`).Scan(&l.counts.Taxonomy.Seeds, &l.counts.Taxonomy.Inherited, &l.counts.Taxonomy.Overrides, &l.counts.Taxonomy.Excluded)
+	err = l.tx.QueryRow(ctx, `SELECT count(*) FILTER (WHERE method='phapdien_seed'), count(DISTINCT provision_id) FILTER (WHERE method='inherited'), count(*) FILTER (WHERE method='manual' AND NOT exclude), count(*) FILTER (WHERE exclude), count(*) FILTER (WHERE method='inherited') FROM taxonomy_assignment`).Scan(&l.counts.Taxonomy.Seeds, &l.counts.Taxonomy.Inherited, &l.counts.Taxonomy.Overrides, &l.counts.Taxonomy.Excluded, &l.counts.inheritedRows)
 	if err != nil {
 		return fmt.Errorf("count taxonomy assignments: %w", err)
 	}
