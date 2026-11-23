@@ -62,32 +62,36 @@ func packPairFromReplay(doc, art *openAITrial, output ArticleArtifact, selection
 }
 
 func packPolicy(document, article Recipe, menu []Family) (ClassificationPolicy, string, error) {
-	var p ClassificationPolicy
+	raw, err := packArticlePolicy(article)
+	if err != nil {
+		return ClassificationPolicy{}, "", err
+	}
+	p := ClassificationPolicy{document, raw, menu}
+	hash, err := p.Hash()
+	return p, hash, err
+}
+
+func packArticlePolicy(article Recipe) (json.RawMessage, error) {
 	if article.Article == nil {
-		return p, "", fmt.Errorf("missing article recipe")
+		return nil, fmt.Errorf("missing article recipe")
 	}
 	raw, err := json.Marshal(article)
 	if err != nil {
-		return p, "", err
+		return nil, err
 	}
 	var fields map[string]json.RawMessage
 	var stage map[string]json.RawMessage
 	if err = json.Unmarshal(raw, &fields); err != nil {
-		return p, "", err
+		return nil, err
 	}
 	if err = json.Unmarshal(fields["article"], &stage); err != nil {
-		return p, "", err
+		return nil, err
 	}
 	delete(stage, "families_sha256")
 	if fields["article"], err = json.Marshal(stage); err != nil {
-		return p, "", err
+		return nil, err
 	}
-	if raw, err = json.Marshal(fields); err != nil {
-		return p, "", err
-	}
-	p = ClassificationPolicy{document, raw, menu}
-	hash, err := p.Hash()
-	return p, hash, err
+	return json.Marshal(fields)
 }
 
 func (p ClassificationPolicy) Hash() (string, error) {

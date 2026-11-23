@@ -131,3 +131,36 @@ classifier. Hard-cut subject filtering.
   for [publication](../design/classification-publish.md); the Batch runner
   wiring for OpenAI is deferred. The floors and the write-path restriction are
   unchanged.
+- 2026-11-23: a second blind recheck by two judges that are neither the
+  classifier nor each other finds the references incomplete rather than wrong.
+  `gpt-6.2-astra` and `claude-fable-5-2` agent sessions each judged all 698
+  level-2 pairs that the reference or the classifier gave for the 500 reference
+  articles, sources hidden; they agreed on 549. Both accepted 385 of 462 pairs
+  that reference and classifier share, 86 of 178 pairs only the classifier gave
+  (both rejected 37) and 12 of 58 pairs only the reference gave (both rejected
+  21). Counting a pair as right only when both judges accept it, the
+  classifier's pair precision is 0.74 and the reference's is 0.76; counting it
+  as wrong only when both reject it, 0.93 and 0.95. Of the pairs both judges
+  accept, the classifier gave 97 percent and the reference 82 percent. The
+  judges saw only proposed pairs, so recall is an upper bound. On
+  `vn/20261121_1` the floors of that morning also failed by one article
+  (post-2023 family recall 93 of 104 against 0.90, one reference no longer
+  matching), which showed they had no margin.
+- 2026-11-23: the two Claude-labeled references are corrected by that consensus
+  and the level-2 floors are set with a margin. The owner chose to fix the
+  reference rather than lower the floors to fit an incomplete one. Remove a
+  label both judges reject, add a level-2 node both accept, leave a split
+  unchanged; each 100-article set gained 16 pairs and lost 5, and one post-2023
+  article kept no label. The 300 seeded articles keep the official package
+  placements. A Claude judge had to agree to every change, so the corrected sets
+  stay independent of the OpenAI classifier, and they gate only `gpt-6.2-sol`
+  ([reference correction](../design/classification-publish.md#reference-correction)).
+  The settled predictions are reused by exact article identity, with no new paid
+  run. Measured on `vn/20261121_1`, non-fragment level 2: seeded recall 238 of
+  260, top-1 220 of 260, family recall 250 of 260; multi-family recall 116 of
+  127, pair precision 116 of 142, family recall 120 of 127; post-2023 recall 105
+  of 115, pair precision 105 of 122, family recall 108 of 115, one reference no
+  longer matching. Floors: recall 0.85, top-1 precision 0.80, pair precision
+  0.75, family recall 0.90, each four to seventeen articles below the measured
+  counts. The review covered proposed pairs only, so these sets measure
+  regression of this classifier, not recall over subjects nobody proposed.

@@ -173,7 +173,7 @@ func TestPackRejectsInvalidEvidence(t *testing.T) {
 func TestPackRepeatIsByteIdentical(t *testing.T) {
 	b, _, doc, _ := packFixture(t, false, false)
 	_, bs, baselineDoc, baselineArticle := packFixture(t, true, true)
-	refs := []packReference{{name: "seeded", provider: "package", selection: bs, docDir: baselineDoc, articleDir: baselineArticle}}
+	refs := []packReference{{name: "seeded", selection: bs, docDir: baselineDoc, articleDir: baselineArticle, scoring: gateLabels{slice: "seeded", provider: "package", hash: bs.hash, labels: taxonomy.Labels{Articles: bs.articles}}}}
 	store := artifact.Store{Root: t.TempDir()}
 	var first []byte
 	for i := range 2 {

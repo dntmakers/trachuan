@@ -20,10 +20,10 @@ func TestEvalRecipe_ClassificationRejectsOldWorker(t *testing.T) {
 }
 
 func TestEvalRecipe_ClassificationBindsFloors(t *testing.T) {
-	const floorsSHA256 = "af0254dbc67dd2ad30d1d69f58b2f79808fc9bef52d4d99ac6c5b135e7f5b273"
+	const floorsSHA256 = "92577289c5d78d83d5b8f298ddf1c566f4edee7c574e392cee497c9f811eaf6a"
 	s := New(Config{})
 	legacy := s.Recipe(stage.Snapshot{})
-	want := stage.RecipeHash("eval-classification-gate", "1", legacy, floorsSHA256)
+	want := stage.RecipeHash("eval-classification-gate", "2", legacy, floorsSHA256)
 	if got := s.Recipe(stage.Snapshot{ClassificationSetSHA256: strings.Repeat("a", 64)}); got != want {
 		t.Fatalf("opted-in recipe = %q, want %q with the frozen floor table", got, want)
 	}

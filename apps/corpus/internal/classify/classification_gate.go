@@ -24,8 +24,8 @@ var classificationFloors = [...]struct {
 	floors [3]gateFloor
 }{
 	{"seeded", [3]gateFloor{{"recall", 85}, {"top_1_precision", 80}, {"family_recall", 90}}},
-	{"multi-family", [3]gateFloor{{"recall", 85}, {"precision", 70}, {"family_recall", 90}}},
-	{"post-2023", [3]gateFloor{{"recall", 85}, {"precision", 70}, {"family_recall", 90}}},
+	{"multi-family", [3]gateFloor{{"recall", 85}, {"precision", 75}, {"family_recall", 90}}},
+	{"post-2023", [3]gateFloor{{"recall", 85}, {"precision", 75}, {"family_recall", 90}}},
 }
 
 func ClassificationFloorsHash() string {

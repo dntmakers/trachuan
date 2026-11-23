@@ -79,10 +79,10 @@ func TestClassificationGateUsesSliceSpecificPrecision(t *testing.T) {
 	}{
 		{0, 4, "pass"},
 		{0, 5, "fail"},
-		{1, 8, "pass"},
-		{1, 9, "fail"},
-		{2, 8, "pass"},
-		{2, 9, "fail"},
+		{1, 6, "pass"},
+		{1, 7, "fail"},
+		{2, 6, "pass"},
+		{2, 7, "fail"},
 	} {
 		set, labels, articles, nodes := gateScoreFixture(t)
 		set.Policy.Menu = append(set.Policy.Menu, Family{Code: "2.1"})
@@ -100,10 +100,15 @@ func TestClassificationGateUsesSliceSpecificPrecision(t *testing.T) {
 
 func TestClassificationGateRequiresFamilyRecall(t *testing.T) {
 	set, labels, articles, nodes := gateScoreFixture(t)
-	for i := range 3 {
+	for i := range 2 {
 		labels[0].labels.Articles[i].Codes = []string{"2.1"}
 	}
 	gate := scoreClassificationReferences(set, labels, articles, nodes)
+	if gate.Status != "pass" {
+		t.Fatalf("family recall at floor must pass: %+v", gate.Slices[0])
+	}
+	labels[0].labels.Articles[2].Codes = []string{"2.1"}
+	gate = scoreClassificationReferences(set, labels, articles, nodes)
 	slice := gate.Slices[0]
 	if gate.Status != "fail" || len(slice.Reasons) != 1 || !strings.HasPrefix(slice.Reasons[0], "family_recall: 17/20") {
 		t.Fatalf("family recall must fail despite passing article metrics: %+v", slice)
