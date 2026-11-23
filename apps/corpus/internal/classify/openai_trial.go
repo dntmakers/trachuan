@@ -11,17 +11,30 @@ import (
 )
 
 const OpenAITrialMaxMicroUSD = 40_000_000
+const openAITrialFullMaxMicroUSD = 175_000_000
+
+func OpenAITrialMaxCap(unseeded bool) int64 {
+	if unseeded {
+		return openAITrialFullMaxMicroUSD
+	}
+	return OpenAITrialMaxMicroUSD
+}
 
 type OpenAITrialOptions struct {
-	Country, Release, LabelsHash, Out string
-	ExpectedFamiliesHash              string
-	Recipe                            Recipe
-	CapMicroUSD                       int64
-	DryRun                            bool
-	Progress                          io.Writer
+	Country, Release, LabelsHash, Out   string
+	ExpectedFamiliesHash                string
+	Selection                           string
+	SelectedDocuments, SelectedArticles int
+	Recipe                              Recipe
+	CapMicroUSD                         int64
+	DryRun                              bool
+	Unseeded                            bool
+	Progress                            io.Writer
 }
 
 type OpenAITrialSummary struct {
+	SelectedDocuments  int   `json:"selected_documents,omitempty"`
+	SelectedArticles   int   `json:"selected_articles,omitempty"`
 	Requests           int   `json:"requests"`
 	CountedInputTokens int64 `json:"counted_input_tokens"`
 	ReserveMicroUSD    int64 `json:"reserve_micro_usd"`
@@ -89,8 +102,8 @@ func RunOpenAIDocumentTrial(ctx context.Context, o OpenAITrialOptions, client *O
 
 func runOpenAITrial(ctx context.Context, stage string, o OpenAITrialOptions, client *OpenAITrialClient, plan func(*openAITrial) error) (OpenAITrialSummary, error) {
 	var summary OpenAITrialSummary
-	if o.Out == "" || o.Country == "" || o.Release == "" || !validKey(o.LabelsHash) || o.CapMicroUSD < 1 || o.CapMicroUSD > OpenAITrialMaxMicroUSD || client == nil || client.Client == nil || len(client.credential) == 0 || (o.Recipe.Article != nil) != (stage == "article") {
-		return summary, fmt.Errorf("invalid OpenAI trial options or cap (maximum 40 USD)")
+	if o.Out == "" || o.Country == "" || o.Release == "" || !validKey(o.LabelsHash) || o.CapMicroUSD < 1 || o.CapMicroUSD > OpenAITrialMaxCap(o.Unseeded) || client == nil || client.Client == nil || len(client.credential) == 0 || (o.Recipe.Article != nil) != (stage == "article") {
+		return summary, fmt.Errorf("invalid OpenAI trial options or cap")
 	}
 	if _, err := openAIRecipe(o.Recipe); err != nil {
 		return summary, err

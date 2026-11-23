@@ -43,7 +43,12 @@ func runOpenAITrialDocuments(ctx context.Context, o classify.OpenAITrialOptions,
 	if err != nil {
 		return summary, err
 	}
-	documents, err := classify.LoadSelectedDocuments(ctx, release, workshop, artifact.Store{Root: cfg.Artifacts}, labels)
+	var documents []classify.Document
+	if o.Unseeded {
+		documents, err = classify.LoadUnseededDocuments(ctx, release, workshop, artifact.Store{Root: cfg.Artifacts}, labels)
+	} else {
+		documents, err = classify.LoadSelectedDocuments(ctx, release, workshop, artifact.Store{Root: cfg.Artifacts}, labels)
+	}
 	if err != nil {
 		return summary, err
 	}
@@ -77,6 +82,11 @@ func runOpenAITrialArticles(ctx context.Context, o classify.OpenAITrialOptions, 
 	families, hash, err := classify.ReadFamilyArtifact(familiesFile, evidence.taxonomyHash, evidence.nodes)
 	if err != nil {
 		return summary, err
+	}
+	if o.Unseeded {
+		if err = validateUnseededFamilies(o.LabelsHash, families); err != nil {
+			return summary, err
+		}
 	}
 	if o.ExpectedFamiliesHash != "" && o.ExpectedFamiliesHash != hash {
 		return summary, fmt.Errorf("trial families changed while reading")

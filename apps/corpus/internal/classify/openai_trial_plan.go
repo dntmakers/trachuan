@@ -43,6 +43,18 @@ func ResumeOpenAITrial(ctx context.Context, stage string, o OpenAITrialOptions, 
 	if err != nil || !found {
 		return summary, true, fmt.Errorf("cannot read retained trial state")
 	}
+	if !t.state.matchesSelection(o) {
+		return summary, true, fmt.Errorf("trial selection does not match retained state")
+	}
+	if o.Unseeded && o.LabelsHash == "" {
+		switch t.state.Phase {
+		case trialDispatched, trialSubmitted, trialTerminal, trialSettled:
+			o.LabelsHash = t.state.LabelsHash
+			t.o.LabelsHash = o.LabelsHash
+		default:
+			return summary, false, nil
+		}
+	}
 	if t.state.Phase == trialPreparing {
 		return summary, false, nil
 	}
@@ -66,6 +78,9 @@ func (t *openAITrial) resume(ctx context.Context) (OpenAITrialSummary, error) {
 		return summary, err
 	}
 	summary.Requests, summary.ReserveMicroUSD, summary.SiblingMicroUSD = len(t.parts), t.state.ReserveMicroUSD, t.state.SiblingMicroUSD
+	if t.o.DryRun && t.o.Unseeded {
+		summary.SelectedDocuments, summary.SelectedArticles = t.state.SelectedDocuments, t.state.SelectedArticles
+	}
 	for _, part := range t.parts {
 		summary.CountedInputTokens += part.Count
 	}
