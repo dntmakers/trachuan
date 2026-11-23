@@ -114,3 +114,14 @@ classifier. Hard-cut subject filtering.
   subject as a filter, where a missing node hides an article and an extra node
   only widens the result. The deeper rows and the inheritance rows are
   unchanged.
+- 2026-11-23: a blind recheck suggests the references miss labels, so measured
+  pair precision understates `gpt-6.2-sol`. Four `gpt-6.2-sol` agent sessions
+  judged every level-2 pair that either the reference or the classifier gave for
+  the 200 Claude-labeled articles, with the sources hidden. They accepted 161 of
+  191 pairs both sides gave, 44 of 75 pairs only the classifier gave and 11 of
+  29 pairs only the reference gave. Against those verdicts the classifier's
+  precision is 0.78 and the reference's is 0.80. The judge shares the
+  classifier's model and saw only proposed pairs, so this is evidence, not a
+  gate: the floors stay measured against the frozen references, which are not
+  amended from classifier output. A higher precision floor needs an
+  owner-labeled set.

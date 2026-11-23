@@ -66,6 +66,106 @@ func TestOpenAISubmitArchivePrefixes(t *testing.T) {
 	}
 }
 
+func TestOpenAISubmitArchiveStaging(t *testing.T) {
+	for _, staged := range []bool{false, true} {
+		t.Run(map[bool]string{false: "empty", true: "unlinked-create-response"}[staged], func(t *testing.T) {
+			s, bodies, client, _ := submitFixture(t)
+			s.State = "preparing"
+			s.CreatedAt = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+			root := t.TempDir()
+			r := &Runner{IntentDir: root}
+			if err := r.writeIntent(s); err != nil {
+				t.Fatal(err)
+			}
+			guard, err := r.lockOpenAICreator(s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sink := &openAISubmitDisk{root: root, guard: guard, now: func() time.Time { return s.CreatedAt }}
+			if _, err = openAISubmit(context.Background(), s, bodies, client, sink); err != nil {
+				t.Fatal(err)
+			}
+			if err = guard.close(); err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(root, "evidence", s.ID, "openai-submit")
+			stage := filepath.Join(dir, ".staging")
+			if err = os.MkdirAll(stage, 0700); err != nil {
+				t.Fatal(err)
+			}
+			if staged {
+				if err = os.Remove(filepath.Join(dir, submitNames[5])); err != nil {
+					t.Fatal(err)
+				}
+				if err = os.Rename(filepath.Join(dir, submitNames[4]), filepath.Join(stage, "capture")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := readOpenAISubmitArchive(root, s, nil)
+			if staged && err == nil {
+				t.Fatalf("accepted unlinked staged response: %+v", got)
+			}
+			if !staged && (err != nil || got.Phase != archiveVerifiedReceipt) {
+				t.Fatalf("empty staging: phase=%v err=%v", got.Phase, err)
+			}
+		})
+	}
+}
+
+func TestOpenAISubmitArchiveCreatorMarkers(t *testing.T) {
+	for _, mode := range []string{"absent", "finished", "finished-no-dispatch", "unknown", "invalid"} {
+		t.Run(mode, func(t *testing.T) {
+			s, bodies, client, _ := submitFixture(t)
+			s.State = "preparing"
+			s.CreatedAt = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+			root := t.TempDir()
+			r := &Runner{IntentDir: root, Now: func() time.Time { return s.CreatedAt.Add(time.Hour) }}
+			if err := r.writeIntent(s); err != nil {
+				t.Fatal(err)
+			}
+			guard, err := r.lockOpenAICreator(s.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sink := &openAISubmitDisk{root: root, guard: guard, now: func() time.Time { return s.CreatedAt }}
+			if _, err = openAISubmit(context.Background(), s, bodies, client, sink); err != nil {
+				t.Fatal(err)
+			}
+			if err = guard.close(); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = readOpenAISubmitArchive(root, s, nil); err != nil {
+				t.Fatal(err)
+			}
+			switch mode {
+			case "absent":
+				_, err = r.creatorQuietSince(s)
+			case "finished", "finished-no-dispatch":
+				if mode == "finished-no-dispatch" {
+					dir := filepath.Join(root, "evidence", s.ID, "openai-submit")
+					for _, name := range submitNames[3:] {
+						if err = os.Remove(filepath.Join(dir, name)); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				err = r.writeCreatorTrace(s, "creator.finished", true)
+			case "unknown":
+				err = os.WriteFile(filepath.Join(root, "submissions", s.ID+".unknown"), nil, 0600)
+			case "invalid":
+				err = os.WriteFile(filepath.Join(root, "submissions", s.ID+".creator.absent"), []byte("{}"), 0600)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = readOpenAISubmitArchive(root, s, nil)
+			if (mode == "absent" || mode == "finished") != (err == nil) {
+				t.Fatalf("mode %s: err=%v", mode, err)
+			}
+		})
+	}
+}
+
 func TestOpenAISubmitArchiveRejectsCorruption(t *testing.T) {
 	for _, mode := range []string{"scope", "hash", "missing", "extra", "symlink", "sync", "project", "field", "time", "zero-field"} {
 		t.Run(mode, func(t *testing.T) {

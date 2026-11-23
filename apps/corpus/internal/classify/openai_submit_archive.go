@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
@@ -28,6 +29,32 @@ type openAISubmitArchive struct {
 	UploadBody     []byte
 	ResponseStatus int
 	ResponseBody   []byte
+}
+
+func archiveNamespace(sub int, s Submission) (bool, error) {
+	entries, err := countEntries(sub)
+	if err != nil {
+		return false, err
+	}
+	finishedDispatched := false
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, s.ID) || name == s.ID+".json" || name == s.ID+".creator.lock" {
+			continue
+		}
+		if name != s.ID+".creator.absent" && name != s.ID+".creator.finished" {
+			return false, fmt.Errorf("prior submission evidence")
+		}
+		raw, err := submitRead(sub, name)
+		var record creatorRecord
+		if err != nil || validateRetainedJSON(raw, &record) != nil || json.Unmarshal(raw, &record) != nil || record.ID != s.ID || record.ItemsHash != s.ItemsHash || record.At.Before(s.CreatedAt) {
+			return false, fmt.Errorf("invalid creator record")
+		}
+		if name == s.ID+".creator.finished" {
+			finishedDispatched = record.Dispatched
+		}
+	}
+	return finishedDispatched, nil
 }
 
 func readOpenAISubmitArchive(root string, s Submission, syncDir func(int) error) (openAISubmitArchive, error) {
@@ -56,7 +83,8 @@ func readOpenAISubmitArchive(root string, s Submission, syncDir func(int) error)
 		return fail()
 	}
 	defer func() { _ = unix.Close(sub) }()
-	if submitNamespace(sub, s.ID) != nil || submitOtherEvidence(st.root, s.ID) != nil || submitResultEvidence(st.root, s.ID) != nil {
+	finishedDispatched, err := archiveNamespace(sub, s)
+	if err != nil || submitOtherEvidence(st.root, s.ID) != nil || submitResultEvidence(st.root, s.ID) != nil {
 		return fail()
 	}
 	raw, err := submitRead(sub, s.ID+".json")
@@ -90,7 +118,17 @@ func readOpenAISubmitArchive(root string, s Submission, syncDir func(int) error)
 			return fail()
 		}
 		for _, entry := range entries {
-			if entry.Name() != ".staging" {
+			if entry.Name() == ".staging" {
+				stage, e := countOpenDir(dir, ".staging", false)
+				if e != nil {
+					return fail()
+				}
+				staged, e := countEntries(stage)
+				_ = unix.Close(stage)
+				if e != nil || len(staged) != 0 {
+					return fail()
+				}
+			} else {
 				n++
 			}
 		}
@@ -100,7 +138,7 @@ func readOpenAISubmitArchive(root string, s Submission, syncDir func(int) error)
 	}
 	disk := &openAISubmitDisk{}
 	records, err := disk.history(dir, s, n)
-	if err != nil {
+	if err != nil || (finishedDispatched && n < 4) {
 		return fail()
 	}
 	for i, r := range records {
