@@ -24,7 +24,7 @@ func VerifyScoreLabels(recipe Recipe, data []byte) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown classifier provider")
 	}
-	slice, _, _, err := taxonomy.VerifyScoringInput(provider, data)
+	slice, _, _, err := taxonomy.VerifyClassifierScoringInput(provider, recipe.Model, data)
 	return slice, err
 }
 
@@ -85,13 +85,16 @@ type ScoreReport struct {
 }
 
 type scoredArticle struct {
-	truth         [3]map[string]bool
-	predictions   [3]map[string]float64
-	topCode       string
-	topConfidence float64
-	topMapped     [3]string
-	noNode        bool
-	confidences   [3][]float64
+	truth       [3]map[string]bool
+	predictions [3]map[string]float64
+	top         [3]scoredTop
+	noNode      bool
+	confidences [3][]float64
+}
+
+type scoredTop struct {
+	code, mapped string
+	confidence   float64
 }
 
 func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArtifact, release []Article, nodes []Node) (ScoreReport, error) {
@@ -110,6 +113,15 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 		key := a.DocumentKey + "/" + a.Anchor
 		if _, ok := predicted[key]; ok {
 			return report, fmt.Errorf("duplicate article prediction")
+		}
+		if a.Outcome.Outcome == "ok" {
+			family := families.Documents[a.DocumentKey]
+			for _, p := range a.Outcome.Codes {
+				n := byCode[p.Code]
+				if !n.Active || n.Level < 2 || n.Level > 4 || (n.Origin != "phapdien" && n.Origin != "custom") || math.IsNaN(p.Confidence) || math.IsInf(p.Confidence, 0) || p.Confidence < 0 || p.Confidence > 1 || family.Outcome != "ok" || !containsCode(family.Codes, ancestor(p.Code, 2, byCode)) {
+					return report, fmt.Errorf("invalid article prediction code or confidence")
+				}
+			}
 		}
 		predicted[key] = a.Outcome
 	}
@@ -143,6 +155,9 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 		item := scoredArticle{noNode: label.NoNode, truth: [3]map[string]bool{{}, {}, {}}, predictions: [3]map[string]float64{{}, {}, {}}}
 		for code := range truthCodes {
 			for i, level := range []int{2, 3, 0} {
+				if i > 0 && containsCode(label.Level2OnlyCodes, ancestor(code, 2, byCode)) {
+					continue
+				}
 				mapped := ancestor(code, level, byCode)
 				if mapped == "" && !valid {
 					mapped = "invalid/" + code
@@ -153,20 +168,20 @@ func Score(labels taxonomy.Labels, families FamilyArtifact, artifact ArticleArti
 			}
 		}
 		out := predicted[key]
-		if valid && family.Outcome == "ok" && len(family.Codes) > 0 && out.Outcome == "ok" {
+		if (valid || label.ConfirmedEmpty) && family.Outcome == "ok" && len(family.Codes) > 0 && out.Outcome == "ok" {
 			for _, p := range out.Codes {
-				n := byCode[p.Code]
-				if !n.Active || n.Level < 2 || n.Level > 4 || (n.Origin != "phapdien" && n.Origin != "custom") || math.IsNaN(p.Confidence) || math.IsInf(p.Confidence, 0) || p.Confidence < 0 || p.Confidence > 1 || !containsCode(family.Codes, ancestor(p.Code, 2, byCode)) {
-					return report, fmt.Errorf("invalid article prediction code or confidence")
-				}
-				if item.topCode == "" || p.Confidence > item.topConfidence || (p.Confidence == item.topConfidence && p.Code < item.topCode) {
-					item.topCode, item.topConfidence = p.Code, p.Confidence
-					for i, level := range []int{2, 3, 0} {
-						item.topMapped[i] = ancestor(p.Code, level, byCode)
-					}
-				}
 				for i, level := range []int{2, 3, 0} {
+					if i > 0 && containsCode(label.Level2OnlyCodes, ancestor(p.Code, 2, byCode)) {
+						continue
+					}
 					mapped := ancestor(p.Code, level, byCode)
+					if label.ConfirmedEmpty {
+						mapped = p.Code
+					}
+					top := item.top[i]
+					if top.code == "" || p.Confidence > top.confidence || (p.Confidence == top.confidence && p.Code < top.code) {
+						item.top[i] = scoredTop{p.Code, mapped, p.Confidence}
+					}
 					if mapped == "" {
 						continue
 					}
@@ -265,9 +280,10 @@ func scoreAt(articles []scoredArticle, level int, threshold float64) Metrics {
 		if a.noNode && level > 0 {
 			continue
 		}
-		if a.topCode != "" && a.topConfidence >= threshold {
+		top := a.top[level]
+		if top.code != "" && top.confidence >= threshold {
 			m.topOneTotal++
-			if a.truth[level][a.topMapped[level]] {
+			if a.truth[level][top.mapped] {
 				m.topOneHits++
 			}
 		}
@@ -275,7 +291,7 @@ func scoreAt(articles []scoredArticle, level int, threshold float64) Metrics {
 			if confidence < threshold {
 				continue
 			}
-			if code != a.topMapped[level] {
+			if code != top.mapped {
 				m.AdditionalTotal++
 				if a.truth[level][code] {
 					m.AdditionalCorrect++

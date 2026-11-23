@@ -17,23 +17,31 @@ type ProvisionEvidence struct {
 
 func ReadLabels(path string) (taxonomy.Labels, string, error) {
 	var labels taxonomy.Labels
+	var frozen taxonomy.FrozenLabels
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return labels, "", fmt.Errorf("read taxonomy labels: %w", err)
 	}
-	if err = validateRetainedJSON(b, &labels); err != nil {
+	if err = validateRetainedJSON(b, &frozen); err != nil {
 		return labels, "", fmt.Errorf("decode taxonomy labels: %w", err)
 	}
-	if err = json.Unmarshal(b, &labels); err != nil {
+	if err = json.Unmarshal(b, &frozen); err != nil {
 		return labels, "", fmt.Errorf("decode taxonomy labels: %w", err)
 	}
+	if frozen.Provider == "consensus" {
+		_, _, frozen, err = taxonomy.VerifyClassifierScoringInput("openai", taxonomy.ConsensusModel, b)
+		if err != nil {
+			return labels, "", fmt.Errorf("verify taxonomy labels: %w", err)
+		}
+	}
+	labels = frozen.Selection()
 	if labels.Country != "vn" || labels.Release == "" || len(labels.Articles) == 0 {
 		return labels, "", fmt.Errorf("taxonomy labels require country, source release and articles")
 	}
 	seen := map[string]bool{}
 	for _, a := range labels.Articles {
 		key := a.Key + "/" + a.Anchor
-		if a.Key == "" || a.Anchor == "" || len(a.Codes) == 0 || seen[key] {
+		if a.Key == "" || a.Anchor == "" || !validLabelShape(a, labels.IsVerifiedConsensus()) || seen[key] {
 			return labels, "", fmt.Errorf("invalid or duplicate taxonomy label identity")
 		}
 		seen[key] = true
@@ -125,17 +133,20 @@ func ValidateSelection(labels taxonomy.Labels, articles []Article, nodes []Node)
 	for _, a := range articles {
 		texts[a.DocumentKey+"/"+a.Anchor] = a.OwnText
 	}
-	active := map[string]bool{}
+	byCode := map[string]Node{}
 	for _, n := range nodes {
-		active[n.Code] = n.Active
+		byCode[n.Code] = n
 	}
 	for _, label := range labels.Articles {
 		text, ok := texts[label.Key+"/"+label.Anchor]
 		if !ok || taxonomy.OwnTextSHA256(text) != label.OwnTextSHA256 {
 			return fmt.Errorf("selected label does not match release article text")
 		}
+		if !validLabelShape(label, labels.IsVerifiedConsensus()) || !validDeepMarkers(label, byCode) {
+			return fmt.Errorf("invalid selected label markers")
+		}
 		for _, code := range label.Codes {
-			if !active[code] {
+			if !byCode[code].Active {
 				return fmt.Errorf("selected label names an inactive taxonomy code")
 			}
 		}

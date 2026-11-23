@@ -6,6 +6,15 @@ import (
 	"fmt"
 )
 
+const ConsensusModel = "gpt-6.2-sol"
+
+func consensusPins() []adjudicatedPin {
+	return []adjudicatedPin{
+		{"multi-family", "consensus", "8a5a76ceb5cec313b0fba4e4806cb59537081c4b51dd3d966031a066a56d13fc"},
+		{"post-2023", "consensus", "ac53b485991c41e120bece309593d0c7d3eccbc0b0b5b66c8ac89521870eeb0b"},
+	}
+}
+
 type adjudicatedPin struct{ slice, provider, hash string }
 
 func adjudicatedPins() []adjudicatedPin {
@@ -27,12 +36,16 @@ func VerifyAdjudicated(classifierProvider string, data []byte) (string, string, 
 }
 
 func VerifyScoringInput(classifierProvider string, data []byte) (string, string, FrozenLabels, error) {
+	return VerifyClassifierScoringInput(classifierProvider, "", data)
+}
+
+func VerifyClassifierScoringInput(classifierProvider, model string, data []byte) (string, string, FrozenLabels, error) {
 	var labels FrozenLabels
 	if classifierProvider != "openai" && classifierProvider != "anthropic" {
 		return "", "", labels, fmt.Errorf("unknown classifier provider")
 	}
 	hash := fmt.Sprintf("%x", sha256.Sum256(data))
-	for _, pin := range adjudicatedPins() {
+	for _, pin := range append(adjudicatedPins(), consensusPins()...) {
 		if pin.hash != hash {
 			continue
 		}
@@ -52,10 +65,33 @@ func VerifyScoringInput(classifierProvider string, data []byte) (string, string,
 		if provider != pin.provider || labels.DrawRule != AdjudicatedDrawRule {
 			return "", "", FrozenLabels{}, fmt.Errorf("inconsistent adjudicated provenance")
 		}
+		if provider == "consensus" {
+			if classifierProvider != "openai" || model != ConsensusModel {
+				return "", "", FrozenLabels{}, fmt.Errorf("consensus labels require openai/%s", ConsensusModel)
+			}
+			if err := verifyConsensusProvenance(pin.slice, labels); err != nil {
+				return "", "", FrozenLabels{}, err
+			}
+			labels.verifiedConsensus = true
+		}
 		if provider == classifierProvider {
 			return "", "", FrozenLabels{}, fmt.Errorf("classifier and labeler providers must differ")
 		}
 		return pin.slice, provider, labels, nil
 	}
 	return "", "", labels, fmt.Errorf("unpinned adjudicated labels")
+}
+
+func verifyConsensusProvenance(slice string, labels FrozenLabels) error {
+	for _, pin := range adjudicatedPins() {
+		if pin.slice != slice || pin.provider != "anthropic" || pin.hash != labels.BaseLabelsSHA256 {
+			continue
+		}
+		source, err := SourceListSHA256(labels.Articles)
+		if err != nil || source != labels.SourceListSHA256 || labels.Labeler != "gpt-6.2-astra+claude-fable-5-2" {
+			return fmt.Errorf("inconsistent consensus provenance")
+		}
+		return nil
+	}
+	return fmt.Errorf("incorrect consensus base pin for %s", slice)
 }

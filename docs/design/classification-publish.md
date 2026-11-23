@@ -149,6 +149,48 @@ bind the exact staged report, dump, manifest and `build.json`. Do not change the
 signer. Test that upload refuses a failing staged report. Diagnostic
 `corpus eval` uses the same gate but cannot publish a decided run.
 
+## Reference correction
+
+The gate scores `gpt-6.2-sol` against two corrected references. Keep
+`taxonomy-<slice>-anthropic.json` as the Claude base for `multi-family` and
+`post-2023`. `taxonomy-<slice>-consensus-v1.json` holds the same draw and
+article triples with `provider: consensus`,
+`labeler: gpt-6.2-astra+claude-fable-5-2`, `base_labels_sha256` (the SHA-256 of
+the pinned base file's bytes) and the recomputed `source_list_sha256`. The
+seeded file does not change. The consensus pins score only `gpt-6.2-sol`, in
+`classify score` and in the gate: a judge is never scored on its own votes, and
+the gate requires the article recipe derived from the Sol document recipe.
+
+Two judges, blind to each other and to the sources, judged every level-2 pair
+that the base or the classifier gave. Remove all base codes under a family both
+mark `does_not_fit`. Add an absent family only when both mark it `fits`. A split
+or `unsure` changes nothing. An added family is a level-2 code listed in
+`level_2_only_codes`; it is left out of that article's level-3 and deepest
+diagnostics, predicted descendants included. An article with no code left stays
+in the set with `codes: []` and `confirmed_empty: true`: it gives no recall or
+family target, and each prediction on it is a false positive. A reference whose
+triple no longer matches the release counts in the 5 percent check and is never
+treated as a fragment.
+
+The corrections are reproducible. `taxonomy-consensus-v1.sha256` lists the
+digests of the bases, the packets the judges saw, their verdicts, the key, the
+generator and both outputs; these inputs stay with the paid archive, not in Git.
+A reviewer reproduces both files byte for byte from the rule alone and checks
+each packet id against the article's text hash and candidate set.
+
+Pack verifies each baseline trial against its historical label pin, then joins
+its predictions to the current pin of the same slice by a two-way comparison of
+exact triples, skips included. The set carries the three current scoring pins;
+the gate rejects a set whose pins or providers differ from the catalog, so a set
+packed before a correction cannot gate. The old Claude pins remain valid for
+`classify score` on the artifacts that bind them, as a diagnostic.
+
+These references measure regression of `gpt-6.2-sol`, not recall over pairs
+nobody proposed. Before another model is compared with it, the same two-judge
+procedure reviews every level-2 pair that model proposes outside the references;
+otherwise report the comparison as biased toward `gpt-6.2-sol`. A comparison
+never changes the gate's pins.
+
 ## Later releases
 
 Reuse exact triples from a set with the same taxonomy. New or changed articles

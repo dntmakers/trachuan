@@ -26,8 +26,9 @@ type PackBuild struct {
 type PackBaseline struct{ references []packReference }
 
 type packReference struct {
-	name, provider, docDir, articleDir string
-	selection                          packSelection
+	name, docDir, articleDir string
+	selection                packSelection
+	scoring                  gateLabels
 }
 
 func LoadOpenAIPackSource(ctx context.Context, db *pgxpool.Pool, country, release string) (PackBuild, error) {
@@ -86,7 +87,11 @@ func readPackBuild(ctx context.Context, tx pgx.Tx, country, release string) (Pac
 }
 
 func readPackReferences(root string, b PackBuild) ([]packReference, error) {
-	raw, err := evaluation.VNTaxonomyReferences()
+	raw, err := evaluation.VNTaxonomyTrialReferences()
+	if err != nil {
+		return nil, err
+	}
+	current, err := readClassificationReferenceCatalog("openai", taxonomy.ConsensusModel, b.Country, b.Release)
 	if err != nil {
 		return nil, err
 	}
@@ -98,15 +103,15 @@ func readPackReferences(root string, b PackBuild) ([]packReference, error) {
 		}
 		stem := filepath.Join(root, "gpt-6.2-sol-"+descriptor.stem)
 		sel := packSelection{build: b, articles: labels.Articles, hash: digest(raw[i])}
-		refs = append(refs, packReference{slice, provider, stem + "-documents", stem + "-articles", sel})
+		refs = append(refs, packReference{slice, stem + "-documents", stem + "-articles", sel, current[i]})
 	}
 	return refs, nil
 }
 
 func verifyPackReferenceTriples(ctx context.Context, db packQueryer, nodes []Node, refs []packReference) error {
-	active := make(map[string]bool, len(nodes))
+	byCode := make(map[string]Node, len(nodes))
 	for _, n := range nodes {
-		active[n.Code] = n.Active
+		byCode[n.Code] = n
 	}
 	for _, ref := range refs {
 		labels := make(map[packArticleKey]taxonomy.LabelArticle, len(ref.selection.articles))
@@ -116,11 +121,21 @@ func verifyPackReferenceTriples(ctx context.Context, db packQueryer, nodes []Nod
 				return fmt.Errorf("invalid baseline %s reference triple", ref.name)
 			}
 			for _, code := range a.Codes {
-				if !active[code] {
+				if !byCode[code].Active {
 					return fmt.Errorf("baseline %s reference code %s is not active", ref.name, code)
 				}
 			}
 			labels[key] = a
+		}
+		for _, a := range ref.scoring.labels.Articles {
+			if !validLabelShape(a, ref.scoring.labels.IsVerifiedConsensus()) || !validDeepMarkers(a, byCode) {
+				return fmt.Errorf("invalid baseline %s scoring label markers", ref.name)
+			}
+			for _, code := range a.Codes {
+				if !byCode[code].Active {
+					return fmt.Errorf("baseline %s scoring reference code %s is not active", ref.name, code)
+				}
+			}
 		}
 		if err := matchPackReferenceTriples(ctx, db, ref, labels); err != nil {
 			return err
@@ -169,4 +184,30 @@ func makePackSelection(b PackBuild, part, total int) (packSelection, error) {
 	}
 	bound, err := UnseededBuildHash(hash, b.InputHash, b.RecipeHash)
 	return packSelection{b, labels.Articles, bound, fmt.Sprintf("unseeded:%d/%d", part, total)}, err
+}
+
+func packScoringReference(ref packReference, pair packPair) (ClassificationReference, error) {
+	scoring := ref.scoring
+	if scoring.slice != ref.name || !validKey(scoring.hash) {
+		return ClassificationReference{}, fmt.Errorf("invalid %s scoring reference pin", ref.name)
+	}
+	missing := make(map[packArticleKey]string, len(scoring.labels.Articles))
+	for _, a := range scoring.labels.Articles {
+		key := packArticleKey{a.Key, a.Anchor}
+		if _, exists := missing[key]; exists || key.document == "" || key.anchor == "" || !validKey(a.OwnTextSHA256) {
+			return ClassificationReference{}, fmt.Errorf("invalid %s scoring reference triple", ref.name)
+		}
+		missing[key] = a.OwnTextSHA256
+	}
+	for _, a := range pair.Articles {
+		key := packArticleKey{a.Key, a.Anchor}
+		if hash, exists := missing[key]; !exists || hash != a.OwnTextSHA256 {
+			return ClassificationReference{}, fmt.Errorf("baseline %s prediction triple differs from scoring reference for %q %q", ref.name, key.document, key.anchor)
+		}
+		delete(missing, key)
+	}
+	if len(missing) != 0 {
+		return ClassificationReference{}, fmt.Errorf("baseline %s is missing %d scoring reference triples", ref.name, len(missing))
+	}
+	return ClassificationReference{ref.name, scoring.provider, scoring.hash, pair.Documents, pair.Articles}, nil
 }

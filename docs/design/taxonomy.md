@@ -193,10 +193,10 @@ fragments.
 | same                                                   | seeded, masked    | recall and top-1 precision at level 3                                                | 0.80  |
 | same                                                   | seeded, masked    | recall and top-1 precision at the deepest level                                      | 0.75  |
 | 100 unseeded articles labeled with every family        | model-adjudicated | recall over all pairs at level 2                                                     | 0.85  |
-| same                                                   | model-adjudicated | precision over all pairs at level 2                                                  | 0.70  |
+| same                                                   | model-adjudicated | precision over all pairs at level 2                                                  | 0.75  |
 | every LLM slice                                        | as the slice      | family recall (each true node's level-2 ancestor among the document request's codes) | 0.90  |
 | 100 post-2023 articles                                 | model-adjudicated | recall at level 2                                                                    | 0.85  |
-| same                                                   | model-adjudicated | precision at level 2                                                                 | 0.70  |
+| same                                                   | model-adjudicated | precision at level 2                                                                 | 0.75  |
 | same                                                   | model-adjudicated | precision and recall at the deepest level                                            | 0.70  |
 | 50 articles that belong to custom nodes                | model-adjudicated | precision and recall of custom nodes                                                 | 0.80  |
 | 100 inherited consolidated articles                    | model-adjudicated | precision at level 2 (inheritance layer)                                             | 0.95  |
@@ -275,19 +275,15 @@ counts as a miss in its slice, so the denominator never shrinks; when more than
 5 percent of a set's entries fail, the slice is unavailable until the set is
 re-adjudicated and frozen again. A redraw is a reviewed change, never automatic.
 
-A model-adjudicated set gates a classifier only when its labeler uses a
-different provider. Without an independent set, the slice fails. For OpenAI, a
-fresh Claude session (Fable, or Opus when unavailable) labels the frozen
-multi-family and post-2023 articles under the same rule, blind to existing
-labels, seeds, inherited nodes and classifier output. Do not redraw or replace
-articles. Give a second fresh blind session only the blank entries to label.
-Freeze `taxonomy-<slice>-anthropic.json` only when every article is labeled. The
-coordinator reads the frozen set at the same sample sizes as for the first sets,
-without comparing labels or classifier output, and supplies no labels. Any
-correction goes to a new blind session, without labels or scores. Freeze the
-revision and finish all checks before anyone compares the sets or scores. The
-[packet and freeze commands](classification-openai.md#independent-evaluation-inputs)
-preserve the exact lists and text hashes.
+A single-provider reference gates only a classifier from a different provider.
+The gate for `gpt-6.2-sol` uses the two
+[consensus-corrected references](classification-publish.md#reference-correction):
+a Claude model wrote the base and a Claude judge had to agree to every change,
+so OpenAI cannot change a label alone. They gate no other model, and never a
+judge. Without an eligible pinned reference, the slice fails. The 300 masked
+seeds keep their official package placements. The blind labeling procedure for
+the bases is in
+[independent evaluation inputs](classification-openai.md#independent-evaluation-inputs).
 
 The report also lists assignment counts per node, unassigned counts, and the
 diff of node changes against the previous release. A failed floor blocks

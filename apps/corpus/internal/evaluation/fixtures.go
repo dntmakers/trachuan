@@ -17,8 +17,16 @@ import (
 var vnFixtures embed.FS
 
 func VNTaxonomyReferences() ([3][]byte, error) {
+	return readVNTaxonomyReferences("consensus-v1")
+}
+
+func VNTaxonomyTrialReferences() ([3][]byte, error) {
+	return readVNTaxonomyReferences("anthropic")
+}
+
+func readVNTaxonomyReferences(suffix string) ([3][]byte, error) {
 	var out [3][]byte
-	for i, name := range [...]string{"taxonomy-labels.json", "taxonomy-multi-family-anthropic.json", "taxonomy-post-2023-anthropic.json"} {
+	for i, name := range [...]string{"taxonomy-labels.json", "taxonomy-multi-family-" + suffix + ".json", "taxonomy-post-2023-" + suffix + ".json"} {
 		b, err := vnFixtures.ReadFile("testdata/vn/" + name)
 		if err != nil {
 			return out, fmt.Errorf("read pinned taxonomy reference %s: %w", name, err)

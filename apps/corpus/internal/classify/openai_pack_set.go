@@ -94,7 +94,11 @@ func packOpenAI(ctx context.Context, runs string, parts int, build PackBuild, re
 		if err = acceptPair(pair); err != nil {
 			return "", fmt.Errorf("baseline %s: %w", ref.name, err)
 		}
-		set.References = append(set.References, ClassificationReference{ref.name, ref.provider, ref.selection.hash, pair.Documents, pair.Articles})
+		scoring, err := packScoringReference(ref, pair)
+		if err != nil {
+			return "", err
+		}
+		set.References = append(set.References, scoring)
 	}
 	sort.Slice(set.References, func(i, j int) bool { return set.References[i].Slice < set.References[j].Slice })
 	for i, ref := range set.References {

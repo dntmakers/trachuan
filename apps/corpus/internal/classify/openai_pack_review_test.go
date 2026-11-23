@@ -147,7 +147,7 @@ func TestPackRejectsReusedSubmissionID(t *testing.T) {
 			target := articles
 			if crossPair {
 				_, bs, baselineDoc, baselineArticle := packFixture(t, true, true)
-				refs = append(refs, packReference{name: "seeded", provider: "package", selection: bs, docDir: baselineDoc, articleDir: baselineArticle})
+				refs = append(refs, packReference{name: "seeded", selection: bs, docDir: baselineDoc, articleDir: baselineArticle})
 				target = baselineArticle
 			}
 			var origin, other openAITrialState

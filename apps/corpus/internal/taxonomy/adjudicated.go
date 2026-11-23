@@ -56,7 +56,14 @@ type FrozenLabels struct {
 	Labeler          string         `json:"labeler"`
 	Provider         string         `json:"provider,omitempty"`
 	SourceListSHA256 string         `json:"source_list_sha256,omitempty"`
+	BaseLabelsSHA256 string         `json:"base_labels_sha256,omitempty"`
 	Articles         []LabelArticle `json:"articles"`
+
+	verifiedConsensus bool
+}
+
+func (f FrozenLabels) Selection() Labels {
+	return Labels{Country: f.Country, Release: f.Release, Seed: f.Seed, DrawRule: f.DrawRule, Articles: f.Articles, verifiedConsensus: f.verifiedConsensus}
 }
 
 func DrawAdjudicated(rows []DrawArticle, slice string, seed int64) ([]PacketArticle, error) {

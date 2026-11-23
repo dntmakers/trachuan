@@ -83,13 +83,16 @@ func TestScore_FailedFamiliesAndInvalidLabelsAreMisses(t *testing.T) {
 			case "failed family":
 				f.Documents["vn:vbpl:1"] = Outcome{Outcome: "invalid_response"}
 			}
+			want := 1
+			if reason == "empty family" || reason == "failed family" {
+				for i := range a.Articles {
+					a.Articles[i].Outcome = ArticleOutcome{Outcome: f.Documents["vn:vbpl:1"].Outcome}
+				}
+				want = 20
+			}
 			report, err := Score(l, f, a, release, nodes)
 			if err != nil {
 				t.Fatal(err)
-			}
-			want := 1
-			if reason == "empty family" || reason == "failed family" {
-				want = 20
 			}
 			if report.Levels[2].All.Raw.FalseNegative != want {
 				t.Fatalf("report %+v", report)

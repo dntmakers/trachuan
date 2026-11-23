@@ -10,11 +10,13 @@ import (
 const DrawRuleVersion = "seeded-articles/2"
 
 type LabelArticle struct {
-	Key           string   `json:"document_key"`
-	Anchor        string   `json:"anchor"`
-	OwnTextSHA256 string   `json:"own_text_sha256"`
-	Codes         []string `json:"codes"`
-	NoNode        bool     `json:"no_node,omitempty"`
+	Key             string   `json:"document_key"`
+	Anchor          string   `json:"anchor"`
+	OwnTextSHA256   string   `json:"own_text_sha256"`
+	Codes           []string `json:"codes"`
+	NoNode          bool     `json:"no_node,omitempty"`
+	Level2OnlyCodes []string `json:"level_2_only_codes,omitempty"`
+	ConfirmedEmpty  bool     `json:"confirmed_empty,omitempty"`
 }
 
 type Labels struct {
@@ -23,6 +25,12 @@ type Labels struct {
 	Seed     int64          `json:"seed"`
 	DrawRule string         `json:"draw_rule"`
 	Articles []LabelArticle `json:"articles"`
+
+	verifiedConsensus bool
+}
+
+func (l Labels) IsVerifiedConsensus() bool {
+	return l.verifiedConsensus
 }
 
 func OwnTextSHA256(text string) string {
