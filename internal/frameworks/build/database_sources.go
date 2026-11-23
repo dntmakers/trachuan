@@ -15,6 +15,10 @@ type sourceFileDB interface {
 func loadSourceFiles(ctx context.Context, tx sourceFileDB, d databaseInputs, ids databaseIDs) error {
 	id := 0
 	for _, v := range d.versions {
+		selected, err := v.SelectedSource()
+		if err != nil {
+			return hide("select source file", err)
+		}
 		files := append([]registry.File{}, v.Files...)
 		sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 		for _, file := range files {
@@ -28,8 +32,12 @@ func loadSourceFiles(ctx context.Context, tx sourceFileDB, d databaseInputs, ids
 			if role == "mapping workbook" {
 				role = "mapping"
 			}
+			textSource := "structured"
+			if file.Role == "text" && file.Format == "pdf" {
+				textSource = "pdf_text"
+			}
 			//nolint:misspell // Match the registry field names.
-			_, err := tx.Exec(ctx, `INSERT INTO source_file(id,version_id,name,role,sha256,size,licence_kind,text_source,text_complete) VALUES($1,$2,$3,$4,$5,$6,$7,'structured',true)`, id, ids.versions[versionKey(v.Code, v.Version)], file.Path, role, file.SHA256, file.Size, v.LicenceKind)
+			_, err := tx.Exec(ctx, `INSERT INTO source_file(id,version_id,name,role,sha256,size,licence_kind,text_source,text_complete) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, id, ids.versions[versionKey(v.Code, v.Version)], file.Path, role, file.SHA256, file.Size, v.LicenceKind, textSource, file.Path == selected.Path)
 			if err != nil {
 				return hide("load source file", err)
 			}

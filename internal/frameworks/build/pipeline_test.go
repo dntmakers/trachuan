@@ -29,6 +29,7 @@ func editRegistry(t *testing.T, edit func(*registry.Registry)) {
 
 func TestRun_CanonicalControlAndChunkOrder(t *testing.T) {
 	work := fixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(os.Getenv("FRAMEWORKS_SOURCE_DIR"), "trachuan/titles.csv"), []byte("code,version,citation,title\nfw-alpha,v10,A-2,Our title\n"), 0600))
 	editRegistry(t, func(reg *registry.Registry) {
 		reg.Frameworks[0].Version = "v10"
 		reg.Frameworks[0].Ordinal = 2
@@ -105,6 +106,7 @@ func TestRun_LicensedTextDoesNotChangePublicChunks(t *testing.T) {
 
 func TestRun_ChunksFollowControlOrdinals(t *testing.T) {
 	work := fixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(os.Getenv("FRAMEWORKS_SOURCE_DIR"), "trachuan/titles.csv"), []byte("code,version,citation,title\nfw-alpha,v1,Z-2,Our title\n"), 0600))
 	path := filepath.Join(os.Getenv("FRAMEWORKS_SOURCE_DIR"), "fw-alpha.json")
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)

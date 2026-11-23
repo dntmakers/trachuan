@@ -182,8 +182,8 @@ func prepare() (string, string, error) {
 			source = path
 		}
 	}
-	if err := unix.Setrlimit(unix.RLIMIT_CORE, &unix.Rlimit{Cur: 0, Max: 0}); err != nil {
-		return "", "", hide("disable core dumps", err)
+	if err := disableCoreDumps(); err != nil {
+		return "", "", err
 	}
 	tmp, err := checkedDir(filepath.Join(work, "tmp"))
 	if err != nil {
@@ -242,6 +242,13 @@ func removeTemp(path string) error {
 	}
 	if err := os.RemoveAll(resolved); err != nil {
 		return hide("remove temporary step", err)
+	}
+	return nil
+}
+
+func disableCoreDumps() error {
+	if err := unix.Setrlimit(unix.RLIMIT_CORE, &unix.Rlimit{Cur: 0, Max: 0}); err != nil {
+		return hide("disable core dumps", err)
 	}
 	return nil
 }

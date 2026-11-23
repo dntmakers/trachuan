@@ -26,8 +26,11 @@ A with no ID in C opens a `domain` root keyed by its terminal uppercase acronym,
 including `&`. A row with an ID in C is a `control` (`<acronym>-NN`), parented
 to the active domain with that acronym. Keep the title in B and specification in
 D. Reject malformed IDs, missing title or specification, a mismatched domain or
-an unexpected row inside the table. Skip preamble, blank and trailer rows and do
-not parse other sheets.
+an unexpected row inside the table. Skip preamble and blank rows and do not
+parse other sheets. The profile defines no trailer grammar. Skip trailer rows
+only for the pinned workbook, identified by its whole-file SHA-256, from its
+pinned first trailer row to the end. In any other workbook a nonblank row that
+is not a domain or control fails the parse.
 
 After the specification and a blank line, emit one line per E–W cell, in column
 order. Use `Group / Column: value`, taking the group from its row 2 merge anchor

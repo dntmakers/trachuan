@@ -86,7 +86,7 @@ func validStep(raw []byte, name string) bool {
 	if name == "relate" {
 		wantVersion = 4
 	}
-	if step.Version != wantVersion {
+	if step.Version != wantVersion && (name != "parse" || step.Version != 2) {
 		return false
 	}
 	if name == "chunk" {

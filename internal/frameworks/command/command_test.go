@@ -45,20 +45,15 @@ func TestRun_SyntheticSourceOutput(t *testing.T) {
 	if err := Run([]string{"edges"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "resolved: 0") || strings.Contains(out.String(), "private-citation") || strings.Contains(out.String(), "invented-private-title") {
-		t.Fatal("edge statistics leaked text or omitted counts")
+	if out.Len() != 0 {
+		t.Fatal("licensed edge statistics must be silent")
 	}
 	out.Reset()
 	if err := Run([]string{"alpha", "1.0"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	for _, secret := range []string{"private-citation", "invented-private-title"} {
-		if strings.Contains(strings.ToLower(out.String()), secret) {
-			t.Error("source text in output")
-		}
-	}
-	if !strings.Contains(out.String(), "controls: 1") {
-		t.Error("missing control count")
+	if out.String() != "controls: 1\n" {
+		t.Error("licensed diagnostic must contain only the approved total")
 	}
 	for _, replacement := range []string{"expected_controls: 2", ""} {
 		changed := strings.Replace(registry, "expected_controls: 1", replacement, 1)
@@ -67,20 +62,18 @@ func TestRun_SyntheticSourceOutput(t *testing.T) {
 		}
 		out.Reset()
 		err := Run([]string{"alpha", "1.0"}, &out)
-		want := "control count mismatch"
-		if replacement == "" {
-			want = "expected control count unset"
+		if err == nil || err.Error() != "frameworks command failed" || out.Len() != 0 {
+			t.Errorf("expected generic error and no output: %v", err)
 		}
-		if err == nil || err.Error() != want {
-			t.Errorf("unexpected error class: %v", err)
-		}
-		if !strings.Contains(out.String(), "controls: 1") {
-			t.Error("missing count on failure")
+		out.Reset()
+		err = Run([]string{"edges"}, &out)
+		if err == nil || err.Error() != "frameworks command failed" || out.Len() != 0 {
+			t.Errorf("expected generic edge error and no output: %v", err)
 		}
 	}
-	for _, tc := range []struct{ parser, content, want string }{
-		{"nist-oscal-800-53", `{"catalog":"invented-private-value"}`, "invalid catalog JSON"},
-		{"cis-controls-8-xlsx", "invented-private-value", "invalid workbook"},
+	for _, tc := range []struct{ parser, content string }{
+		{"nist-oscal-800-53", `{"catalog":"invented-private-value"}`},
+		{"cis-controls-8-xlsx", "invented-private-value"},
 	} {
 		broken := []byte(tc.content)
 		brokenSum := sha256.Sum256(broken)
@@ -95,14 +88,25 @@ func TestRun_SyntheticSourceOutput(t *testing.T) {
 		}
 		out.Reset()
 		err := Run([]string{"alpha", "1.0"}, &out)
-		if err == nil || err.Error() != tc.want {
-			t.Errorf("unexpected error class: %v", err)
-		}
-		if strings.Contains(out.String(), "invented-private-value") {
-			t.Error("source text in output")
+		if err == nil || err.Error() != "frameworks command failed" || out.Len() != 0 {
+			t.Errorf("expected generic error and no output: %v", err)
 		}
 	}
-
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	free := strings.Replace(registry, "access: licensed", "access: free\n    "+"lic"+"ence_kind: public-domain\n    "+"lic"+"ence_url: https://example.test/license", 1)
+	if err := os.WriteFile(filepath.Join(dir, "sources", "frameworks.yaml"), []byte(free), 0600); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := Run([]string{"alpha", "1.0"}, &out); err != nil || !strings.Contains(out.String(), "invalid citations:") {
+		t.Fatal("free diagnostic lost details")
+	}
+	out.Reset()
+	if err := Run([]string{"edges"}, &out); err != nil || !strings.Contains(out.String(), "resolved:") {
+		t.Fatal("free edges lost details")
+	}
 }
 
 func TestRun_UsageNamesBothForms(t *testing.T) {

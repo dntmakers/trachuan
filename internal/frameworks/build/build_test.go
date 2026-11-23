@@ -176,3 +176,16 @@ func TestRun_Validation(t *testing.T) {
 		require.NotContains(t, err.Error(), "private corrupt citation")
 	})
 }
+
+func TestTitleImport_FailurePreservesExisting(t *testing.T) {
+	fixture(t)
+	path := filepath.Join(os.Getenv("FRAMEWORKS_SOURCE_DIR"), "trachuan/titles.csv")
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	input := filepath.Join(t.TempDir(), "input.csv")
+	require.NoError(t, os.WriteFile(input, []byte("framework_code,version_label,citation_norm,title\nfw-alpha,v1,A-2,Only one\n"), 0600))
+	require.Error(t, ImportTitles(context.Background(), input))
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}

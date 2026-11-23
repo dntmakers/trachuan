@@ -22,6 +22,10 @@ func validPath(p string) bool {
 }
 
 func (r *Registry) Read(name string) ([]byte, error) {
+	return r.ReadAt(os.Getenv("FRAMEWORKS_SOURCE_DIR"), name)
+}
+
+func (r *Registry) ReadAt(dir, name string) ([]byte, error) {
 	if !validPath(name) {
 		return nil, fmt.Errorf("invalid source path")
 	}
@@ -37,7 +41,6 @@ func (r *Registry) Read(name string) ([]byte, error) {
 	if registered == nil {
 		return nil, fmt.Errorf("unregistered source path")
 	}
-	dir := os.Getenv("FRAMEWORKS_SOURCE_DIR")
 	if dir == "" {
 		return nil, fmt.Errorf("FRAMEWORKS_SOURCE_DIR is empty")
 	}

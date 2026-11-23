@@ -123,3 +123,37 @@ func TestFrameworks_EmbedsBeforeDatabaseConfigurationFailure(t *testing.T) {
 	require.Contains(t, errout.String(), "parse")
 	require.NotContains(t, out.String()+errout.String(), "licensed text")
 }
+
+func TestFrameworksTitlesCommandsDispatch(t *testing.T) {
+	t.Setenv("FRAMEWORKS_SOURCE_DIR", t.TempDir())
+	t.Chdir(t.TempDir())
+	for _, args := range [][]string{{"frameworks", "check-titles"}, {"frameworks", "import-titles", "--input", "missing.csv"}} {
+		var out, errout bytes.Buffer
+		if code := Run(context.Background(), args, &out, &errout); code != 1 {
+			t.Fatalf("%v: got %d, want command failure 1", args, code)
+		}
+	}
+}
+
+func TestFrameworksTitles_CancelledImport(t *testing.T) {
+	root := t.TempDir()
+	t.Chdir(root)
+	t.Setenv("HOME", root)
+	t.Setenv("FRAMEWORKS_SOURCE_DIR", filepath.Join(root, "source"))
+	require.NoError(t, os.MkdirAll("sources", 0700))
+	require.NoError(t, os.MkdirAll("source/trachuan", 0700))
+	data := []byte(`{"catalog":{"groups":[{"id":"aa","title":"invented"}]}}`)
+	require.NoError(t, os.WriteFile("source/catalog.json", data, 0600))
+	reg := fmt.Sprintf("frameworks:\n  - code: fw-alpha\n    version: v1\n    name: Invented\n    publisher: Invented\n    language: en\n    access: licensed\n    ordinal: 1\n    citation_scheme: oscal-catalog\n    parser: nist-oscal-800-53\n    expected_controls: 1\n    files:\n      - path: catalog.json\n        sha256: %x\n        size: %d\n        role: catalog\n        format: json\n", sha256.Sum256(data), len(data))
+	require.NoError(t, os.WriteFile("sources/frameworks.yaml", []byte(reg), 0600))
+	old := []byte("old contents\n")
+	require.NoError(t, os.WriteFile("source/trachuan/titles.csv", old, 0600))
+	require.NoError(t, os.WriteFile("input.csv", []byte("framework_code,version_label,citation_norm,title\nfw-alpha,v1,AA,New\n"), 0600))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var out, errout bytes.Buffer
+	require.Equal(t, 1, Run(ctx, []string{"frameworks", "import-titles", "--input", "input.csv"}, &out, &errout))
+	after, err := os.ReadFile("source/trachuan/titles.csv")
+	require.NoError(t, err)
+	require.Equal(t, old, after)
+}

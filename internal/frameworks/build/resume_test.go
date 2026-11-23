@@ -102,3 +102,18 @@ func TestSnapshotInputs_RefusesSymlinkDirectory(t *testing.T) {
 	_, err := snapshotInputs(dir)
 	require.Error(t, err)
 }
+
+func TestRun_OldParseRecipeRefused(t *testing.T) {
+	work := fixture(t)
+	require.NoError(t, testRun(context.Background(), "20990101", &bytes.Buffer{}))
+	path := filepath.Join(work, "20990101/parse/manifest.json")
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var m manifest
+	require.NoError(t, json.Unmarshal(data, &m))
+	m.Recipe.Version = 1
+	data, err = json.Marshal(m)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, data, 0600))
+	require.ErrorContains(t, testRun(context.Background(), "20990101", &bytes.Buffer{}), "parse: inputs or recipe changed")
+}

@@ -47,6 +47,8 @@ func Parse(name string, data []byte, code, version string, expected *int) (*Resu
 		nodes, err = parseCSF(data, code, version)
 	case "cis-controls-8-xlsx":
 		nodes, err = parseCIS(data)
+	case "csa-ccm-4-1-xlsx":
+		nodes, err = parseCSA(data)
 	default:
 		return nil, fmt.Errorf("unknown parser")
 	}
@@ -106,6 +108,9 @@ func validateResult(r *Result, expected *int) error {
 	}
 	if expected == nil {
 		return fmt.Errorf("expected control count unset")
+	}
+	if *expected <= 0 {
+		return fmt.Errorf("invalid expected control count")
 	}
 	if len(r.Nodes) != *expected {
 		return fmt.Errorf("control count mismatch")
