@@ -125,11 +125,13 @@ type Querier interface {
 	MarkOCRCheckAttemptsSubmitted(ctx context.Context, arg MarkOCRCheckAttemptsSubmittedParams) (int64, error)
 	MarkOCRCheckAttemptsUncertain(ctx context.Context, arg MarkOCRCheckAttemptsUncertainParams) (int64, error)
 	MarkRunFromStates(ctx context.Context, arg MarkRunFromStatesParams) (int64, error)
+	MatchEmbedArtifact(ctx context.Context, arg MatchEmbedArtifactParams) (bool, error)
 	PauseRunSource(ctx context.Context, arg PauseRunSourceParams) (int64, error)
 	PublishExpanded(ctx context.Context, arg PublishExpandedParams) (int64, error)
 	PublishFinal(ctx context.Context, arg PublishFinalParams) (int64, error)
 	PublishSeeds(ctx context.Context, arg PublishSeedsParams) (int64, error)
 	RecoverRun(ctx context.Context, id int64) error
+	RepairEmbedRow(ctx context.Context, arg RepairEmbedRowParams) (int64, error)
 	ResetFailedItems(ctx context.Context, arg ResetFailedItemsParams) error
 	ResetOlderFailedStageItems(ctx context.Context, arg ResetOlderFailedStageItemsParams) error
 	ResetRetryItem(ctx context.Context, arg ResetRetryItemParams) (int64, error)

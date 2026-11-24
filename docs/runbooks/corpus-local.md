@@ -114,6 +114,16 @@ current checkout. The build pins the parsed entries at planning. Review
 `validity-review.json` in the build artifact for unresolved validity and
 proposed corrections before accepting the release.
 
+## Repair embedding cache pointers
+
+If embed logs show `artifact missing or verification failed` after old bundles
+are removed, run `corpus embed-index` between runs with the workshop database
+and artifact root used by the worker. It checks retained embedding bundles for
+the current recipe and repairs cache entries for which a verified copy exists.
+It does not fetch documents, call the embedder or change a release. A key
+without any verified copy remains a miss if requested again. Do not clear
+`embed_row` or skip artifact verification to turn a miss into a hit.
+
 ## Source settings and pauses
 
 The secondary source defaults to

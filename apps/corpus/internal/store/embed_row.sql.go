@@ -75,7 +75,8 @@ func (q *Queries) ListEmbedArtifacts(ctx context.Context, recipeHash string) ([]
 }
 
 const lookupEmbedRows = `-- name: LookupEmbedRows :many
-SELECT e.input_sha256, e.row, e.token_count, a.id AS artifact_id, a.input_hash, a.path, a.sha256
+SELECT e.input_sha256, e.row, e.token_count, a.id AS artifact_id, a.input_hash, a.path, a.sha256,
+    a.stage AS artifact_stage, a.recipe_hash AS artifact_recipe_hash
 FROM embed_row e JOIN artifact a ON a.id = e.artifact_id
 WHERE e.recipe_hash = $1 AND e.input_sha256 = ANY($2::text[])
 `
@@ -86,13 +87,15 @@ type LookupEmbedRowsParams struct {
 }
 
 type LookupEmbedRowsRow struct {
-	InputSha256 string
-	Row         int32
-	TokenCount  int32
-	ArtifactID  int64
-	InputHash   string
-	Path        string
-	Sha256      string
+	InputSha256        string
+	Row                int32
+	TokenCount         int32
+	ArtifactID         int64
+	InputHash          string
+	Path               string
+	Sha256             string
+	ArtifactStage      string
+	ArtifactRecipeHash string
 }
 
 func (q *Queries) LookupEmbedRows(ctx context.Context, arg LookupEmbedRowsParams) ([]LookupEmbedRowsRow, error) {
@@ -112,6 +115,8 @@ func (q *Queries) LookupEmbedRows(ctx context.Context, arg LookupEmbedRowsParams
 			&i.InputHash,
 			&i.Path,
 			&i.Sha256,
+			&i.ArtifactStage,
+			&i.ArtifactRecipeHash,
 		); err != nil {
 			return nil, err
 		}
@@ -121,4 +126,68 @@ func (q *Queries) LookupEmbedRows(ctx context.Context, arg LookupEmbedRowsParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const matchEmbedArtifact = `-- name: MatchEmbedArtifact :one
+SELECT EXISTS (
+    SELECT 1 FROM artifact
+    WHERE id = $1 AND stage = 'embed' AND recipe_hash = $2
+        AND input_hash = $3 AND path = $4 AND sha256 = $5
+)
+`
+
+type MatchEmbedArtifactParams struct {
+	ID         int64
+	RecipeHash string
+	InputHash  string
+	Path       string
+	Sha256     string
+}
+
+func (q *Queries) MatchEmbedArtifact(ctx context.Context, arg MatchEmbedArtifactParams) (bool, error) {
+	row := q.db.QueryRow(ctx, matchEmbedArtifact,
+		arg.ID,
+		arg.RecipeHash,
+		arg.InputHash,
+		arg.Path,
+		arg.Sha256,
+	)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const repairEmbedRow = `-- name: RepairEmbedRow :execrows
+UPDATE embed_row
+SET artifact_id = $1, row = $2, token_count = $3
+WHERE recipe_hash = $4 AND input_sha256 = $5
+    AND artifact_id = $6 AND row = $7 AND token_count = $8
+`
+
+type RepairEmbedRowParams struct {
+	ArtifactID    int64
+	Row           int32
+	TokenCount    int32
+	RecipeHash    string
+	InputSha256   string
+	OldArtifactID int64
+	OldRow        int32
+	OldTokenCount int32
+}
+
+func (q *Queries) RepairEmbedRow(ctx context.Context, arg RepairEmbedRowParams) (int64, error) {
+	result, err := q.db.Exec(ctx, repairEmbedRow,
+		arg.ArtifactID,
+		arg.Row,
+		arg.TokenCount,
+		arg.RecipeHash,
+		arg.InputSha256,
+		arg.OldArtifactID,
+		arg.OldRow,
+		arg.OldTokenCount,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

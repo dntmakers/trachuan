@@ -225,12 +225,15 @@ long; the item is done with explicit gaps.
 Rows are reused per chunk input. The workshop table `embed_row` maps
 `(recipe_hash, input_sha256)` to the `artifact_id`, `row` and `token_count` of a
 verified embed artifact; the stage's `Rows` writes an artifact's rows when the
-artifact is first recorded, so only verified artifacts fill it, and a one-time
-backfill indexes the existing verified artifacts of the current recipe. Before
-tokenizing, the stage looks up each input under its own recipe hash. A hit
-reopens the referenced artifact with manifest verification and copies that row's
-float32 bytes and token count; a failed verification, a missing file or a row
-outside the artifact is a miss, logged. Misses are tokenized and embedded as
+artifact is recorded. Indexing keeps a usable row. If the recorded row no longer
+verifies, a verified copy of the same input under the same recipe can replace
+it. The write must still match the stale locator it checked so it never
+overrides a concurrent repair. A missing file alone is not a replacement. The
+backfill applies the same rule to retained artifacts without running the model.
+Before tokenizing, the stage looks up each input under its own recipe hash. A
+hit reopens the referenced artifact with manifest verification and copies that
+row's float32 bytes and token count; a failed verification, a missing file or a
+row outside the artifact is a miss, logged. Misses are tokenized and embedded as
 above, in ordinal order and the same batch limits. The document service is
 deterministic per input: on 2026-11-13, 1,572 re-embedded rows, alone, in the
 stage's batches and in mixed batches, were byte-identical to the stored rows, so

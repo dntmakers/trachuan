@@ -19,9 +19,30 @@ import (
 )
 
 func TestRows_RejectsUnverifiedArtifact(t *testing.T) {
-	_, err := New(nil, recipe()).Rows(context.Background(), stage.Env{Artifacts: artifact.Store{Root: t.TempDir()}}, artifact.Result{Path: "missing"})
-	if err == nil {
+	ctx := context.Background()
+	writer, err := New(nil, recipe()).Rows(ctx, stage.Env{Artifacts: artifact.Store{Root: t.TempDir()}}, artifact.Result{Path: "missing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = writer(ctx, nil, 1); err == nil {
 		t.Fatal("accepted unverified artifact")
+	}
+}
+
+func TestRows_RejectsInvalidVectors(t *testing.T) {
+	ctx := context.Background()
+	s := New(nil, recipe())
+	artifacts := artifact.Store{Root: t.TempDir()}
+	file := chunk.File{DocumentKey: "doc", Chunks: []chunk.Chunk{{Content: "text"}}}
+	art, _, _ := publishRepairBundle(t, s, artifacts, strings.Repeat("b", 64), file, func(_ *Index, vectors *[]byte) {
+		*vectors = []byte("invalid")
+	})
+	writer, err := s.Rows(ctx, stage.Env{Artifacts: artifacts}, art)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = writer(ctx, nil, 1); err == nil || !strings.Contains(err.Error(), "invalid vector size") {
+		t.Fatalf("writer error = %v, want invalid vector size", err)
 	}
 }
 
@@ -66,7 +87,7 @@ func TestCache_ReusePreservesArtifactBytes(t *testing.T) {
 	}
 	entries := cacheQuery{}
 	for _, row := range idx.Rows {
-		entries = append(entries, store.LookupEmbedRowsRow{InputSha256: row.InputSHA256, Row: int32(row.Row), TokenCount: int32(row.TokenCount), ArtifactID: 1, InputHash: input, Path: published.Path, Sha256: published.SHA256})
+		entries = append(entries, store.LookupEmbedRowsRow{InputSha256: row.InputSHA256, Row: int32(row.Row), TokenCount: int32(row.TokenCount), ArtifactID: 1, ArtifactStage: "embed", ArtifactRecipeHash: s.Recipe(stage.Snapshot{}), InputHash: input, Path: published.Path, Sha256: published.SHA256})
 	}
 	env := stage.Env{Artifacts: artifacts}
 	for _, tc := range []struct {
@@ -203,5 +224,70 @@ func TestCache_CopiedRowDoesNotAliasSource(t *testing.T) {
 	a.vectors[8] = 99
 	if got.bytes[0] != 9 || got.count != 3 {
 		t.Fatalf("copied row=%v count=%d", got.bytes, got.count)
+	}
+}
+
+func TestResolve_RejectsWrongIndexIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		alter func(*Index, *[]byte)
+	}{
+		{"recipe", func(idx *Index, _ *[]byte) {
+			idx.Recipe.TokenCap++
+			idx.RecipeHash = idx.Recipe.Hash()
+		}},
+		{"chunk hash", func(idx *Index, _ *[]byte) {
+			idx.ChunkSHA256 = strings.Repeat("c", 64)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := New(nil, recipe())
+			artifacts := artifact.Store{Root: t.TempDir()}
+			file := chunk.File{DocumentKey: "doc", Chunks: []chunk.Chunk{{Content: "text"}}}
+			art, _, _ := publishRepairBundle(t, s, artifacts, strings.Repeat("b", 64), file, tc.alter)
+			if _, err := s.Resolve(context.Background(), stage.Env{Artifacts: artifacts}, stage.Run{}, stage.Item{}, art); err == nil || !strings.Contains(err.Error(), "embed artifact identity mismatch") {
+				t.Fatalf("resolve error = %v, want embed artifact identity mismatch", err)
+			}
+		})
+	}
+}
+
+func TestOpenRecorded_ComparesResolvedPaths(t *testing.T) {
+	s := New(nil, recipe())
+	root := t.TempDir()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rel, err := filepath.Rel(cwd, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifacts := artifact.Store{Root: root}
+	file := chunk.File{DocumentKey: "doc", Chunks: []chunk.Chunk{{Content: "text"}}}
+	art, _, _ := publishRepairBundle(t, s, artifacts, strings.Repeat("b", 64), file, nil)
+	absPath := filepath.Join(root, art.Path)
+	alias := filepath.Join(root, "alias")
+	if err := os.Symlink(absPath, alias); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, root, record string
+		stale              bool
+	}{
+		{"relative root and absolute record", rel, absPath, false},
+		{"absolute root and relative record", root, art.Path, false},
+		{"root-prefixed legacy record", rel, filepath.Join(rel, art.Path), false},
+		{"different path", rel, filepath.Join(root, "other"), true},
+		{"symlink spelling", rel, alias, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			record := art
+			record.Path = tc.record
+			got := s.openRecorded(artifact.Store{Root: tc.root}, s.Recipe(stage.Snapshot{}), record)
+			if got.stale != tc.stale || (got.err != nil) != tc.stale {
+				t.Fatalf("open recorded stale = %t, error = %v; want stale %t", got.stale, got.err, tc.stale)
+			}
+		})
 	}
 }

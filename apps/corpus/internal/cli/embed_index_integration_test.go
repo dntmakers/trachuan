@@ -37,7 +37,8 @@ func TestEmbedIndex_IdempotentAndSkipsInvalidArtifacts(t *testing.T) {
 	recipe := s.Recipe(stage.Snapshot{})
 	input := strings.Repeat("a", 64)
 	hash := strings.Repeat("b", 64)
-	idx := embed.Index{Version: 1, DocumentKey: "doc", ChunkSHA256: input, RecipeHash: r.Hash(), Recipe: r, Dimensions: r.Dimensions, Rows: []embed.Row{{Row: 0, ChunkOrdinal: 0, TokenCount: 2, InputSHA256: hash}}, Rejected: []embed.Rejected{}}
+	newHash := strings.Repeat("e", 64)
+	idx := embed.Index{Version: 1, DocumentKey: "doc", ChunkSHA256: input, RecipeHash: r.Hash(), Recipe: r, Dimensions: r.Dimensions, Rows: []embed.Row{{Row: 0, ChunkOrdinal: 0, TokenCount: 2, InputSHA256: hash}, {Row: 1, ChunkOrdinal: 1, TokenCount: 2, InputSHA256: newHash}}, Rejected: []embed.Rejected{}}
 	art, err := artifacts.Publish(ctx, "embed", input, recipe, func(dir string) error {
 		data, e := json.Marshal(idx)
 		if e != nil {
@@ -46,8 +47,12 @@ func TestEmbedIndex_IdempotentAndSkipsInvalidArtifacts(t *testing.T) {
 		if e = os.WriteFile(filepath.Join(dir, "index.json"), data, 0600); e != nil {
 			return e
 		}
-		vectors := make([]byte, r.Dimensions*4)
+		if e = os.WriteFile(filepath.Join(dir, "report.json"), []byte(`{"version":1,"rows":2,"rejected":0,"gaps":[]}`), 0600); e != nil {
+			return e
+		}
+		vectors := make([]byte, r.Dimensions*4*2)
 		binary.LittleEndian.PutUint32(vectors, 0x3f800000)
+		binary.LittleEndian.PutUint32(vectors[r.Dimensions*4:], 0x3f800000)
 		return os.WriteFile(filepath.Join(dir, "vectors.f32"), vectors, 0600)
 	})
 	if err != nil {
@@ -56,7 +61,10 @@ func TestEmbedIndex_IdempotentAndSkipsInvalidArtifacts(t *testing.T) {
 	if _, err = db.Exec(ctx, "INSERT INTO artifact(stage,item_key,input_hash,recipe_hash,path,sha256) VALUES ('embed','doc',$1,$2,$3,$4),('embed','bad',$5,$2,'missing',$6)", input, recipe, art.Path, art.SHA256, strings.Repeat("c", 64), strings.Repeat("d", 64)); err != nil {
 		t.Fatal(err)
 	}
-	for i, expected := range []string{"rows inserted=1", "rows inserted=0"} {
+	if _, err = db.Exec(ctx, "INSERT INTO embed_row(recipe_hash,input_sha256,artifact_id,row,token_count) SELECT recipe_hash,$2,id,0,2 FROM artifact WHERE recipe_hash=$1 AND item_key='bad'", recipe, hash); err != nil {
+		t.Fatal(err)
+	}
+	for i, expected := range []string{"rows inserted=1 rows repaired=1", "rows inserted=0 rows repaired=0"} {
 		var out, errout bytes.Buffer
 		if code := Run(ctx, []string{"embed-index"}, &out, &errout); code != 0 {
 			t.Fatalf("run %d code=%d stderr=%s", i, code, errout.String())
@@ -64,5 +72,9 @@ func TestEmbedIndex_IdempotentAndSkipsInvalidArtifacts(t *testing.T) {
 		if !strings.Contains(out.String(), expected) || !strings.Contains(out.String(), "artifacts verified=1") || !strings.Contains(out.String(), "artifacts skipped=1") || !strings.Contains(out.String(), "skipped:") {
 			t.Fatalf("output=%s", out.String())
 		}
+	}
+	var path string
+	if err = db.QueryRow(ctx, "SELECT a.path FROM embed_row e JOIN artifact a ON a.id=e.artifact_id WHERE e.recipe_hash=$1 AND e.input_sha256=$2", recipe, hash).Scan(&path); err != nil || path != art.Path {
+		t.Fatalf("repaired pointer path=%q err=%v", path, err)
 	}
 }
