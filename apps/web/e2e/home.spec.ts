@@ -47,6 +47,18 @@ test('home keeps the sample current, public and usable on mobile', async ({ page
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
+for (const width of [390, 1280]) {
+  test(`maker actions are spaced below the paragraph at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/')
+    const paragraph = await page.locator('.home-maker p').boundingBox()
+    const actions = await page.locator('.home-maker-actions').boundingBox()
+    expect(paragraph).not.toBeNull()
+    expect(actions).not.toBeNull()
+    expect(Math.abs(actions!.y - (paragraph!.y + paragraph!.height) - 16)).toBeLessThanOrEqual(0.5)
+  })
+}
+
 for (const width of [1280, 390]) {
   test(`home hero is inset at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
