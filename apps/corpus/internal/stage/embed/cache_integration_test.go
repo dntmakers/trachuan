@@ -4,9 +4,6 @@ package embed
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -61,32 +58,17 @@ func TestEmbedRow_WriterInsertsAndIgnoresConflicts(t *testing.T) {
 	}
 	defer db.Close()
 	artifacts := artifact.Store{Root: t.TempDir()}
-	f := &fake{}
-	s := New(f.client(recipe()), recipe())
+	s := New(nil, recipe())
 	input := strings.Repeat("b", 64)
-	idx, vectors, err := s.build(ctx, chunk.File{DocumentKey: "doc", Chunks: []chunk.Chunk{{Content: "a"}}}, chunk.Coverage{}, input)
-	if err != nil {
-		t.Fatal(err)
-	}
-	art, err := artifacts.Publish(ctx, "embed", input, s.Recipe(stage.Snapshot{}), func(dir string) error {
-		b, e := json.Marshal(idx)
-		if e != nil {
-			return e
-		}
-		if e = os.WriteFile(filepath.Join(dir, "index.json"), b, 0600); e != nil {
-			return e
-		}
-		return os.WriteFile(filepath.Join(dir, "vectors.f32"), vectors, 0600)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	file := chunk.File{DocumentKey: "doc", Chunks: []chunk.Chunk{{Content: "a"}}}
+	art, _, _ := publishRepairBundle(t, s, artifacts, input, file, nil)
+	other, _, _ := publishRepairBundle(t, s, artifacts, strings.Repeat("c", 64), file, nil)
 	var id int64
 	if err = db.QueryRow(ctx, "INSERT INTO artifact(stage,item_key,input_hash,recipe_hash,path,sha256) VALUES('embed','doc',$1,$2,$3,$4) RETURNING id", input, s.Recipe(stage.Snapshot{}), art.Path, art.SHA256).Scan(&id); err != nil {
 		t.Fatal(err)
 	}
 	var otherID int64
-	if err = db.QueryRow(ctx, "INSERT INTO artifact(stage,item_key,input_hash,recipe_hash,path,sha256) VALUES('embed','other',$1,$2,$3,$4) RETURNING id", strings.Repeat("c", 64), s.Recipe(stage.Snapshot{}), art.Path, art.SHA256).Scan(&otherID); err != nil {
+	if err = db.QueryRow(ctx, "INSERT INTO artifact(stage,item_key,input_hash,recipe_hash,path,sha256) VALUES('embed','other',$1,$2,$3,$4) RETURNING id", other.InputHash, s.Recipe(stage.Snapshot{}), other.Path, other.SHA256).Scan(&otherID); err != nil {
 		t.Fatal(err)
 	}
 	writer, err := s.Rows(ctx, stage.Env{DB: db, Artifacts: artifacts}, art)
@@ -101,7 +83,14 @@ func TestEmbedRow_WriterInsertsAndIgnoresConflicts(t *testing.T) {
 	if err = writer(ctx, tx, id); err != nil {
 		t.Fatal(err)
 	}
-	if err = writer(ctx, tx, otherID); err != nil {
+	if err = writer(ctx, tx, otherID); err == nil {
+		t.Fatal("writer accepted another artifact ID")
+	}
+	otherWriter, err := s.Rows(ctx, stage.Env{DB: db, Artifacts: artifacts}, other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = otherWriter(ctx, tx, otherID); err != nil {
 		t.Fatal(err)
 	}
 	var count int

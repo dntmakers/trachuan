@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -72,16 +73,25 @@ func decodeFile(dir, name string, dst any) error {
 		return fmt.Errorf("open %s: %w", name, err)
 	}
 	defer func() { _ = f.Close() }()
-	d := json.NewDecoder(f)
+	return decodeArtifact(name, f, dst)
+}
+
+func decodeArtifact(name string, r io.Reader, dst any) error {
+	d := json.NewDecoder(r)
 	d.DisallowUnknownFields()
-	if err = d.Decode(dst); err != nil {
+	if err := d.Decode(dst); err != nil {
 		return fmt.Errorf("decode %s: %w", name, err)
 	}
-	var extra any
-	if err = d.Decode(&extra); err != io.EOF {
+	var extra json.RawMessage
+	err := d.Decode(&extra)
+	if err == io.EOF {
+		return nil
+	}
+	var syntax *json.SyntaxError
+	if err == nil || err == io.ErrUnexpectedEOF || errors.As(err, &syntax) {
 		return fmt.Errorf("trailing JSON in %s", name)
 	}
-	return nil
+	return fmt.Errorf("decode trailing JSON in %s: %w", name, err)
 }
 func validHash(s string) bool {
 	b, err := hex.DecodeString(s)
