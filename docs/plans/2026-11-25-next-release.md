@@ -19,6 +19,9 @@
 - Tag the next patch release from `main` and deploy; the website shows the issue-date filter, source files and the timeline at once.
 - Live home sample: before setting `SERVER_PUBLIC_SAMPLE=true` on the host, run the fixed query once on the active release and confirm a 200 rendered as the live sample (`docs/design/web-home-sample.md` "Acceptance"); then add the flag to the host server environment and run the capacity phase D sample stream on A1.
 
+- 2026-11-25: `v0.1.55` is live with A1, A2 and A3 (the sample route answers `not_found` with the flag off; the home page shows the stored sample with its label).
+- Live home sample, found on the one-time check with release `20261124_1` on the local stack: the fixed query returns Điều 19 of 91/2025/QH15 but the server refuses it (`no_proven_cut`), because the cut lies in the article's clauses and points; the cut rule in `docs/design/web-home-sample.md` is being widened to the hit's subtree (Astra review, then code). The sample answers `busy` until a signed-in search has opened the release engine. `loadcheck` does not send the phase D sample stream yet. The A1 capacity window needs host access between 01:00 and 03:00; owner decides whether the flag may go on before it.
+
 ## Group B: needs a corpus release (open issues, discuss after Group A)
 
 ### B1 queries without diacritics
@@ -29,12 +32,16 @@
 - No diacritic restoration dictionary (banhmi had 27,908 rows): one unaccented syllable maps to several words (`thue`: `thuê`, `thuế`), and `docs/design/embedder.md` forbids restoring in service.
 - Keep `unsupported_query` for input with no Latin letters. Update the rejection text in `internal/retrieval/validate.go`, the `guide` text and the web copy that ask for diacritics.
 
+- Measured 2026-11-25: in the latest evaluation artifact (run of 2026-11-24, legacy cohort, gate skipped) all three unaccented cases abstain with `low_confidence` in every arm and limit. Removing the gate alone gives users an accepted query and no evidence. B1 needs a route for unaccented text before the recipe change: candidates are restoring diacritics from the top lexical hits before the dense embedding, or a lexical-only route with its own abstention statistic; measure on the golden questions folded to unaccented form (a calibration input, not a gate).
+
 ### B2 Công báo information
 - ADR 0012 rejected Công báo as a source because its search missed known documents (`docs/research/vn-sources-2026-11.md`); the new role is metadata only (gazette issue number and publication date), recorded as an ADR 0012 History entry. `sbv_hanoi` stays dropped.
 - banhmi knowledge (not code, ADR 0001): RSS of the newest 50 documents and an exact-number search whose items carry `danh_sach_dang_trong_cong_bao` and `danh_sach_ky_cong_bao` (`banhmi/pkg/ingest/congbao/search.go`). Record fresh fixtures from a Vietnam egress first.
 - Identity: match by normalized number, issuer and issue date as for `chinhphu`; a miss is a gap, never absence.
 - First use: the 71 validity entries that start "sau N ngày kể từ ngày đăng Công báo" (backlog 2026-11-18); a gazette date resolves them. Show the gazette number and date on the document entry.
 - Cost: one lookup per served document (3,847 today) at the per-host rate in budgets; a new column or table is a corpus schema version.
+
+- Probed 2026-11-25 from a Vietnam address (24 numbers, 1.5 s apart, `api-searchcongbao.chinhphu.vn`): 0 exact matches. Every returned item was issued in 2010 or later and carries gazette issues; the 329 served documents whose commencement counts from gazette publication were all issued from 2003 to 2008, so the gazette search cannot date them. 325 of the 329 already have a source `eff_from`; 4 do not (78/2005/TTLT-BTC-BYT, 88/2005/TTLT-BTC-BYT, 51/2006/QĐ-NHNN, 05/2007/CT-NHNN). Decision for the owner: close B2 (no adapter); the 4 go to manual corrections if a dated source is found.
 
 ### B3 changes between releases
 - `changes.jsonl` is a release-evidence file beside the dump (`docs/design/release-evidence.md`), not in the corpus database, so the server cannot read it today; build loads it into the release database (schema version) or the activator stores it.
