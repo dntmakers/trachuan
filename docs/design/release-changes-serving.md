@@ -65,12 +65,10 @@ The set row holds the projection version, current and predecessor release
 identities, predecessor identity hash when known, baseline flag, counts and a
 projection digest. Rows have a dense ascending ordinal, a kind, up to two
 document keys for filtering and a bounded JSON payload. The projection digest is
-SHA-256 over the compact, versioned JSON header (projection version, country,
-release, predecessor, predecessor identity hash and baseline), then the
-projected rows in ordinal order. Encode each as one UTF-8 line ending in LF.
-Include each ordinal, kind, filter keys and payload in the digest. Derive counts
-by kind from the rows. A baseline has zero rows. Store the digest in
-`build.json`, which the build manifest already hashes.
+SHA-256 over the canonical lines of the
+[projection encoding](release-changes-encoding.md). Derive counts by kind from
+the rows. A baseline has zero rows. Store the digest in `build.json`, which the
+build manifest already hashes.
 
 Evidence recomputes the digest and counts from the stored rows in the verified
 build database. They must match the set row and the projection of the finished
@@ -91,12 +89,17 @@ Before the [active database pointer swap](corpus-release-activation.md#steps),
 as `corpus_reader`. Validate the schema and set row, compare the set's current
 and previous release identities to the verified manifest, and stream the actual
 rows in ordinal order under the projection budget and release-check deadline.
-Recompute the digest and per-kind counts from that stream. Require the digest
-and version to match both the signed field and the set row, and the counts to
-match the set row's counts. Abort on any mismatch or incomplete read. Run this
-check before the swap for `new` and `retained` activations, including resumed
-attempts that have yet to swap. The server reads the same tables on the same
-release lease as other corpus reads.
+The query itself refuses the projection before the host receives an oversized
+field: a filter key longer than the `read` handle limit in code points, a
+payload longer than the item cap in bytes
+([request limits](budgets.md#request-limits)), or a running total of canonical
+line bytes, TAB and LF included, above the projection cap
+([indexing](budgets.md#indexing)). Recompute the digest and per-kind counts from
+that stream. Require the digest and version to match both the signed field and
+the set row, and the counts to match the set row's counts. Abort on any mismatch
+or incomplete read. Run this check before the swap for `new` and `retained`
+activations, including resumed attempts that have yet to swap. The server reads
+the same tables on the same release lease as other corpus reads.
 
 ## Served records
 
