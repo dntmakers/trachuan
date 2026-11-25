@@ -113,6 +113,9 @@ subtree the way the `search` `nodes[]` filter decides membership; global gaps
 with neither are left out. An unknown code is `invalid_request`. Paging, the
 `kind` filter and the page size stay as without `node`.
 
+The proposed `changes` tool lists [release changes](release-changes-serving.md)
+under the same release pinning rule.
+
 Tool schemas grow only additively. `/mcp` requires scope `mcp:read` and serves
 RFC 9728 metadata at `/.well-known/oauth-protected-resource`. Every `/mcp`
 response carries `Cache-Control: no-store, no-transform`, whatever the tool or

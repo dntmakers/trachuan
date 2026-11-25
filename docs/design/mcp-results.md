@@ -12,10 +12,14 @@ Each tool result carries `structuredContent` and the same JSON, serialized
 without whitespace, in one text block, as the
 [MCP tools specification](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)
 recommends for backward compatibility. Each tool declares an `outputSchema`.
-Keys are English; legal text is verbatim. Null and empty fields are omitted
-except for the [required nullable source file fields](mcp-read.md#source-files).
-Booleans are always present. The web API returns the same objects through the
-OpenAPI document.
+Keys are English and legal text is verbatim. Booleans are always present. Omit
+null and empty fields except for the
+[required nullable source file fields](mcp-read.md#source-files) and the
+[release changes fields](release-changes-serving.md#request-and-response) below.
+In `changes` results, keep `items: []` when empty. Keep explicit null dates in
+`before` and `after` pairs and in provision validity tuples. Apply the same
+exceptions to `structuredContent`, the text copy and the web API response. The
+web API returns the same objects through the OpenAPI document.
 
 ## Handles
 

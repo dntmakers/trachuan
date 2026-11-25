@@ -200,6 +200,9 @@ MCP tools. Documents wraps a read item result with the web caps and fields
 above. Both reader calls and search retain `release` pinning and
 `release_expired`.
 
+The proposed [`POST /api/v1/changes`](release-changes-serving.md#mcp-and-web)
+serves the active release comparison.
+
 ## Errors and limits
 
 Errors are `{error:{code,message}}` with fixed messages: 400 `invalid_request`,
