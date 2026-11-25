@@ -58,6 +58,16 @@ itself (`<loại văn bản> này`, the type equal to the document's own type).
 
 - Commencement sentence: `<subject> có hiệu lực [thi hành] [kể] từ ngày <date>`,
   date spelled (`D tháng M năm YYYY`) or numeric (`D/M/YYYY`).
+- Commencement from signing: `<subject> có hiệu lực [thi hành] [kể] từ ngày ký`,
+  also with `ban hành` after `ký`. It states no date: the date is the document's
+  stored `issue_date`, which is the signing date (owner decision 2026-11-25). A
+  document with no issue date has no commencement date and its article is
+  unresolved. The date is what the document states, not a finding that it took
+  effect then. `sau N ngày kể từ ngày ký` and a date counted from gazette
+  publication are not this form and stay unresolved. The form gives no date to a
+  document under `hold` or with a date normalization gap: a stored issue date
+  known to be wrong is answered by a manual `eff_from` with evidence, or the
+  document stays in review.
 - Replacement sentence: `<subject> thay thế [cho] <items>` or
   `<subject> bãi bỏ <items>`, also when coordinated in one sentence
   (`thay thế cho A; B và bãi bỏ Điều 3 của C`). A whole item is
@@ -82,7 +92,11 @@ the result does not depend on traversal order or on a document's latest status:
    when the usable article states the same date or the document has no usable
    article. A source date that differs from the stated date on a document
    outside rule A is a date conflict: the document has no operative date, makes
-   no events and enters the review queue.
+   no events and enters the review queue. For commencement from signing the
+   check comes before rule A, right after the manual `eff_from`: a source
+   `eff_from` that differs from the issue date is a date conflict for every
+   document, a rule A candidate included, so a `not_yet` actor never ends its
+   target on a date its source contradicts.
 2. Replacement events from every document with an operative date.
 3. Apply events and conflicts, then the remaining manual fields.
 
@@ -232,10 +246,11 @@ the relation cap.
 - [Build normalization](normalization.md): the consolidated derivation is
   unchanged and still counts only source-supplied `in_force` or `partial`
   targets; derived and corrected targets do not count in this release.
-  `validity_rules_version` (`validity/3`) joins the build recipe and the
-  corrections file hash joins the build input; the shared `normalizer_version`
-  is not bumped, because chunk recipes depend on it, so a frozen run is never
-  rebuilt under new rules.
+  `validity_rules_version` joins the build recipe (`validity/4` from the build
+  that reads commencement from signing; a release built under `validity/3` keeps
+  its recipe and evidence) and the corrections file hash joins the build input;
+  the shared `normalizer_version` is not bumped, because chunk recipes depend on
+  it, so a frozen run is never rebuilt under new rules.
 - [Retrieval](retrieval-validity.md#validity-and-evidence): eligibility adds
   "not `validity_conflict`"; the `validity` policy version is bumped; `Validity`
   carries the evidence record.
@@ -251,15 +266,17 @@ the relation cap.
 
 No network or model at build time; only verified artifacts and resolved
 relations. Tests cover each sentence form, quoted text, a clause-scoped date, an
-unparsed sentence, staggered effect, D before issue, D after `eff_to`, an
-incoming amendment, a partial repeal, an ambiguous number, chains (C replaces B
-replaces A), both processing orders of a chain, an expired actor, an adverse
-status name, a cleared invalid interval, list continuation, every manual entry
-check, and both retrieval modes. Before the new baseline is accepted, the
-primary reviews every rule B expiry, every rule C conflict and the whole review
-queue for the run, and records the counts and the recall cost in the research
-note. The bulk kinds (`unresolved_article`, `parsed_text_article`, `unknown`,
-`repeals_current`) are model-adjudicated: Codex `gpt-6-astra` checks each parser
-proposal against the quoted sentences, only unambiguous ones become manual
-entries, and the primary reads a 10 percent sample before they are accepted
-(coordinator decision 2026-11-15).
+unparsed sentence, staggered effect, commencement from signing (with and without
+an issue date, with a source `eff_from` equal to and different from the issue
+date, with days added), D before issue, D after `eff_to`, an incoming amendment,
+a partial repeal, an ambiguous number, chains (C replaces B replaces A), both
+processing orders of a chain, an expired actor, an adverse status name, a
+cleared invalid interval, list continuation, every manual entry check, and both
+retrieval modes. Before the new baseline is accepted, the primary reviews every
+rule B expiry, every rule C conflict and the whole review queue for the run, and
+records the counts and the recall cost in the research note. The bulk kinds
+(`unresolved_article`, `parsed_text_article`, `unknown`, `repeals_current`) are
+model-adjudicated: Codex `gpt-6-astra` checks each parser proposal against the
+quoted sentences, only unambiguous ones become manual entries, and the primary
+reads a 10 percent sample before they are accepted (coordinator decision
+2026-11-15).

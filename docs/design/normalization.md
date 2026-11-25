@@ -27,10 +27,12 @@ only; `normalizer_version` also enters the chunk recipe and stays unchanged.
 `eff_to` is the first excluded civil date, so eligibility is
 `eff_from <= date AND (eff_to IS NULL OR date < eff_to)`. A same-day interval is
 empty, not automatically extended. Missing `eff_from` stays eligible for the
-date test with `missing_effective_date`. No issue-date fallback for legal
-validity; issue dates serve prefixes and consolidation ordering only. Source
-boundary semantics need the primary's official-source check before a release;
-this convention is explicitly reported as source-date interpretation, not
+date test with `missing_effective_date`. Normalization has no issue-date
+fallback for legal validity; here issue dates serve prefixes and consolidation
+ordering only. The one rule that reads an issue date as a commencement date is
+[commencement from signing](validity-status.md#automatic-rules). Source boundary
+semantics need the primary's official-source check before a release; this
+convention is explicitly reported as source-date interpretation, not
 independently adjudicated legal effect.
 
 Evidence supplied by the primary: live run `vn/20261109`, database

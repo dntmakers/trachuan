@@ -240,3 +240,56 @@ func TestValidity_ParsedTextIsReviewOnly(t *testing.T) {
 	}
 	t.Fatal("missing parsed text review with proposed correction")
 }
+
+func TestValidity_SigningDate(t *testing.T) {
+	target := testDoc("a", "1/2020/NĐ-CP", "2020-01-01", "2020-01-01")
+	for _, tc := range []struct {
+		name, issue, from                              string
+		candidate, hold, gap, event, conflict, derived bool
+	}{
+		{name: "matching", issue: "2021-01-01", from: "2021-01-01", event: true},
+		{name: "candidate", issue: "2021-01-01", candidate: true, event: true, derived: true},
+		{name: "conflict", issue: "2021-01-01", from: "2021-02-01", candidate: true, conflict: true},
+		{name: "missing issue", from: "2021-01-01"},
+		{name: "hold", issue: "2021-01-01", from: "2021-01-01", hold: true},
+		{name: "gap", issue: "2021-01-01", from: "2021-01-01", gap: true},
+		{name: "hold conflict", issue: "2021-01-01", from: "2021-02-01", hold: true, conflict: true},
+		{name: "gap conflict", issue: "2021-01-01", from: "2021-02-01", gap: true, conflict: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			actor := testDoc("b", "2/2021/NĐ-CP", tc.issue, tc.from)
+			if tc.candidate {
+				actor.sourceClass = "not_yet"
+				actor.statusCode = "CCHL"
+			}
+			actor.dateGap = tc.gap
+			r := validity.Parse("Nghị định", "Điều 1. Hiệu lực thi hành\nNghị định này có hiệu lực từ ngày ký. "+replacement(target.number, "1/1/2020"))
+			actor.article = &r
+			v := runTest(t, []validityDocument{target, actor}, nil, map[string]source.Correction{"b": {Hold: tc.hold}})
+			end := v.documents["a"].values.To
+			if (tc.event && dateValue(end) != "2021-01-01") || (!tc.event && end != nil) || hasReview(v, "date_conflict") != tc.conflict || (v.documents["b"].values.Basis == "derived_from_text") != tc.derived {
+				t.Fatalf("%+v reviews=%+v", v.documents, v.reviews)
+			}
+			if tc.derived && dateValue(v.documents["b"].values.From) != tc.issue {
+				t.Fatal(v.documents["b"])
+			}
+			if tc.issue == "" && !hasReview(v, "unresolved_article") {
+				t.Fatal(v.reviews)
+			}
+			if tc.conflict {
+				for _, review := range v.reviews {
+					if review.kind != "date_conflict" {
+						continue
+					}
+					if tc.hold || tc.gap {
+						if review.proposed != nil {
+							t.Fatal(review)
+						}
+					} else if review.proposed == nil || dateValue(review.proposed.Set.EffFrom) != tc.issue {
+						t.Fatal(review)
+					}
+				}
+			}
+		})
+	}
+}

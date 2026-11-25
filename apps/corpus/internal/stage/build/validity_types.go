@@ -8,7 +8,7 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/validity"
 )
 
-const validityRulesVersion = "validity/3"
+const validityRulesVersion = "validity/4"
 
 type validityDocument struct {
 	key, number, class, numberNorm, docType, issuer, issue   string
