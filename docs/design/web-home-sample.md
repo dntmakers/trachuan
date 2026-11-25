@@ -28,15 +28,32 @@ constant to the fixture; the runtime does not open the fixture or accept a
 configuration override. Do not log queries or result text.
 
 The first primary hit must be from `vn:vbpl:179252`, the law numbered
-`91/2025/QH15`; do not pick another hit. The
-[snippet rule](mcp-results.md#snippet-rule) must keep and omit non-whitespace
-body text of the provision named by the hit's handle. Prove this from the
-snippet builder's retained source ranges and the hit's `body` fragments with
-that exact provision identity. Count a source position as omitted only if no
-retained range contains a copy of it. A cut only in a lead, a heading or a child
-provision does not qualify. Neither `complete:false`, a printed omission marker
-nor source incompleteness proves a body cut. If the builder cannot prove the cut
-from its source spans, use the stored sample.
+`91/2025/QH15`; do not pick another hit. The excerpt must show only part of the
+hit: the [snippet rule](mcp-results.md#snippet-rule) must keep some and omit
+some rule text of the hit's own subtree, with at least one non-whitespace
+character on each side. The subtree is the provision named by the hit's handle
+together with its descendants, found through `parent_id` when the hit is built,
+never by comparing anchors. Rule text is a provision's text without its label
+and heading line, so an excerpt that drops only a heading and keeps every
+sentence does not qualify; when the builder cannot separate the heading from the
+rest of a provision's text, that provision proves nothing.
+
+Prove this from the snippet builder's retained source ranges and the hit's
+`body` fragments of the subtree. [Chunk rendering](chunk.md#tree-rendering) can
+put the same characters under a parent's and a child's coordinates: a source
+position counts as kept when any copy of it, under any of those coordinates or
+in a lead, is in a retained range, and as omitted only when no copy is. A cut
+only in an ancestor's lead does not qualify, because the named provision could
+then be shown whole. Whole child clauses or points may appear inside the
+excerpt; the named provision with its descendants may not. Neither
+`complete:false`, a printed omission marker nor source incompleteness proves a
+cut. If the builder cannot prove the cut from its source spans, use the stored
+sample.
+
+On release `20261124_1` the fixed query returns Điều 19 of that law, whose rule
+text sits in its clauses and points: the excerpt keeps the heading, the lead of
+clause 1, points b and c and the start of point d, and omits the rest. A rule
+that counted only Điều 19's own lines refused that excerpt (`no_proven_cut`).
 
 A 200 response is `PublicSampleResult`: it keeps the stored sample's JSON layout
 but has its own OpenAPI schema, not `SearchResult` or its nested schemas. Every
@@ -156,9 +173,11 @@ credential equivalence, one attempt across concurrent cold requests, warm hits,
 abstention and embedder failure, activation and rollback while a flight is
 running, and unchanged signed-in search and reader capacity under the
 [public overload gates](web-public-documents-serving.md#capacity-acceptance). A
-long lead cut with a complete named body, a cut only in a descendant and an
-unproven cut each fall back. A proven cut inside the named body succeeds. Feed
-Nitro hostile 200 responses with extra hits, a wrong document key, extra nested
+long lead cut with a complete named subtree, an excerpt that drops only a
+heading or only white space, an excerpt whose every seemingly omitted position
+survives in a parent or lead copy, and an unproven cut each fall back. A proven
+cut inside the named body or inside one of its descendants succeeds. Feed Nitro
+hostile 200 responses with extra hits, a wrong document key, extra nested
 fields, `hit.text`, and oversized decoded bodies, including an unknown length.
 Each must fall back before the page gets the data. Inspect the API body,
 rendered page, client assets and decoded hydration data for markers planted in
