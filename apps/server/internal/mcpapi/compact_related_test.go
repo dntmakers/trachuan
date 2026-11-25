@@ -71,7 +71,7 @@ func TestMCP_CompactRelatedKeepMatchesPresenter(t *testing.T) {
 
 func TestMCP_ReadRelatedWithOmit(t *testing.T) {
 	h := newHarness(t, func(c *Config) { c.OmitCompactRelated = true })
-	h.engine.readResult = &retrieval.ReadResult{Release: "20991111", Items: []retrieval.ItemResult{{Doc: "vn:one", Document: &retrieval.DocumentEntry{Related: []retrieval.Pointer{{Dir: "in", Kind: "repeals"}}, RelatedCounts: map[string]int{"in:repeals": 1}}, Complete: true}}}
+	h.engine.readResult = &retrieval.ReadResult{Release: "20991111", Items: []retrieval.ItemResult{{Doc: "vn:one", Document: &retrieval.ReadDocumentEntry{DocumentEntry: retrieval.DocumentEntry{Related: []retrieval.Pointer{{Dir: "in", Kind: "repeals"}}, RelatedCounts: map[string]int{"in:repeals": 1}}}, Complete: true}}}
 	out := resultJSON(t, callTool(t, h, "read", map[string]any{"country": "vn", "items": []any{map[string]any{"handle": "vn:one"}}}))
 	doc := out["items"].([]any)[0].(map[string]any)["document"].(map[string]any)
 	if _, ok := doc["related"]; !ok {

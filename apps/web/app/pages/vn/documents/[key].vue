@@ -26,6 +26,7 @@ const key = computed(() => String(route.params.key))
 const release = ref('')
 const hash = ref('')
 const files = ref<components['schemas']['SourceFile'][]>([])
+const filesOmitted = ref<number>()
 const documentEntry = ref<Document>()
 useHead(() => {
   const document = documentEntry.value
@@ -161,8 +162,11 @@ async function requestPage(version: number, signal: AbortSignal) {
     if (!pages.value) {
       release.value = page.release
       hash.value = page.fetch_sha256 || ''
-      files.value = page.files || []
       documentEntry.value = page.item.document
+    }
+    if (!pages.value || (page.files?.length || 0) > files.value.length || (filesOmitted.value === undefined && page.files_omitted !== undefined && (page.files?.length || 0) === files.value.length)) {
+      files.value = page.files || []
+      filesOmitted.value = page.files_omitted
     }
     Object.assign(nodes.value, page.nodes || {})
     rawUnits.value.push(...(page.item.units || []))
@@ -303,6 +307,7 @@ watch([key, () => route.query.release], async () => {
   release.value = ''
   hash.value = ''
   files.value = []
+  filesOmitted.value = undefined
   documentEntry.value = undefined
   visibleAnchor.value = ''
   visibleArticle.value = ''
@@ -349,7 +354,7 @@ watch(displayUnits, async () => {
         <p v-if="error" class="notice" role="alert">{{ errorMessage(language, error) }} <a v-if="error === 'release_expired'" :href="`/vn/documents/${key}`">{{ messages.readerCurrent }}</a></p>
         <div v-if="next && !error" class="reader-more"><button ref="sentinel" class="btn btn-secondary" type="button" :disabled="loading" @click="load">{{ messages.readerMore }}</button><span v-if="loading" role="status"><span class="reader-spinner" aria-hidden="true" /> {{ readerMessagesText.loading }}</span></div>
       </section>
-      <ReaderRail v-if="release" :document="documentEntry" :nodes="nodes" :gaps="gaps" :release="release" :hash="hash" :files="files" :units="textUnits" :document-key="key" :warnings="warnings" />
+      <ReaderRail v-if="release" :document="documentEntry" :nodes="nodes" :gaps="gaps" :release="release" :hash="hash" :files="files" :files-omitted="filesOmitted" :units="textUnits" :document-key="key" :warnings="warnings" />
     </div>
   </div>
 </template>

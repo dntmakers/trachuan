@@ -48,7 +48,8 @@ func presentUnit(unit Unit) Unit {
 
 func presentReadItem(item ItemResult) ItemResult {
 	if item.Document != nil {
-		doc := presentDocument(*item.Document)
+		doc := *item.Document
+		doc.DocumentEntry = presentDocument(doc.DocumentEntry)
 		item.Document = &doc
 	}
 	item.Units = slices.Clone(item.Units)

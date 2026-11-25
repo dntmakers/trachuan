@@ -100,7 +100,9 @@ func omitEmpty(value any) {
 	switch v := value.(type) {
 	case map[string]any:
 		for k, item := range v {
-			omitEmpty(item)
+			if k != "files" {
+				omitEmpty(item)
+			}
 			empty := item == nil
 			switch x := item.(type) {
 			case string:

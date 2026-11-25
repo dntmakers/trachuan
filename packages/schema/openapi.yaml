@@ -3886,7 +3886,17 @@ components:
       properties:
         doc: *id001
         document:
-          $ref: '#/components/schemas/Document'
+          allOf:
+          - $ref: '#/components/schemas/Document'
+          - type: object
+            properties:
+              files:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SourceFile'
+              files_omitted:
+                type: integer
+                minimum: 1
         units:
           type: array
           items:
@@ -3926,6 +3936,9 @@ components:
     DocumentPage:
       type: object
       properties:
+        files_omitted:
+          type: integer
+          minimum: 1
         files:
           type: array
           items:

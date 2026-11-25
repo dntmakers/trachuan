@@ -111,16 +111,17 @@ func (e *Engine) documents(ctx context.Context, keys []string) (map[string]Docum
 }
 
 type cachedSequence struct {
-	Doc      string
-	Document json.RawMessage `json:",omitempty"`
-	Files    []SourceFile
-	Source   Document
-	Units    []Unit
-	Parts    map[int][]Unit
-	Gaps     []Gap
-	Offset   int
-	More     bool
-	Complete bool
+	Doc        string
+	Document   json.RawMessage `json:",omitempty"`
+	Files      []SourceFile
+	FilesTotal int
+	Source     Document
+	Units      []Unit
+	Parts      map[int][]Unit
+	Gaps       []Gap
+	Offset     int
+	More       bool
+	Complete   bool
 }
 
 func sequenceKey(release string, item ReadItem) [32]byte {
@@ -149,7 +150,7 @@ func (e *Engine) sequence(ctx context.Context, tx pgx.Tx, c cursor) (readSequenc
 		if raw, ok := cache.Get(e.release.Rel, cursorSequenceKey(e.release.Rel, c)); ok {
 			var stored cachedSequence
 			if json.Unmarshal(raw, &stored) == nil && (!c.Item.Relations || c.Unit == stored.Offset) {
-				seq := readSequence{doc: stored.Doc, source: stored.Source, files: stored.Files, units: stored.Units, parts: stored.Parts, gaps: stored.Gaps, offset: stored.Offset, more: stored.More, complete: stored.Complete}
+				seq := readSequence{doc: stored.Doc, source: stored.Source, files: stored.Files, filesTotal: stored.FilesTotal, units: stored.Units, parts: stored.Parts, gaps: stored.Gaps, offset: stored.Offset, more: stored.More, complete: stored.Complete}
 				if len(stored.Document) > 0 {
 					var doc DocumentEntry
 					if json.Unmarshal(stored.Document, &doc) != nil {
@@ -182,7 +183,7 @@ func (e *Engine) saveSequence(ctx context.Context, c cursor, seq readSequence) f
 		if limit <= 0 || sequenceSize(seq, limit) > limit || ctx.Err() != nil {
 			return
 		}
-		stored := cachedSequence{Doc: seq.doc, Source: seq.source, Files: seq.files, Units: seq.units, Parts: seq.parts, Gaps: seq.gaps, Offset: seq.offset, More: seq.more, Complete: seq.complete}
+		stored := cachedSequence{Doc: seq.doc, Source: seq.source, Files: seq.files, FilesTotal: seq.filesTotal, Units: seq.units, Parts: seq.parts, Gaps: seq.gaps, Offset: seq.offset, More: seq.more, Complete: seq.complete}
 		if seq.document != nil {
 			stored.Document = metadataJSON(*seq.document)
 		}

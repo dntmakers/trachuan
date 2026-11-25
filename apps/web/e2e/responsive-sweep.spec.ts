@@ -141,7 +141,7 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
       else if (state.kind === 'search' || state.kind === 'reader' || state.kind === 'reader-files') {
         await page.route('**/api/v1/me', route => route.fulfill({ json: account }))
         await page.route('**/api/v1/search', route => route.fulfill({ json: { release: '20990101', abstain: false, hits: [{ citation: 'Điều 1', complete: true, text: 'Nội dung giả lập.' }] } }))
-        await page.route('**/api/v1/documents/*', route => route.fulfill({ json: { release: '20990101', fetch_sha256: fileHash, files: state.kind === 'reader-files' ? files : [], item: { complete: true, document: { number: '1/2099', title: 'Test law', status: { class: 'in_force', current: true }, text_source: 'none', text_complete: false }, units: [{ kind: 'provision', anchor: 'dieu-1', label: 'Điều 1', text: 'Text' }] } } }))
+        await page.route('**/api/v1/documents/*', route => route.fulfill({ json: { release: '20990101', fetch_sha256: fileHash, files: state.kind === 'reader-files' ? files : [], files_omitted: state.kind === 'reader-files' ? 3 : 0, item: { complete: true, document: { number: '1/2099', title: 'Test law', status: { class: 'in_force', current: true }, text_source: 'none', text_complete: false }, units: [{ kind: 'provision', anchor: 'dieu-1', label: 'Điều 1', text: 'Text' }] } } }))
         await page.goto('/')
         const menu = page.locator('button[aria-controls="site-menu"]')
         if (await menu.isVisible()) await menu.click()
@@ -156,7 +156,10 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
           await expect(page.locator('.reader-identity .num')).toBeVisible()
           await page.locator('.reader-rail').getByText(language === 'vi' ? 'Chi tiết kỹ thuật' : 'Technical details', { exact: true }).click()
           await expect(page.locator('.reader-technical')).toBeVisible()
-          if (state.kind === 'reader-files') await expect(page.locator('.reader-file')).toHaveCount(3)
+          if (state.kind === 'reader-files') {
+            await expect(page.locator('.reader-file')).toHaveCount(3)
+            await expect(page.locator('.reader-technical')).toContainText(language === 'vi' ? 'và 3 tệp khác' : 'and 3 more files')
+          }
         }
       } else {
         await page.route('**/api/v1/me', route => route.fulfill({ json: account }))

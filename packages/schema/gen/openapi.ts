@@ -4460,7 +4460,10 @@ export interface components {
         };
         ItemResult: {
             doc?: string;
-            document?: components["schemas"]["Document"];
+            document?: components["schemas"]["Document"] & {
+                files?: components["schemas"]["SourceFile"][];
+                files_omitted?: number;
+            };
             units?: components["schemas"]["Unit"][];
             complete: boolean;
             next?: string;
@@ -4480,6 +4483,7 @@ export interface components {
             fetched_at: string | null;
         };
         DocumentPage: {
+            files_omitted?: number;
             files?: components["schemas"]["SourceFile"][];
             nodes?: components["schemas"]["NodeIndex"];
             release: string;

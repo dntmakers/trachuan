@@ -179,13 +179,27 @@ func (e *Engine) readItem(ctx context.Context, tx pgx.Tx, c cursor, continued bo
 	return page, cost, save, err
 }
 
-func readPage(seq readSequence, c cursor, budget int, first bool) (ItemResult, int, error) {
-	result := ItemResult{Doc: seq.doc, Gaps: seq.gaps, Files: seq.files, FetchSHA256: seq.source.FetchSHA256}
-	used := 0
+func readPage(seq readSequence, c cursor, budget int, first bool) (result ItemResult, used int, err error) {
+	result = ItemResult{Doc: seq.doc, Gaps: seq.gaps, FetchSHA256: seq.source.FetchSHA256}
+	var files []SourceFile
+	var filesOmitted, fileCost int
+	var filesPresent bool
+	defer func() {
+		if result.Error != "" || (!c.WholeDocument && result.Document == nil) {
+			used = max(0, used-fileCost)
+			return
+		}
+		result.Files, result.FilesOmitted, result.FilesPresent = files, filesOmitted, filesPresent
+		if !c.WholeDocument && (filesPresent || filesOmitted > 0) {
+			doc := *result.Document
+			doc.Files, doc.FilesOmitted = files, filesOmitted
+			result.Document = &doc
+		}
+	}()
 	var firstParts []Unit
 	firstPartsChecked, firstPartsOK := false, false
 	if c.Unit == 0 && c.Part == 0 && seq.document != nil {
-		result.Document = seq.document
+		result.Document = &ReadDocumentEntry{DocumentEntry: *seq.document}
 		used = c.size(seq.document)
 		if used > c.pageCap() {
 			return ItemResult{Doc: seq.doc, Gaps: seq.gaps, Error: "unit_too_large"}, 0, nil
@@ -199,6 +213,20 @@ func readPage(seq readSequence, c cursor, budget int, first bool) (ItemResult, i
 		}
 		if used > budget && !first {
 			return ItemResult{Doc: seq.doc, NotRead: "call_cap", Next: encodeNext(c)}, 0, nil
+		}
+	}
+	if (result.Document != nil && !c.WholeDocument) || c.WholeDocument {
+		reserved := used
+		local := c.Unit - seq.offset
+		if local >= 0 && local < len(seq.units) {
+			parts, ok := sequenceParts(seq, local, c)
+			if ok && c.Part < len(parts) {
+				reserved += c.size(parts[c.Part])
+			}
+		}
+		if reserved <= budget {
+			files, filesOmitted, filesPresent, fileCost = filePreview(seq.files, seq.filesTotal, budget-reserved, c, c.WholeDocument)
+			used += fileCost
 		}
 	}
 	for i := c.Unit - seq.offset; i < len(seq.units); i++ {
