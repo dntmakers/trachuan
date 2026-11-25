@@ -13,6 +13,37 @@ func cursorEngine() *Engine {
 	return &Engine{release: Release{Rel: "vn-20990101"}, options: Options{Now: func() time.Time { return time.Date(2099, 1, 1, 16, 59, 59, 0, time.UTC) }}}
 }
 
+func TestCursor_PreIssueFilterUnfilteredToken(t *testing.T) {
+	const token = "eyJ2IjoxLCJyZWxlYXNlIjoidm4tMjA5OTAxMDEiLCJmaXJzdF9saW1pdCI6NSwidGFrZW5fcHJpbWFyeSI6NSwidGFrZW5fbm9uX2N1cnJlbnQiOjAsImFzX29mIjoiMjA5OS0wMS0wMSIsImRpZ2VzdCI6IjhmZThmYzk3Y2RlNzQ0MDc0YjY5OWFlMGFmZmMwMDFjNjk1ZGFhNjJlZWMzNGRmM2E5ZDk2YzRlN2JhOGEyMjMifQ"
+	_, cursor, err := cursorEngine().searchRequest(Request{Query: "Nội dung", Limit: 5, Cursor: token})
+	if err != nil || cursor.TakenPrimary != 5 || cursor.AsOf.String() != "2099-01-01" {
+		t.Fatalf("legacy cursor rejected: %+v %v", cursor, err)
+	}
+}
+
+func TestCursor_IssueBounds(t *testing.T) {
+	e := cursorEngine()
+	from, to := &Date{2024, time.January, 1}, &Date{2025, time.January, 1}
+	req := Request{Query: "Nội dung", IssuedFrom: from, IssuedTo: to}
+	_, cursor, err := e.searchRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, change := range []func(*Request){
+		func(r *Request) { r.IssuedFrom = nil },
+		func(r *Request) { r.IssuedTo = nil },
+		func(r *Request) { r.IssuedFrom = &Date{2024, time.February, 1} },
+		func(r *Request) { r.IssuedTo = &Date{2025, time.February, 1} },
+	} {
+		other := req
+		other.Cursor = encodeSearchCursor(cursor)
+		change(&other)
+		if _, _, err := e.searchRequest(other); !errors.Is(err, ErrInvalidRequest) {
+			t.Fatal("bound change accepted", err)
+		}
+	}
+}
+
 func TestCursor_BoundToRequestAndRelease(t *testing.T) {
 	e := cursorEngine()
 	req := Request{Query: "Nội dung", Limit: 5, DocTypes: []string{" Café ", "Law"}}

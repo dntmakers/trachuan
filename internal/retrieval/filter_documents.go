@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/text/unicode/norm"
@@ -42,8 +43,7 @@ func queryFilterDocuments(ctx context.Context, db filterDocumentReader, keys []s
 	keys = slices.Clone(keys)
 	slices.Sort(keys)
 	keys = slices.Compact(keys)
-	// Filtering needs no relations, node counts or other document metadata.
-	rows, err := db.Query(ctx, `SELECT key,doc_type,issuer FROM document WHERE key=ANY($1::text[])`, keys)
+	rows, err := db.Query(ctx, `SELECT key,doc_type,issuer,issue_date FROM document WHERE key=ANY($1::text[])`, keys)
 	if err != nil {
 		return nil, databaseFailure("query filter metadata", err)
 	}
@@ -51,9 +51,11 @@ func queryFilterDocuments(ctx context.Context, db filterDocumentReader, keys []s
 	for rows.Next() {
 		var key string
 		var doc DocumentEntry
-		if err = rows.Scan(&key, &doc.Type, &doc.Issuer); err != nil {
+		var issued *time.Time
+		if err = rows.Scan(&key, &doc.Type, &doc.Issuer, &issued); err != nil {
 			return nil, databaseFailure("scan filter metadata", err)
 		}
+		doc.Issued = dateValue(issued)
 		doc.Type = norm.NFC.String(strings.TrimSpace(doc.Type))
 		doc.Issuer = norm.NFC.String(strings.TrimSpace(doc.Issuer))
 		docs[key] = doc

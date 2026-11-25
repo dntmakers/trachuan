@@ -4412,6 +4412,16 @@ export interface components {
             issuers?: string[];
             /** @description Ordering preference that never hides hits. */
             documents?: string[];
+            /**
+             * Format: date
+             * @description Inclusive issue-date ordering preference that never hides hits.
+             */
+            issued_from?: string;
+            /**
+             * Format: date
+             * @description Inclusive issue-date ordering preference that never hides hits.
+             */
+            issued_to?: string;
             /** @description At most 2048 UTF-8 bytes. */
             cursor?: string;
         };

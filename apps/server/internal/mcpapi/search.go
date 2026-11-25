@@ -19,6 +19,8 @@ type searchInput struct {
 	DocTypes    []string         `json:"doc_types,omitempty"`
 	Issuers     []string         `json:"issuers,omitempty"`
 	Documents   []string         `json:"documents,omitempty"`
+	IssuedFrom  *string          `json:"issued_from,omitempty"`
+	IssuedTo    *string          `json:"issued_to,omitempty"`
 	Cursor      string           `json:"cursor,omitempty"`
 }
 
@@ -59,6 +61,21 @@ func prepareSearch(in searchInput) (retrieval.Request, retrieval.Detail, retriev
 		}
 		req.AsOf = &retrieval.Date{Year: date.Year(), Month: date.Month(), Day: date.Day()}
 	}
+	for _, bound := range []struct {
+		input  *string
+		output **retrieval.Date
+	}{{in.IssuedFrom, &req.IssuedFrom}, {in.IssuedTo, &req.IssuedTo}} {
+		if bound.input != nil {
+			date, err := time.Parse(time.DateOnly, *bound.input)
+			if err != nil || date.Year() < 1 {
+				return retrieval.Request{}, "", retrieval.Validation{}, invalidRequest{}
+			}
+			*bound.output = &retrieval.Date{Year: date.Year(), Month: date.Month(), Day: date.Day()}
+		}
+	}
+	if in.IssuedFrom != nil && in.IssuedTo != nil && *in.IssuedFrom > *in.IssuedTo {
+		return retrieval.Request{}, "", retrieval.Validation{}, invalidRequest{}
+	}
 	validation, err := retrieval.ValidateQuery(in.Query)
 	if err != nil {
 		return retrieval.Request{}, "", retrieval.Validation{}, invalidRequest{}
@@ -67,7 +84,7 @@ func prepareSearch(in searchInput) (retrieval.Request, retrieval.Detail, retriev
 }
 
 func searchResolved(ctx context.Context, engine Engine, rel string, req retrieval.Request, detail retrieval.Detail, validation retrieval.Validation) (retrieval.SearchResult, error) {
-	if !validation.Accepted && len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) == 0 && req.Cursor == "" {
+	if !validation.Accepted && len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) == 0 && req.IssuedFrom == nil && req.IssuedTo == nil && req.Cursor == "" {
 		return retrieval.SearchResult{Release: rel, Abstain: true, Reason: validation.Reason, Message: validation.Message}, nil
 	}
 	response, err := engine.Search(ctx, req)

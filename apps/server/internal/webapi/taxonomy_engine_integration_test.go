@@ -47,7 +47,7 @@ func (taxonomyEmbedder) Embed(context.Context, string) (embedding.Vector, error)
 	return embedding.Vector{Values: values, TokenCount: 1, RecipeHash: q.Hash()}, nil
 }
 
-func taxonomyIntegrationEngine(t *testing.T) *retrieval.Engine {
+func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine {
 	t.Helper()
 	ctx := context.Background()
 	q, d := embedding.QueryRecipe1(), embedding.DocumentRecipe1()
@@ -90,6 +90,9 @@ func taxonomyIntegrationEngine(t *testing.T) *retrieval.Engine {
 	}
 	exec(`INSERT INTO taxonomy_node(id,country,parent_id,level,code,name,description,origin,status,path,ordinal,provision_count,document_count) VALUES (1,'vn',NULL,1,'1','Root','Root description','custom','active','n1',1,1,1), (2,'vn',1,2,'1.1','Family','Family description','custom','active','n1.n2',1,1,1);
  INSERT INTO taxonomy_assignment(provision_id,node_id,family_id,method,exclude,confidence,taxonomy_version) VALUES(1,2,2,'manual',false,1,'v1')`)
+	for _, statement := range extra {
+		exec(statement)
+	}
 	now := func() time.Time { return time.Date(2099, 11, 10, 0, 0, 0, 0, time.UTC) }
 	recipe := retrieval.Recipe2()
 	threshold := 0.1

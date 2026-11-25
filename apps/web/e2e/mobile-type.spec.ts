@@ -157,9 +157,11 @@ test('touch devices keep inputs at 16px on wide viewports', async ({ browser }, 
   await page.goto('/')
   await expect(page.getByRole('link', { name: /account|tài khoản/i })).toBeVisible()
   await push(page, '/vn/search')
-  const date = page.locator('.search-filters input[type=date]')
-  await expect(date).toBeVisible()
-  await expect(date).toHaveCSS('font-size', '16px')
+  for (const name of [/^(Áp dụng vào ngày|Applies on)/, /^(Ban hành từ ngày|Issued from)/, /^(Ban hành đến ngày|Issued to)/]) {
+    const date = page.locator('.search-rail').getByLabel(name)
+    await expect(date).toBeVisible()
+    await expect(date).toHaveCSS('font-size', '16px')
+  }
   await context.close()
 })
 
@@ -171,8 +173,10 @@ test('mouse desktops keep the filter date input at 13px', async ({ browser }, in
   await page.goto('/')
   await expect(page.getByRole('link', { name: /account|tài khoản/i })).toBeVisible()
   await push(page, '/vn/search')
-  const date = page.locator('.search-filters input[type=date]')
-  await expect(date).toBeVisible()
-  await expect(date).toHaveCSS('font-size', '13px')
+  for (const name of [/^(Áp dụng vào ngày|Applies on)/, /^(Ban hành từ ngày|Issued from)/, /^(Ban hành đến ngày|Issued to)/]) {
+    const date = page.locator('.search-rail').getByLabel(name)
+    await expect(date).toBeVisible()
+    await expect(date).toHaveCSS('font-size', '13px')
+  }
   await context.close()
 })

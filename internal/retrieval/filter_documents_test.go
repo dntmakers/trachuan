@@ -5,7 +5,17 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestFilterDocuments_IssueDate(t *testing.T) {
+	date := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	rows := &cacheRows{values: [][]any{{"vn:1", "law", "issuer", &date}}}
+	docs, err := queryFilterDocuments(t.Context(), rowsTx{rows: rows}, []string{"vn:1"})
+	if err != nil || docs["vn:1"].Issued == nil {
+		t.Fatalf("issue date missing: %v %v", docs, err)
+	}
+}
 
 func TestFilterDocuments_NormalizesFacets(t *testing.T) {
 	rows := &cacheRows{values: [][]any{

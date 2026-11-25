@@ -18,6 +18,14 @@ func lawToolCall[In, Out any](cfg Config, name string, run func(context.Context,
 	}
 	input.Properties["country"].Enum = []any{"vn"}
 	if name == "search" {
+		for _, name := range []string{"issued_from", "issued_to"} {
+			p := input.Properties[name]
+			p.Types = nil
+			p.Type = "string"
+			p.MinLength = ptrInt(10)
+			p.MaxLength = ptrInt(10)
+			p.Description = "An inclusive issue-date ordering preference that never hides hits."
+		}
 		input.Properties["cursor"].MaxLength = ptrInt(2048)
 		input.Properties["detail"].Enum = []any{"compact", "full"}
 		input.Properties["as_of"].MinLength = ptrInt(10)

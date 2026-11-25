@@ -30,7 +30,8 @@ func requestDigest(req Request) string {
 		Mode                                Mode
 		Arms                                ArmMode
 		Nodes, DocTypes, Issuers, Documents []string
-	}{req.Query, inForce, req.AsOf, req.Mode, req.Arms, req.Nodes, req.DocTypes, req.Issuers, req.Documents})
+		IssuedFrom, IssuedTo                *Date `json:",omitempty"`
+	}{req.Query, inForce, req.AsOf, req.Mode, req.Arms, req.Nodes, req.DocTypes, req.Issuers, req.Documents, req.IssuedFrom, req.IssuedTo})
 	digest := sha256.Sum256(raw)
 	return hex.EncodeToString(digest[:])
 }
