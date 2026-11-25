@@ -42,17 +42,25 @@ type ListedRelation struct {
 	EvidenceComplete bool   `json:"evidence_complete"`
 }
 
+type ReadDocumentEntry struct {
+	DocumentEntry
+	Files        []SourceFile `json:"files,omitempty"`
+	FilesOmitted int          `json:"files_omitted,omitempty"`
+}
+
 type ItemResult struct {
-	Files       []SourceFile   `json:"-"`
-	FetchSHA256 string         `json:"-"`
-	Doc         string         `json:"doc,omitempty"`
-	Document    *DocumentEntry `json:"document,omitempty"`
-	Units       []Unit         `json:"units,omitempty"`
-	Complete    bool           `json:"complete"`
-	Next        string         `json:"next,omitempty"`
-	NotRead     string         `json:"not_read,omitempty"`
-	Error       string         `json:"error,omitempty"`
-	Gaps        []Gap          `json:"gaps,omitempty"`
+	Files        []SourceFile       `json:"-"`
+	FilesOmitted int                `json:"-"`
+	FilesPresent bool               `json:"-"`
+	FetchSHA256  string             `json:"-"`
+	Doc          string             `json:"doc,omitempty"`
+	Document     *ReadDocumentEntry `json:"document,omitempty"`
+	Units        []Unit             `json:"units,omitempty"`
+	Complete     bool               `json:"complete"`
+	Next         string             `json:"next,omitempty"`
+	NotRead      string             `json:"not_read,omitempty"`
+	Error        string             `json:"error,omitempty"`
+	Gaps         []Gap              `json:"gaps,omitempty"`
 }
 
 type ReadResult struct {
@@ -62,16 +70,17 @@ type ReadResult struct {
 }
 
 type readSequence struct {
-	files    []SourceFile
-	source   Document
-	doc      string
-	document *DocumentEntry
-	units    []Unit
-	parts    map[int][]Unit
-	gaps     []Gap
-	offset   int
-	more     bool
-	complete bool
+	files      []SourceFile
+	filesTotal int
+	source     Document
+	doc        string
+	document   *DocumentEntry
+	units      []Unit
+	parts      map[int][]Unit
+	gaps       []Gap
+	offset     int
+	more       bool
+	complete   bool
 }
 
 func readSize(v any) int {

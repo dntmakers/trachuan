@@ -56,19 +56,19 @@ func (o *Operations) Document(ctx context.Context, key, release, next string) (j
 		return nil, err
 	}
 	page := struct {
-		Files       *[]retrieval.SourceFile      `json:"files,omitempty"`
-		Release     string                       `json:"release"`
-		FetchSHA256 string                       `json:"fetch_sha256,omitempty"`
-		Item        json.RawMessage              `json:"item"`
-		Nodes       map[string]retrieval.NodeRef `json:"nodes,omitempty"`
+		Files        *[]retrieval.SourceFile      `json:"files,omitempty"`
+		FilesOmitted int                          `json:"files_omitted,omitempty"`
+		Release      string                       `json:"release"`
+		FetchSHA256  string                       `json:"fetch_sha256,omitempty"`
+		Item         json.RawMessage              `json:"item"`
+		Nodes        map[string]retrieval.NodeRef `json:"nodes,omitempty"`
 	}{Release: result.Release, Item: encoded.StructuredContent.(json.RawMessage), Nodes: result.Nodes}
 	if readItem.Error == "" {
 		page.FetchSHA256 = readItem.FetchSHA256
-		files := readItem.Files
-		if files == nil {
-			files = []retrieval.SourceFile{}
+		page.FilesOmitted = readItem.FilesOmitted
+		if readItem.FilesPresent {
+			page.Files = &readItem.Files
 		}
-		page.Files = &files
 	}
 	return json.Marshal(page)
 }

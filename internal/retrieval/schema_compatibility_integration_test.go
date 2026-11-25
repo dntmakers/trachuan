@@ -104,23 +104,46 @@ INSERT INTO taxonomy_assignment(provision_id,node_id,family_id,method,exclude,co
 	}
 }
 
+func TestDocuments_SourceFilesBoundedCount(t *testing.T) {
+	db, engine := readFixture(t)
+	readExec(t, db, `INSERT INTO source_file(id,document_id,source,name,hash,size,role)
+SELECT i,1,'vbpl',lpad(i::text,3,'0') || '.pdf',repeat('a',64),1,'main' FROM generate_series(1,30) i`)
+	result, err := engine.Read(t.Context(), ReadRequest{Release: engine.release.Rel, Items: []ReadItem{{Handle: "vn:1"}}})
+	if err != nil || len(result.Items) != 1 || result.Items[0].Document == nil {
+		t.Fatalf("read = %+v, error = %v", result, err)
+	}
+	doc := result.Items[0].Document
+	if len(doc.Files) != 20 || doc.FilesOmitted != 10 || doc.Files[0].Name != "001.pdf" || doc.Files[19].Name != "020.pdf" {
+		t.Fatalf("files = %+v, omitted = %d", doc.Files, doc.FilesOmitted)
+	}
+}
+
 func TestDocuments_SourceFilesOrderedAndNullable(t *testing.T) {
 	db, engine := readFixture(t)
 	readExec(t, db, `INSERT INTO source_file(id,document_id,source,name,url,hash,size,role,fetched_at) VALUES
 (1,1,'vbpl','z.pdf',NULL,repeat('c',64),3,'unknown',NULL),
-(2,1,'vbpl','a.pdf','https://example.invalid/a',repeat('b',64),2,'main','2099-01-01T00:00:00Z'),
+(2,1,'chinhphu','a.pdf','https://datafiles.chinhphu.vn/a',repeat('b',64),2,'main','2099-01-01T00:00:00Z'),
 (3,1,'vbpl','a.pdf',NULL,repeat('a',64),1,'scan',NULL),
-(4,2,'vbpl','other.pdf',NULL,repeat('d',64),4,'appendix',NULL)`)
+(4,2,'vbpl','other.pdf',NULL,repeat('d',64),4,'appendix',NULL),
+	(5,1,'vbpl','signed.pdf','https://datafiles.chinhphu.vn/a?sig=secret',repeat('e',64),5,'main',NULL)`)
 	result, err := engine.Read(t.Context(), ReadRequest{Release: engine.release.Rel, Items: []ReadItem{{Handle: "vn:1"}}, WholeDocument: true, DocumentKey: "vn:1", PageCap: 2_000_000, PartSize: 1_000_000})
 	if err != nil || len(result.Items) != 1 {
 		t.Fatalf("read = %+v, error = %v", result, err)
 	}
 	files := result.Items[0].Files
-	if len(files) != 3 || files[0].Name != "a.pdf" || files[0].Hash != strings.Repeat("a", 64) || files[1].Hash != strings.Repeat("b", 64) || files[2].Name != "z.pdf" || files[0].URL != nil || files[0].FetchedAt != nil || files[1].URL == nil || *files[1].URL != "https://example.invalid/a" || files[1].FetchedAt == nil || files[1].Size != 2 || files[1].Role != "main" {
+	if len(files) != 4 || files[0].Name != "a.pdf" || files[0].Hash != strings.Repeat("a", 64) || files[1].Hash != strings.Repeat("b", 64) || files[2].Name != "signed.pdf" || files[2].URL != nil || files[3].Name != "z.pdf" || files[0].URL != nil || files[0].FetchedAt != nil || files[1].URL == nil || *files[1].URL != "https://datafiles.chinhphu.vn/a" || files[1].FetchedAt == nil || files[1].Size != 2 || files[1].Role != "main" {
 		t.Fatalf("files = %+v", files)
 	}
 	raw, err := json.Marshal(result)
 	if err != nil || strings.Contains(string(raw), "files") || strings.Contains(string(raw), "fetched_at") {
-		t.Fatalf("MCP result = %s, error = %v", raw, err)
+		t.Fatalf("whole-document item = %s, error = %v", raw, err)
+	}
+	read, err := engine.Read(t.Context(), ReadRequest{Release: engine.release.Rel, Items: []ReadItem{{Handle: "vn:1"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err = json.Marshal(read)
+	if err != nil || !strings.Contains(string(raw), `"files"`) || !strings.Contains(string(raw), `"url":null`) || !strings.Contains(string(raw), `"fetched_at":null`) || strings.Contains(string(raw), "sig=secret") {
+		t.Fatalf("read result = %s, error = %v", raw, err)
 	}
 }

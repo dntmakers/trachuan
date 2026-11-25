@@ -35,10 +35,10 @@ func TestReadPage_DocumentAndFirstPartFitsExactly(t *testing.T) {
 	doc := &DocumentEntry{Title: "x"}
 	overhead := readSize(doc) - 1
 	doc.Title = strings.Repeat("x", ReadCallCap-overhead-readSize(parts[0]))
-	seq := readSequence{doc: "vn:1", document: doc, units: []Unit{unit}, complete: true}
+	seq := readSequence{doc: "vn:1", document: doc, files: []SourceFile{{Name: "file.pdf", Hash: strings.Repeat("a", 64), Role: "main"}}, units: []Unit{unit}, complete: true}
 	c := cursor{V: 1, Release: "20990101", Item: ReadItem{Handle: "vn:1"}}
 	result, cost, err := readPage(seq, c, ReadCallCap, true)
-	if err != nil || result.Error != "" || cost != ReadCallCap || len(result.Units) != 1 || result.Next == "" {
+	if err != nil || result.Error != "" || cost != ReadCallCap || len(result.Units) != 1 || result.Next == "" || result.Document == nil || len(result.Document.Files) != 0 || result.Document.FilesOmitted != 0 {
 		t.Fatal("exactly fitting first part was rejected", cost, result.Error)
 	}
 	deferred, cost, err := readPage(seq, c, ReadCallCap-1, false)

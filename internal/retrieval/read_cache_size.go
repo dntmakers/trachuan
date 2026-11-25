@@ -9,7 +9,7 @@ import (
 )
 
 func sequenceSize(seq readSequence, limit int64) int64 {
-	stored := cachedSequence{Doc: seq.doc, Source: seq.source, Files: seq.files, Units: seq.units, Parts: seq.parts, Gaps: seq.gaps, Offset: seq.offset, More: seq.more, Complete: seq.complete}
+	stored := cachedSequence{Doc: seq.doc, Source: seq.source, Files: seq.files, FilesTotal: seq.filesTotal, Units: seq.units, Parts: seq.parts, Gaps: seq.gaps, Offset: seq.offset, More: seq.more, Complete: seq.complete}
 	n := cacheJSONSize(reflect.ValueOf(stored), limit)
 	if seq.document != nil && n <= limit {
 		size, _ := cacheJSONFields(reflect.ValueOf(*seq.document), limit, "Status")

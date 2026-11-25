@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { mount, flushPromises } from '@vue/test-utils'
+import { ref } from 'vue'
 import { afterEach, expect, it, vi } from 'vitest'
 import Reader from '../app/pages/vn/documents/[key].vue'
 import { setupReader } from './reader-setup'
@@ -43,6 +44,7 @@ it('shows ordered files with safe links, metadata and full hash copies', async (
   expect(rows[0]!.find('a').attributes('href')).toBe('https://example.test/main')
   for (const row of rows.slice(1)) expect(row.find('a').exists()).toBe(false)
   expect(rows[0]!.text()).toContain('1.5 kB')
+  expect(rows[0]!.text()).not.toContain('Main')
   expect(rows[0]!.text()).toContain('01 Jan 2099')
   expect(rows[1]!.text()).toContain('Appendix')
   expect(rows[1]!.text()).toContain('2 MB')
@@ -58,4 +60,78 @@ it('shows ordered files with safe links, metadata and full hash copies', async (
     expect(writeText).toHaveBeenLastCalledWith(files[index]!.hash)
   }
   expect(writeText).toHaveBeenCalledTimes(5)
+})
+
+it('formats file metadata in Vietnamese with an omitted count', async () => {
+  const file = { name: 'appendix.pdf', url: null, hash: 'a'.repeat(64), size: 1500, role: 'appendix', fetched_at: '2099-01-01T00:00:00Z' }
+  setupReader([{ data: { release: '20990101', files: [file], files_omitted: 2, item: { complete: true, document: { status: { current: true }, text_source: 'none', text_complete: false }, units: [] } } }])
+  vi.stubGlobal('useState', () => ref('vi'))
+  const wrapper = mount(Reader)
+  await flushPromises()
+  const row = wrapper.get('.reader-file')
+  expect(row.text()).toContain('Phụ lục')
+  expect(row.text()).toContain('1,5 kB')
+  expect(row.text()).toContain('01/01/2099')
+  expect(wrapper.get('.reader-technical').text()).toContain('và 2 tệp khác')
+})
+
+it('updates the file preview and omitted count together on later pages', async () => {
+  const document = { status: { current: true }, text_source: 'none', text_complete: false }
+  const file = { name: 'main.pdf', url: null, hash: 'a'.repeat(64), size: 1000, role: 'main', fetched_at: null }
+  setupReader([
+    { data: { release: '20990101', files_omitted: 2, item: { complete: false, document, units: [], next: 'one' } } },
+    { data: { release: '20990101', files: [file], files_omitted: 1, item: { complete: false, units: [], next: 'two' } } },
+    { data: { release: '20990101', files: [], files_omitted: 2, item: { complete: true, units: [] } } },
+  ])
+  const wrapper = mount(Reader)
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).toContain('and 2 more files')
+  await wrapper.get('.reader-more button').trigger('click')
+  await flushPromises()
+  expect(wrapper.get('.reader-file').text()).toContain('main.pdf')
+  expect(wrapper.get('.reader-technical').text()).toContain('and 1 more file')
+  expect(wrapper.get('.reader-technical').text()).not.toContain('and 1 more files')
+  await wrapper.get('.reader-more button').trigger('click')
+  await flushPromises()
+  expect(wrapper.get('.reader-file').text()).toContain('main.pdf')
+  expect(wrapper.get('.reader-technical').text()).toContain('and 1 more file')
+})
+
+it('shows a later omitted count when the earlier page had no file metadata', async () => {
+  const document = { status: { current: true }, text_source: 'none', text_complete: false }
+  setupReader([
+    { data: { release: '20990101', item: { complete: false, document, units: [], next: 'one' } } },
+    { data: { release: '20990101', files_omitted: 2, item: { complete: true, units: [] } } },
+  ])
+  const wrapper = mount(Reader)
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).not.toContain('more files')
+  await wrapper.get('.reader-more button').trigger('click')
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).toContain('and 2 more files')
+})
+
+it('uses singular English for one omitted file', async () => {
+  setupReader([{ data: { release: '20990101', files_omitted: 1, item: { complete: true, document: { status: { current: true }, text_source: 'none', text_complete: false }, units: [] } } }])
+  const wrapper = mount(Reader)
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).toContain('and 1 more file')
+  expect(wrapper.get('.reader-technical').text()).not.toContain('and 1 more files')
+})
+
+it('uses the same Vietnamese wording for one omitted file', async () => {
+  setupReader([{ data: { release: '20990101', files_omitted: 1, item: { complete: true, document: { status: { current: true }, text_source: 'none', text_complete: false }, units: [] } } }])
+  vi.stubGlobal('useState', () => ref('vi'))
+  const wrapper = mount(Reader)
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).toContain('và 1 tệp khác')
+})
+
+it.each(['en', 'vi'])('shows omitted files and empty-list fallback in %s', async (language) => {
+  setupReader([{ data: { release: '20990101', files: [], files_omitted: 3, item: { complete: true, document: { status: { current: true }, text_source: 'none', text_complete: false, source_url: 'https://example.test/source' }, units: [] } } }])
+  vi.stubGlobal('useState', () => ref(language))
+  const wrapper = mount(Reader)
+  await flushPromises()
+  expect(wrapper.get('.reader-technical').text()).toContain(language === 'en' ? 'and 3 more files' : 'và 3 tệp khác')
+  expect(wrapper.get('.reader-technical a').attributes('href')).toBe('https://example.test/source')
 })

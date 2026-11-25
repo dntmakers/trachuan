@@ -37,9 +37,18 @@ func (e *populatedEngine) Present(_ context.Context, _ retrieval.Response, detai
 }
 
 func (e *populatedEngine) Read(_ context.Context, req retrieval.ReadRequest) (retrieval.ReadResult, error) {
-	doc := retrieval.DocumentEntry{Title: "Example", TextSource: "pdf_text", TextComplete: false, Status: retrieval.Status{Current: true}}
+	doc := retrieval.ReadDocumentEntry{DocumentEntry: retrieval.DocumentEntry{Title: "Example", TextSource: "pdf_text", TextComplete: false, Status: retrieval.Status{Current: true}}}
 	locator := "block:2-4"
 	item := retrieval.ItemResult{Files: e.files, Error: e.itemError, FetchSHA256: strings.Repeat("a", 64), Doc: "vn:1", Document: &doc, Units: []retrieval.Unit{{Kind: "provision", Locator: &locator, Anchor: "a", Text: "source", Warnings: []retrieval.Warning{{Pointer: retrieval.Pointer{InRelease: true}, Basis: "text", Target: "vn:1#a", Citation: "Article 1", Exact: true}}, WarningsOmitted: 1, Part: 1, Parts: 2, Relation: &retrieval.ListedRelation{Pointer: retrieval.Pointer{Dir: "in", Kind: "cites", InRelease: true}, Evidence: "evidence", EvidenceComplete: true}}}, Next: "continuation"}
+	if req.WholeDocument {
+		item.FilesPresent = true
+		if item.Files == nil {
+			item.Files = []retrieval.SourceFile{}
+		}
+	} else if len(item.Files) > 0 && item.Error == "" {
+		item.FilesPresent = true
+		doc.Files = item.Files
+	}
 	return retrieval.ReadResult{Release: req.Release, Items: []retrieval.ItemResult{item}}, nil
 }
 
@@ -121,9 +130,19 @@ func TestDocumentPage_SourceFilesAndErrors(t *testing.T) {
 					t.Fatal("unknown provenance lost its nulls", string(page["files"]))
 				}
 			}
+			if code == "" {
+				search := webCall(h, "POST", "/api/v1/search", `{"country":"vn","query":"ngân hàng","detail":"full"}`)
+				if search.Code != 200 || strings.Contains(search.Body.String(), `"files`) {
+					t.Fatal("search includes file fields", search.Code, search.Body.String())
+				}
+				batch := webCall(h, "POST", "/api/v1/read", `{"country":"vn","release":"20991110_1","items":[{"handle":"vn:1"}]}`)
+				if batch.Code != 200 || !strings.Contains(batch.Body.String(), `"url":null`) || !strings.Contains(batch.Body.String(), `"fetched_at":null`) {
+					t.Fatal("batch lost nullable file keys", batch.Code, batch.Body.String())
+				}
+			}
 			read := mcpCall(t, h, "read", `{"country":"vn","release":"20991110_1","items":[{"handle":"vn:1"}]}`)
-			if strings.Contains(string(read), `"files"`) || strings.Contains(string(read), "fetched_at") {
-				t.Fatal("source files leaked to MCP")
+			if code == "" && (!strings.Contains(string(read), `"files"`) || !strings.Contains(string(read), `"fetched_at":null`)) {
+				t.Fatal("source files missing from MCP", string(read))
 			}
 		})
 	}

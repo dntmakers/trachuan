@@ -143,14 +143,14 @@ func (tx *documentHashTx) Query(ctx context.Context, sql string, args ...any) (p
 	if strings.Contains(sql, "FROM source_file") {
 		tx.queries++
 		tx.fileQueries++
-		if !strings.Contains(sql, "ORDER BY name,hash") || len(args) != 1 || args[0] != int64(1) {
+		if !strings.Contains(sql, "ORDER BY name,hash") || !strings.Contains(sql, "LIMIT 21") || !strings.Contains(sql, "count(*) OVER") || len(args) != 1 || args[0] != int64(1) {
 			return nil, fmt.Errorf("invalid source file query: %s %v", sql, args)
 		}
 		name := tx.fileName
 		if name == "" {
 			name = "law.pdf"
 		}
-		return &cacheRows{values: [][]any{{name, nil, strings.Repeat("b", 64), int64(42), "main", nil}}}, nil
+		return &cacheRows{values: [][]any{{"vbpl", name, nil, strings.Repeat("b", 64), int64(42), "main", nil, int(1)}}}, nil
 	}
 	return tx.readCacheTx.Query(ctx, sql, args...)
 }
@@ -229,8 +229,8 @@ func TestDocuments_WholeScopeAndCacheStaySeparateFromMCP(t *testing.T) {
 	}
 	mcp := cursor{V: 1, Release: c.Release, Item: c.Item}
 	outlined, _, _, err := e.readItem(t.Context(), tx, mcp, false, ReadCallCap, true)
-	if err != nil || len(outlined.Units) != 1 || outlined.Units[0].Kind != "outline" || outlined.Files != nil || tx.fileQueries != 2 || tx.queries == queries {
-		t.Fatal("MCP reused whole-document cache", err)
+	if err != nil || len(outlined.Units) != 1 || outlined.Units[0].Kind != "outline" || outlined.Files == nil || tx.fileQueries != 3 || tx.queries == queries {
+		t.Fatal("MCP reused whole-document cache", err, len(outlined.Units), outlined.Files, tx.fileQueries, tx.queries, queries)
 	}
 	changed := c
 	changed.PartSize = 100_000
