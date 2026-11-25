@@ -58,3 +58,8 @@ AuthPlane (fallbacks if the spike fails).
   account: identity, status, structural outline and approved chapter and article
   titles, at their own URL. Reading the full text stays behind sign-in. Reviewed
   by gpt-6-astra in four rounds.
+- 2026-11-25: the owner approved one public home sample route: one compact hit
+  from a fixed, design-owned query on the active release, with no client input,
+  cached per release and backed by the stored sample. All other search and full
+  text stay behind sign-in. See
+  [public home sample](../design/web-home-sample.md).

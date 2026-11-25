@@ -30,17 +30,28 @@ repeal relations appear as warnings, never as a changed stamp.
 
 ## Filter contract
 
-Filters reorder, never hide; `nodes[]`, `doc_types[]`, `issuers[]` and
-`documents[]` are ordering preferences. Together they form one predicate: a hit
-is inside when it matches every kind the request names, and a kind matches when
-any of its values does. A node matches when the hit provision has an effective
-node in that node's subtree ([taxonomy](taxonomy.md#serving)); a node code that
-is not served is `invalid_request`. `doc_types` and `issuers` match the hit
-document's `type` and `issuer` after trimming and NFC normalization; `documents`
-match document keys. `corpus_status` lists the release's document types and
-issuers, normalized the same way, with their document counts over the classes
-search ranks by default (all but `relation_context`), so callers pick values
-that exist.
+Filters reorder, never hide. `nodes[]`, `doc_types[]`, `issuers[]`,
+`documents[]` and the issue-date range are ordering preferences. Together they
+form one predicate: a hit is inside when it matches every kind the request
+names, and a list kind matches when any of its values does. A node matches when
+the hit provision has an effective node in that node's subtree
+([taxonomy](taxonomy.md#serving)); a node code that is not served is
+`invalid_request`. `doc_types` and `issuers` match the hit document's `type` and
+`issuer` after trimming and NFC normalization; `documents` match document keys.
+`corpus_status` lists the release's normalized document types and issuers with
+document counts over the classes search ranks by default (all but
+`relation_context`), so callers pick values that exist. It needs no date range:
+the bounds are dates a caller chooses, not codes from a release vocabulary.
+
+`issued_from` and `issued_to` are inclusive bounds on the document's stored
+`issue_date`; either bound alone is valid. If either is present, a document with
+a null issue date is outside the filter. If neither is present, issue date does
+not affect membership. Each present value must be a Gregorian civil date from
+year 0001 to 9999 in `YYYY-MM-DD`
+([RFC 3339 full-date](https://www.rfc-editor.org/rfc/rfc3339.html#section-5.6));
+reject nulls, empty strings, malformed or impossible dates and a lower bound
+after the upper bound as `invalid_request` before retrieval. These bounds do not
+affect `as_of`, eligibility, status, candidate collection or validity stamps.
 
 Retrieval always runs over the whole country corpus. Paging walks one list in
 two groups, primary and non-current. Each group's sequence is the unfiltered
@@ -64,18 +75,19 @@ never change them. `next_cursor` continues while either sequence has hits left,
 so every hit the unfiltered search would return stays reachable exactly once.
 The cursor is opaque and holds the release, the first page's `limit`, the number
 of hits taken so far from each sequence, the resolved `as_of` date and a SHA-256
-digest of the request without `cursor` and `limit`, never query text; later
-pages use the cursor's date and rebuild the sequences from it, and a cursor
-whose digest or release does not match is `invalid_request` or
-`release_expired`.
+digest of the request without `cursor` and `limit`, never query text. Both
+issue-date bounds participate in the digest: adding, removing or changing one
+requires a new first page. Later pages use the cursor's date and rebuild the
+sequences from it, and a cursor whose digest or release does not match is
+`invalid_request` or `release_expired`.
 
-The filter changes order, so the recall guarantee is stated per case: for a
-golden case whose expected citations lie inside the selected nodes, filtered
-recall@8 must be at least the unfiltered recall@8 of that case; for every other
-case, every expected citation must appear within the first 100 paged hits: the
-hits of successive pages of `limit` 8 from the first, each page's `hits` before
-its `non_current`. Unfiltered recall@8 on the full golden set is unchanged by
-the feature. Evaluation uses this exact response.
+The [taxonomy recall gate](evaluation.md#metrics) stays unchanged. Issue dates
+add no evaluation cohort or release gate. Instead, contract tests for MCP and
+web search use fixed fixtures to prove inside-first stable order, `in_filter`,
+`outside_filter_count`, null issue dates, and reachability on the first and
+later pages. Test each bound alone, equal bounds, malformed and reversed ranges,
+combinations with other filters and `as_of`, and rejection when changing either
+bound changes the cursor's request digest.
 
 ## Release pinning
 
@@ -86,14 +98,14 @@ error, never silently different text.
 
 ## MCP tools
 
-| Tool            | Input                                                                                                                                      | Output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `guide`         | `country`                                                                                                                                  | Usage, Vietnamese rule, citation format, the reading flow in [search results](mcp-results.md#guide), suggested flow `taxonomy` then `search` with `nodes` then `read`, `in_force_only:false` for a past period, `abstain` advisory                                                                                                                                                                                                                                                                |
-| `corpus_status` | `country`                                                                                                                                  | Release, counts of documents, provisions, served nodes and gaps, newest source date, document types and issuers with counts                                                                                                                                                                                                                                                                                                                                                                       |
-| `taxonomy`      | `country`, `node` code or empty, `depth`, optional `q`                                                                                     | Served subtree in sibling order with `code`, `name`, `description`, `level`, `origin`, provision and document counts, to `depth` levels below `node` (roots when empty); `q` instead returns served nodes in `node`'s subtree (all when empty) whose name or description contains it, case and diacritics folded, as a flat list in tree order. Either way at most 500 nodes: the subtree fills breadth first in sibling order, the `q` list in tree order, and `truncated` marks that more exist |
-| `search`        | `country`, `query`, `nodes[]`, `as_of`, `in_force_only`, `doc_types[]`, `issuers[]`, `documents[]`, `detail`, `limit`, `cursor`, `release` | `documents` once per document with metadata, status and relation counts (related pointers in full results); ranked hits with handle, citation path, verbatim snippet and `complete`, nodes, warnings, `in_filter`; `detail:"full"` returns recipe text, fragments, score and relations instead of the snippet; plus `outside_filter_count`, `gaps[]`, `abstain`, `release`, `next_cursor` ([search results](mcp-results.md))                                                                      |
-| `read`          | `country`, `items[]` of `handle`, number, `from`/`to` range, `relations`, or `next` token; `release`                                       | Per item: a document's metadata and outline, a provision's verbatim text with ancestor lead-ins and warnings, or its relation list; a per-call cap with fixed parts and opaque `next` tokens, so every call makes progress ([search results](mcp-results.md#read))                                                                                                                                                                                                                                |
-| `quality_gaps`  | `country`, `kind`, `node`, `cursor`                                                                                                        | Paged gap list                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Tool            | Input                                                                                                                                                                  | Output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guide`         | `country`                                                                                                                                                              | Usage, Vietnamese rule, citation format, the reading flow in [search results](mcp-results.md#guide), suggested flow `taxonomy` then `search` with `nodes` then `read`, `in_force_only:false` for a past period, `abstain` advisory                                                                                                                                                                                                                                                                |
+| `corpus_status` | `country`                                                                                                                                                              | Release, counts of documents, provisions, served nodes and gaps, newest source date, document types and issuers with counts                                                                                                                                                                                                                                                                                                                                                                       |
+| `taxonomy`      | `country`, `node` code or empty, `depth`, optional `q`                                                                                                                 | Served subtree in sibling order with `code`, `name`, `description`, `level`, `origin`, provision and document counts, to `depth` levels below `node` (roots when empty); `q` instead returns served nodes in `node`'s subtree (all when empty) whose name or description contains it, case and diacritics folded, as a flat list in tree order. Either way at most 500 nodes: the subtree fills breadth first in sibling order, the `q` list in tree order, and `truncated` marks that more exist |
+| `search`        | `country`, `query`, `nodes[]`, `as_of`, `in_force_only`, `doc_types[]`, `issuers[]`, `documents[]`, `issued_from`, `issued_to`, `detail`, `limit`, `cursor`, `release` | `documents` once per document with metadata, status and relation counts (related pointers in full results); ranked hits with handle, citation path, verbatim snippet and `complete`, nodes, warnings, `in_filter`; `detail:"full"` returns recipe text, fragments, score and relations instead of the snippet; plus `outside_filter_count`, `gaps[]`, `abstain`, `release`, `next_cursor` ([search results](mcp-results.md))                                                                      |
+| `read`          | `country`, `items[]` of `handle`, number, `from`/`to` range, `relations`, `timeline`, or `next` token; `release`                                                       | Per item: a document's metadata, source files and outline, a provision's verbatim text with ancestor lead-ins and warnings, its relation list, or a document timeline; a per-call cap with fixed parts and opaque `next` tokens ([batch reading](mcp-read.md))                                                                                                                                                                                                                                    |
+| `quality_gaps`  | `country`, `kind`, `node`, `cursor`                                                                                                                                    | Paged gap list                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 `quality_gaps` with `node` (a taxonomy code, as in `taxonomy`) returns only gaps
 whose taxonomy node is in that node's subtree, or whose document belongs to that

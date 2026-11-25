@@ -28,6 +28,7 @@ history keeps it. States: `planned`, `in progress`, `landed`, `verified`,
 |16|[Findings and reviewed knowledge](2026-11-15-knowledge-loop.md)|detector registry, findings with identity and frozen observations, reviewed-knowledge contract down to provisions, closed intake of outside reports, `findings.json`, `identity.jsonl` and `changes.jsonl` bound to each signed release (ADR 0017)|Plans 3 and 7 landed; batch 2 corpus release|in progress|
 |18|[Discovery](2026-11-16-discovery.md)|robots.txt, sitemap, head tags, JSON-LD, llms.txt and the public taxonomy codes endpoint ([discovery](../design/discovery.md)); D3 public document summaries are Plan 19|Plan 10 landed|landed; owner actions open|
 |19|[Public document summaries](2026-11-16-public-summaries.md)|`document_summary` rows and heading approval in the corpus build; public document endpoints with their own capacity; the summary route with no session; capacity acceptance on A1 ([public document summaries](../design/web-public-documents.md))|ADR 0005 amendment|in progress (D3c waits for the A1 window)|
+|20|[Next release](2026-11-25-next-release.md)|Group A: issue-date filter, source files, timeline, live home sample; Group B open issues: queries without diacritics, Công báo information, changes between releases|Plan 10 landed|in progress|
 
 Each later plan is written with the writing-plans skill when its dependency
 lands, against `docs/design/README.md` and the research notes from Plan 0.

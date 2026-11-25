@@ -1,8 +1,7 @@
-# Search results and reading for agents
+# Search results for agents
 
-`search` returns compact hits an agent can scan; `read` returns the verbatim
-parts the agent chooses, several per call. The decision and its trade-offs are
-in [ADR 0013](../adr/0013-compact-search-and-batch-read.md). Ranking,
+`search` returns compact hits an agent can scan. The decision and its trade-offs
+are in [ADR 0013](../adr/0013-compact-search-and-batch-read.md). Ranking,
 abstention, validity and hit text come from
 [retrieval recipe](retrieval-recipe.md); this note owns how they are shaped for
 `/mcp` and the matching web API. Numbers are in [budgets](budgets.md).
@@ -13,8 +12,9 @@ Each tool result carries `structuredContent` and the same JSON, serialized
 without whitespace, in one text block, as the
 [MCP tools specification](https://modelcontextprotocol.io/specification/2025-06-18/server/tools)
 recommends for backward compatibility. Each tool declares an `outputSchema`.
-Keys are English; legal text is verbatim. Null and empty fields are omitted;
-booleans are always present. The web API returns the same objects through the
+Keys are English; legal text is verbatim. Null and empty fields are omitted
+except for the [required nullable source file fields](mcp-read.md#source-files).
+Booleans are always present. The web API returns the same objects through the
 OpenAPI document.
 
 ## Handles
@@ -61,7 +61,7 @@ A compact hit has, in this order:
 | `path`      | Ancestors from the top structural level down to and including the hit: `label`, `heading` when the source has one, `anchor` (read as `<doc>#<anchor>`) |
 | `snippet`   | Verbatim text under the snippet rule                                                                                                                   |
 | `complete`  | True only when `snippet` is the whole hit text and the recipe marked the hit complete                                                                  |
-| `in_filter` | Filter result, only when a filter (`nodes`, `doc_types`, `issuers` or `documents`) was requested                                                       |
+| `in_filter` | Filter result, only when a [search filter](retrieval.md#filter-contract) was requested                                                                 |
 | `nodes`     | The hit provision's effective node codes ([taxonomy](taxonomy.md#serving)), deepest first                                                              |
 | `warnings`  | Provision-level warnings attached to this provision ([Warnings](#warnings)), in the recipe's relation order                                            |
 | `gaps`      | The recipe's hit gaps                                                                                                                                  |
@@ -69,10 +69,11 @@ A compact hit has, in this order:
 
 A full hit has the same fields except `snippet`, then the recipe's `text`,
 `fragments`, `score` and complete `relations` with evidence; its `complete` is
-the recipe's `Complete`, and an incomplete full hit carries a `next` read item
-(see Read). Rank order, the document cap and the `non_current` group follow the
-recipe in both modes on an unfiltered first page; filtered and later pages fill
-by the [filter and paging contract](retrieval.md#filter-contract).
+the recipe's `Complete`, and an incomplete full hit carries a `next`
+[read item](mcp-read.md#paging). Rank order, the document cap and the
+`non_current` group follow the recipe in both modes on an unfiltered first page;
+filtered and later pages fill by the
+[filter and paging contract](retrieval.md#filter-contract).
 
 ## Snippet rule
 
@@ -154,70 +155,7 @@ release is never replaced by a number lookup.
 
 ## Read
 
-Input: `country`, `release`, `items`. Handles, numbers and anchors must be valid
-UTF-8 without NUL and within the lengths in budgets; otherwise the item fails
-with `invalid_item` (or `invalid_next` inside a token) before any database
-access. An item is one of:
-
-- `{handle}`: a document handle returns the document entry and its outline; a
-  provision handle returns that provision's text.
-- `{number}`: an exact document number that resolves to one document, read like
-  its handle; otherwise `ambiguous_number` or `not_found`, with no guesses.
-- `{handle, from, to}`: the provisions of one document between the anchors
-  `from` and `to`, both inclusive, in preorder.
-- `{handle, relations:true}`: the relation list of that document or provision.
-- `{next}`: a continuation token copied from an earlier result.
-
-The result carries a top-level `nodes` object, like search's, naming every node
-code its document entries carry.
-
-Units of text never overlap. A provision handle returns the provision with its
-descendants by [chunk rendering](chunk.md#tree-rendering), preceded by its
-ancestors' lead fragments. A range returns each provision in it once, with its
-own text only, in preorder, and the first unit is preceded by the leads of
-ancestors outside the range. An outline lists `phan`, `chuong`, `muc` and `dieu`
-nodes in document order, or the top-level provisions when the document has no
-`dieu`, each with `label`, `heading`, `anchor` and text size in code points.
-Relation lists follow pointer order and add `raw_label` and evidence. The public
-summary outline is a narrower projection with its own heading rule
-([public document summaries](web-public-documents.md)); `read` is unchanged.
-
-An item's output is a fixed sequence of units: the leads, then each provision,
-outline entry or relation, in the order above. Each unit kind has one split
-field: `text` for leads and provisions, `heading` for outline entries,
-`evidence` for relations. Any unit whose serialized size exceeds the part size
-in budgets is split into parts by cutting only that field; every other field is
-copied to each part. If a part with an empty split field would already exceed
-the part size, the item ends with `unit_too_large` and no `next`. If the
-document entry and the first unit or part of its item would together exceed the
-whole call cap, the item also ends with `unit_too_large`. One rule cuts the
-split field: cut at the last whitespace at or before the part size; when the
-remaining span has none, at the last code point at or before the part size that
-does not separate a combining mark from its base, or at the part size when no
-such code point exists, so every part is nonempty and the split field's parts
-concatenate to the original field. Parts carry `part` and `parts`. Boundaries
-depend only on the release and the item, never on the call.
-
-The call cap in budgets counts the serialized size of returned units across
-items, including a document entry on the first page of its item, and the part
-size is below it. Items are processed in order and each returns whole units or
-parts. When an item has more to return, its result carries `next`, an opaque
-token that fixes the release, the item, its mode and the next unit or part. The
-units and parts that follow a `next` are the same whatever else that call reads;
-how many of them fit on one page depends on the cap left. When the next unit
-does not fit in what remains of the cap, the item returns `not_read:"call_cap"`
-and its own `next`. The first item always returns at least one unit or part, so
-every call makes progress; the last page of an item returns no `next`.
-
-`complete` belongs to an item's chain of pages. The page without `next` reports
-`complete:true` when the chain, read in order at one release, delivered the
-whole scope with its leads; every earlier page reports `complete:false`. Text
-from a provision, a range or a part may be cited once its chain was read to that
-last page, so range units share the leads at the start of their chain. Per-item
-failures (`not_found`, `ambiguous_number`, `release_expired`, `invalid_range`,
-`invalid_next`, `invalid_item` for an item that is not exactly one of the forms
-above, `unit_too_large`) do not fail the call. Every result carries `release`,
-and every item result that resolved a document carries its `doc` key.
+[Batch reading](mcp-read.md) owns the read forms, paging and response units.
 
 ## Guide
 

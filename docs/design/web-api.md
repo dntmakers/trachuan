@@ -100,17 +100,17 @@ earlier of now plus 30 days and creation plus 90 days, and sets the cookie's
 `Max-Age` to the time left until that `expires_at`; the cookie set at login is
 clamped the same way. Other requests write nothing.
 
-Each request on `/api/v1` with a session verifies: the hash exists, `revoked_at`
-is null, `expires_at` is in the future, the account is not blocked and the
-session's `auth_epoch` equals the account's. The lookup uses the same 10-second
-cache as bearer credentials ([auth](auth.md)), never beyond `expires_at`; a
-failure of the auth database is 503. Every revocation made by the server process
-(logout, revoking a session or personal token on the account page, a deletion
-request) drops the cache entries of the credentials it revokes before it
-responds, so they stop working at once, including a lookup that was in flight;
-revocations made by another process, such as the admin command, take effect
-within the 10-second window. A session cookie never authorizes `/mcp` and a
-bearer token never authorizes `/api/v1`.
+Each session-authenticated request to `/api/v1` verifies: the hash exists,
+`revoked_at` is null, `expires_at` is in the future, the account is not blocked
+and the session's `auth_epoch` equals the account's. The lookup uses the same
+10-second cache as bearer credentials ([auth](auth.md)), never beyond
+`expires_at`; a failure of the auth database is 503. Every revocation made by
+the server process (logout, revoking a session or personal token on the account
+page, a deletion request) drops the cache entries of the credentials it revokes
+before it responds, so they stop working at once, including a lookup that was in
+flight; revocations made by another process, such as the admin command, take
+effect within the 10-second window. A session cookie never authorizes `/mcp` and
+a bearer token never authorizes `/api/v1`.
 
 `POST /api/v1/auth/logout` revokes the session, clears the cookie and sends
 `Clear-Site-Data: "cookies"`. Sessions are listed and revoked on the account
@@ -159,6 +159,7 @@ follow the same rule. The OAuth consent form has its own rule in
 | `GET /api/v1/public/taxonomy`        | none           | public per IP    | The `taxonomy` tool without `q`: `node` and `depth` as query parameters; same result; `Cache-Control: public, max-age=600`; typed lookup text never goes to this route                                                                                                                                                                                                                                           |
 | `GET /api/v1/public/taxonomy/{code}` | none           | public per IP    | A served node with its path, children and its 20 documents with the most effective assignments in the subtree (number, title, type, status); never provision text; cacheable 600 s                                                                                                                                                                                                                               |
 | `GET /api/v1/public/taxonomy/codes`  | none           | public per IP    | `{release, codes}`: every served node code of the active release in tree order, complete in one response and from one release, or 503; never names or counts; cacheable 600 s; the sitemap's source ([discovery](discovery.md#sitemap))                                                                                                                                                                          |
+| `GET /api/v1/public/sample`          | none           | public admission | One compact hit from the fixed search, with its release ([public home sample](web-home-sample.md))                                                                                                                                                                                                                                                                                                               |
 | `GET /api/v1/public/documents/{key}` | none           | public admission | A document summary from the release's precomputed row, status evaluated per request; 404 while summaries are unavailable ([serving public summaries](web-public-documents-serving.md))                                                                                                                                                                                                                           |
 | `GET /api/v1/public/documents`       | none           | public admission | Every key with a summary and its `index` flag, in one bounded response                                                                                                                                                                                                                                                                                                                                           |
 
@@ -170,7 +171,7 @@ default 90 days, at most one year.
 
 `GET /api/v1/documents/{key}?release=<rel>&next=<token>` is the reader's
 whole-document read: the `read` item `{handle: key, from: first, to: last}` of
-[search results](mcp-results.md#read) with the web caps of
+[batch reading](mcp-read.md#read) with the web caps of
 [budgets](budgets.md#request-limits): units (ancestor leads, provisions) and
 parts by the same cutting rule, a page cap of 2 MB of serialized units and a
 part size of 1 MB, so a long lead or provision is split into parts and every
@@ -178,25 +179,26 @@ page makes progress. The unit sequence starts with the document entry with its
 status, then the outline entries, then the leads and provisions; outline entries
 are ordinary units of that sequence, so a long outline continues across pages
 through `next` like any other units. The response is
-`{release, fetch_sha256, item, nodes, files}`: `release` is the release the page
-was read from, `item` is the `read` item result object, and `fetch_sha256` is
-the document's fetch hash in that release, read with the item from the same
-release (directly or through the release-keyed read cache). It is present on
-every page that carries the document, first or continuation, and absent when
-`item.error` is set. `nodes` names (`name`, `level`) every node code in `item`.
-Continuation is `item.next`, passed back as `next`. The website links search
-results to the reader with `?release=`, so the reader shows the release the
-result came from; the reader shows the document's single `source_url` only when
-present. The response also carries `files`, the document's fetched files from
-`source_file` in that release ordered by `name` then `hash`:
-`{name, url, hash, size, role, fetched_at}`, with `url` and `fetched_at` null
-when unknown; it is present with the document and absent when `item.error` is
-set. MCP results do not carry it.
+`{release, fetch_sha256, item, nodes, files, files_omitted}`: `release` is the
+release the page was read from, `item` is the `read` item result object, and
+`fetch_sha256` is the document's fetch hash in that release, read with the item
+from the same release (directly or through the release-keyed read cache). It is
+present on every page that carries the document, first or continuation, and
+absent when `item.error` is set. `nodes` names (`name`, `level`) every node code
+in `item`. Continuation is `item.next`, passed back as `next`. The website links
+search results to the reader with `?release=`, so the reader shows the release
+the result came from; the reader shows the document's single `source_url` only
+when present. The reader keeps its top-level `files` array for compatibility and
+does not duplicate it inside `item.document`. It uses the shared
+[source file projection and paging priority](mcp-read.md#source-files) on each
+successful page with `item.doc`, using the space left in that page's web cap.
+When there are no rows, return `files:[]` if it fits. Omit both file fields on
+`item.error`.
 
 Search, read and status take the same inputs and return the same objects as the
-MCP tools. Documents wraps one `read` item result with the web caps in the
-object above; MCP result shapes do not change. All four keep `release` pinning
-and `release_expired`; only the transport differs.
+MCP tools. Documents wraps a read item result with the web caps and fields
+above. Both reader calls and search retain `release` pinning and
+`release_expired`.
 
 ## Errors and limits
 

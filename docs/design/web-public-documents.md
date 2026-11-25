@@ -164,16 +164,17 @@ The reader is unaffected in every case.
   that fetched it, and concurrent reads of an empty or expired cache share one
   request. A failed, timed-out or rate-limited (429) refresh is not stored and
   never extends a value past its life; each caller takes its existing
-  unavailable path. When a summary, list or codes response names a release other
-  than the cached status's, and that status was not requested after the
-  response's own request began, the caller refreshes status once through the
-  cache and compares again. The summary page applies every status check again to
-  the refreshed value, so a flag now off gives 404. The sitemap has already
-  chosen its shape from the old flag, so a refreshed flag that differs takes its
-  503 path. A mismatch that remains takes the unavailable path. An activation
-  therefore costs one extra status call, not 30 seconds of 503s. Nitro sends no
-  client address on any server-side call, so its reads share one per-address
-  bucket on the server; the cache keeps them to one call per 30 seconds.
+  unavailable path. When a summary, list, codes or home sample response names a
+  release other than the cached status's, and that status was not requested
+  after the response's own request began, the caller refreshes status once
+  through the cache and compares again. The summary page applies every status
+  check again to the refreshed value, so a flag now off gives 404. The sitemap
+  has already chosen its shape from the old flag, so a refreshed flag that
+  differs takes its 503 path. A mismatch that remains takes the unavailable
+  path. An activation therefore costs one extra status call, not 30 seconds of
+  503s. Nitro sends no client address on any server-side call, so its reads
+  share one per-address bucket on the server; the cache keeps them to one call
+  per 30 seconds.
 - **Promise.** A response newly served by Nitro or the API reflects the current
   release, flag and status date within 10 minutes. Nitro counts a page's life
   from the end of its render, so a page is behind by at most its life, the
@@ -184,8 +185,10 @@ The reader is unaffected in every case.
   it. An API response is at most its `max-age` (at most 300 s) behind, with
   `must-revalidate`, which forbids stale reuse. Topic pages revalidate in the
   browser (`no-cache`), so after a change of availability their links reach the
-  new state within 10 minutes. Pages already displayed or restored from the
-  back-forward cache are not withdrawn; the promise covers new responses only.
+  new state within 10 minutes. The [home sample](web-home-sample.md) is a dated
+  snapshot outside this freshness promise. Home coverage facts still follow the
+  promise. Pages already displayed or restored from the back-forward cache are
+  not withdrawn; the promise covers new responses only.
 
 ## Head tags and JSON-LD
 
