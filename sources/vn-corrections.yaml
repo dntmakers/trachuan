@@ -2397,3 +2397,11 @@
     anchor: "doan-190"
     quote: "92/2016/TTLT-BTC-NHNN ngày 27/6/2016\nHướng dẫn việc phát hành tín phiếu kho bạc qua Ngân hàng Nhà nước Việt Nam do Bộ trưởng Bộ Tài chính - Thống đốc Ngân hàng Nhà nước Việt Nam ban hành\nBị thay thế bởi Thông tư Thông tư 111/2018/TT-BTC ngày 15/11/2018 hướng dẫn phát hành và thanh toán công cụ nợ của Chính phủ tại thị trường trong nước do Bộ trưởng Bộ Tài chính ban hành\n01/01/2019"
   reviewed: "2026-11-18"
+- key: vn:vbpl:hhtquyetdinh_65
+  number: "211/QĐ-NHNN"
+  set: {eff_from: "2019-01-31"}
+  reason: "VBPL gives no effective date. Điều 2 states effect from the signing date, and the signing date is the stored issue date 2019-01-31 (owner decision 2026-11-25, docs/design/validity-status.md commencement from signing). The article has no effect-article heading, so the automatic rule does not read it."
+  evidence:
+    anchor: "dieu-2"
+    quote: "Quyết định này có hiệu lực thi hành kể từ ngày ký"
+  reviewed: "2026-11-25"
