@@ -18,6 +18,16 @@ func SearchSample(ctx context.Context, engine *retrieval.Engine, release string,
 }
 
 func searchSample(ctx context.Context, engine searchEngine, release string, instant time.Time) ([]byte, error) {
+	return searchSampleWithReserve(ctx, engine, release, instant, time.Second)
+}
+
+func searchSampleWithReserve(ctx context.Context, engine searchEngine, release string, instant time.Time, reserve time.Duration) ([]byte, error) {
+	if deadline, ok := ctx.Deadline(); ok {
+		ctx = retrieval.WithRollbackDeadline(ctx, deadline)
+		work, cancel := context.WithDeadline(ctx, deadline.Add(-reserve))
+		defer cancel()
+		ctx = work
+	}
 	inForce := true
 	raw, err := engine.Search(ctx, retrieval.Request{Query: Query, Limit: 1, InForceOnly: &inForce, Instant: instant})
 	if err != nil {

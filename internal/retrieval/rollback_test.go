@@ -21,7 +21,8 @@ func (b blockingRollback) Rollback(ctx context.Context) error {
 }
 
 func TestRollback_BoundedAfterCanceledRequest(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx := WithRollbackDeadline(context.Background(), time.Now().Add(40*time.Millisecond))
+	ctx, cancel := context.WithCancel(ctx)
 	cancel()
 	remaining := make(chan time.Duration, 1)
 	done := make(chan struct{})

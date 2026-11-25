@@ -138,7 +138,7 @@ existing cache and headers remain in force.
 Enable the server route before switching the web page to it; an old server or a
 disabled route simply leaves the stored sample visible. No corpus, recipe,
 database schema or credentials change. Replace the
-[release restore runbook's manual refresh](../runbooks/release-restore.md#refresh-the-home-sample)
+[release restore runbook's manual refresh](../runbooks/release-restore.md#check-the-home-sample)
 when the feature ships: after activation or rollback verify that a live sample
 names the active release and that the home page uses it or clearly labels the
 stored fallback. Do not mint an MCP token, regenerate fixtures or open a web
