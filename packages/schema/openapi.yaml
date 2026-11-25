@@ -3933,6 +3933,7 @@ components:
         from: *id001
         to: *id001
         relations: *id007
+        timeline: *id007
         next: *id001
       additionalProperties: false
     ReadInput:
@@ -3969,8 +3970,45 @@ components:
         size: *id003
         relation:
           $ref: '#/components/schemas/ListedRelation'
+        event:
+          $ref: '#/components/schemas/TimelineEvent'
         part: *id003
         parts: *id003
+    TimelineActor:
+      type: object
+      properties:
+        key: {type: string}
+        number: {type: string}
+        issued: {type: string, format: date}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+        in_release: {type: boolean}
+      required: [key, in_release]
+      additionalProperties: false
+    TimelineTarget:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [document, provision, unresolved_provision]
+        anchor: {type: string}
+        citation: {type: string}
+        named: {type: string}
+      required: [scope]
+      additionalProperties: false
+    TimelineEvent:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [issued, effective_from, effective_to, repeals, replaces, suspends, amends_supplements, consolidates]
+        date: {type: string, format: date}
+        actor:
+          $ref: '#/components/schemas/TimelineActor'
+        target:
+          $ref: '#/components/schemas/TimelineTarget'
+      required: [kind]
+      additionalProperties: false
     ItemResult:
       type: object
       properties:

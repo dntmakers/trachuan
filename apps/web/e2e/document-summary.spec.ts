@@ -43,6 +43,8 @@ for (const credential of ['', 'valid', 'expired', 'forged']) {
         await expect(page.getByRole('link', { name: '2/2099/QH Văn bản liên quan' })).toBeVisible()
         await expect(page.getByRole('banner').getByRole('link', { name: 'Đăng nhập' })).toBeVisible()
         expect(await page.locator('.reader-unit').count()).toBe(0)
+        await expect(page.getByText('Dòng thời gian', { exact: true })).toHaveCount(0)
+        await expect(page.getByText('Timeline', { exact: true })).toHaveCount(0)
         const html = await response!.text()
         const decoded = ['__NUXT_CSP_DATA__', '__NUXT_CSP_CONFIG__'].map(id => Buffer.from(new RegExp(`<meta id="${id}"[^>]*? content="([^"]+)"`).exec(html)![1]!, 'base64').toString('utf8'))
         expect(decoded.every(value => value.length > 0)).toBe(true)

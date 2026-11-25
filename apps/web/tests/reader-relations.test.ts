@@ -16,7 +16,7 @@ it('loads relations on expansion and continues with the returned token', async (
   vi.stubGlobal('useApi', () => ({ captureAction: () => ({ accountId: 1, csrfToken: 'csrf', bound: false }), forAction: () => ({ POST: post }), session: { account: { id: 1 } } }))
   const wrapper = mount(ReaderRail, { props: { document: { status: { current: true }, text_source: 'none', text_complete: false, related: [], related_counts: {} }, release: '20990101_1', documentKey: 'vn:vbpl:1', gaps: [] } })
   expect(calls).toHaveLength(0)
-  const details = wrapper.get('details')
+  const details = wrapper.get('.reader-relations + details')
   details.element.open = true
   await details.trigger('toggle')
   await flushPromises()
@@ -40,7 +40,7 @@ it('keeps outstanding groups and continuation visible after loading from a count
   expect(wrapper.findAll('dt').map(node => node.text())).toEqual(['Related', 'Related'])
   await wrapper.get('button[aria-label="Load more relations: Related"]').trigger('click')
   await flushPromises()
-  expect(wrapper.get('details').element.open).toBe(true)
+  expect(wrapper.get('.reader-relations + details').element.open).toBe(true)
   expect(wrapper.text()).toContain('B')
   expect(wrapper.text()).toContain('+1')
   expect(wrapper.findAll('dt').map(node => node.text())).toEqual(['Related', 'Related'])

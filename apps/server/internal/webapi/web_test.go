@@ -22,9 +22,10 @@ import (
 )
 
 type testEngine struct {
-	calls atomic.Int64
-	read  retrieval.ReadRequest
-	err   error
+	calls      atomic.Int64
+	read       retrieval.ReadRequest
+	readResult *retrieval.ReadResult
+	err        error
 }
 
 func (e *testEngine) Search(context.Context, retrieval.Request) (retrieval.Response, error) {
@@ -36,6 +37,9 @@ func (e *testEngine) Present(context.Context, retrieval.Response, retrieval.Deta
 }
 func (e *testEngine) Read(_ context.Context, r retrieval.ReadRequest) (retrieval.ReadResult, error) {
 	e.read = r
+	if e.readResult != nil {
+		return *e.readResult, e.err
+	}
 	return retrieval.ReadResult{Release: r.Release, Nodes: map[string]retrieval.NodeRef{"1": {Name: "Name", Level: 1}}, Items: []retrieval.ItemResult{{Doc: "vn:1", Complete: true, Document: &retrieval.ReadDocumentEntry{DocumentEntry: retrieval.DocumentEntry{Title: "title", TextSource: "source_tree", TextComplete: true}}, Units: []retrieval.Unit{{Kind: "outline", Anchor: "a"}, {Kind: "provision", Text: "source"}}}}}, e.err
 }
 func (e *testEngine) Status(context.Context) (retrieval.CorpusStatus, error) {
