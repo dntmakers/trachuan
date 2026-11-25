@@ -31,6 +31,7 @@ type Unit struct {
 	Text            string          `json:"text,omitempty"`
 	Size            int             `json:"size,omitempty"`
 	Relation        *ListedRelation `json:"relation,omitempty"`
+	Event           *TimelineEvent  `json:"event,omitempty"`
 	Part            int             `json:"part,omitempty"`
 	Parts           int             `json:"parts,omitempty"`
 }

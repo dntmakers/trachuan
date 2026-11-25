@@ -50,7 +50,7 @@ rejection is a fixed plain-text 429 without a render.
 | Route                 | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/vn/search`          | Vietnamese query box; filters: nodes picked on the tree, applies-on date, issue-date bounds, type, issuer. Cards: citation, stamp, verbatim text, relation chips, nodes. The card marks runs of query words in its text, labelled as matched words and never as evidence: a run of two or more words, or a single number; letter case is ignored, and a query word typed without diacritics also matches its accented forms (`thue` marks `thuế`), while an accented query word matches only itself. Summary bar by validity and gaps. Outside-filter hits follow inside hits with a divider and the total count; paging continues through them |
-| `/vn/documents/{key}` | Reader: table of contents, text scrolled to the anchor, side rail with validity, a timeline, relations, nodes, fetched files and hashes, and the release id                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `/vn/documents/{key}` | Reader: table of contents, text scrolled to the anchor, header with validity, side rail with a timeline, relations, nodes, fetched files and hashes, and the release id                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `/account`            | Email, sessions, personal tokens (create, name, revoke), authorized MCP clients (revoke), security (below), delete account                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Under the applies-on control, the search form shows a separate issue-date range
@@ -70,15 +70,15 @@ document source link if present. Keep the document fetch hash and release in
 this panel.
 
 Place the [timeline](mcp-read.md#timeline) in a collapsed "Dòng thời gian" /
-"Timeline" panel directly below validity in the reader side rail, above
-relations. When opened, load through the signed-in batch read route pinned to
-the reader's release. Append pages through the item's `next` on "Xem thêm" /
-"Show more"; do not reload the text or replace it on a timeline error. Show
-subject issue and effective dates with their labels. For a relation, show the
-kind label, the acting document number (key if the number is absent), its
-separately labelled dates and the recorded target scope. Show "Cấp văn bản" /
-"Document-level" for a document target, the citation with an anchor link for an
-exact provision target, and "Chưa xác định được điều khoản" / "Provision not
+"Timeline" panel at the top of the reader side rail, above relations; validity
+stays in the reader header. When opened, load through the signed-in batch read
+route pinned to the reader's release. Append pages through the item's `next` on
+"Xem thêm" / "Show more"; do not reload the text or replace it on a timeline
+error. Show subject issue and effective dates with their labels. For a relation,
+show the kind label, the acting document number (key if the number is absent),
+its separately labelled dates and the recorded target scope. Show "Cấp văn bản"
+/ "Document-level" for a document target, the citation with an anchor link for
+an exact provision target, and "Chưa xác định được điều khoản" / "Provision not
 resolved" with the named path when known, without a link. Show "Không rõ ngày" /
 "Date unknown" when the actor's issue date is absent. Link only in-release
 actors to the reader at that release. Label the entries as recorded source

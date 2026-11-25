@@ -16,7 +16,76 @@ type ReadItem struct {
 	From      string `json:"from,omitempty"`
 	To        string `json:"to,omitempty"`
 	Relations bool   `json:"relations,omitempty"`
+	Timeline  *bool  `json:"timeline,omitempty"`
 	Next      string `json:"next,omitempty"`
+	fields    uint8
+}
+
+func readItemField(name string) uint8 {
+	switch name {
+	case "handle":
+		return 1
+	case "number":
+		return 2
+	case "from":
+		return 4
+	case "to":
+		return 8
+	case "relations":
+		return 16
+	case "timeline":
+		return 32
+	case "next":
+		return 64
+	}
+	return 0
+}
+
+func (item *ReadItem) UnmarshalJSON(data []byte) error {
+	type plain ReadItem
+	dec := json.NewDecoder(bytes.NewReader(data))
+	start, err := dec.Token()
+	if err != nil || start != json.Delim('{') {
+		return errInvalidNext
+	}
+	var present uint8 = 128
+	var zero bool
+	for dec.More() {
+		key, err := dec.Token()
+		if err != nil {
+			return errInvalidNext
+		}
+		name, ok := key.(string)
+		if !ok {
+			return errInvalidNext
+		}
+		bit := readItemField(name)
+		var raw json.RawMessage
+		if bit == 0 || present&bit != 0 || dec.Decode(&raw) != nil || bytes.Equal(raw, []byte("null")) {
+			return errInvalidNext
+		}
+		zero = zero || bytes.Equal(raw, []byte(`""`)) || bytes.Equal(raw, []byte("false"))
+		present |= bit
+	}
+	if _, err := dec.Token(); err != nil {
+		return errInvalidNext
+	}
+	var value plain
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	*item = ReadItem(value)
+	if zero {
+		item.fields = present
+	}
+	return nil
+}
+
+func (item ReadItem) has(name string, fallback bool) bool {
+	if item.fields != 0 {
+		return item.fields&readItemField(name) != 0
+	}
+	return fallback
 }
 
 type cursor struct {

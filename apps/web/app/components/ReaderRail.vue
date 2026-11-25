@@ -5,6 +5,7 @@ import { messagesFor, type Language } from '../../i18n'
 import { readerMessages } from '../../i18n/reader'
 import CopyButton from './CopyButton.vue'
 import RelationsPanel from './RelationsPanel.vue'
+import TimelinePanel from './TimelinePanel.vue'
 import { warningLink } from '../utils/search-results'
 
 defineProps<{ document?: components['schemas']['Document'], gaps: components['schemas']['Gap'][], release: string, hash?: string, files?: components['schemas']['SourceFile'][], filesOmitted?: number, nodes?: components['schemas']['NodeIndex'], units?: components['schemas']['Unit'][], documentKey?: string, warnings?: Map<string, components['schemas']['Warning'][]> }>()
@@ -16,6 +17,7 @@ function roleLabel(role: string, lang: Language) { const labels: Record<string, 
 </script>
 <template>
   <aside class="reader-rail" :aria-label="m.technical">
+    <TimelinePanel v-if="document && documentKey" :key="`${documentKey}:${release}`" :document-key="documentKey" :release="release" />
     <RelationsPanel v-if="document && documentKey" :key="`${documentKey}:${release}`" :document="document" :document-key="documentKey" :release="release" />
     <section v-if="document?.nodes?.some(code => nodes?.[code]?.name)" class="card reader-card"><h2>{{ m.topics }}</h2><div class="reader-chips"><template v-for="code in document.nodes" :key="code"><NuxtLink v-if="nodes?.[code]?.name" class="chip" :to="`/vn/topics/${code}`">{{ nodes[code]?.name }}</NuxtLink></template></div></section>
     <section v-if="units?.some(unit => warnings?.get(`${documentKey}#${unit.anchor}`)?.length || unit.warnings_omitted)" class="card reader-card reader-warnings"><h2>{{ m.warnings }}</h2><div v-for="(unit, index) in units" :key="index"><template v-if="warnings?.get(`${documentKey}#${unit.anchor}`)?.length || unit.warnings_omitted"><h3>{{ warnings?.get(`${documentKey}#${unit.anchor}`)?.[0]?.citation || unit.citation || unit.label }}</h3><p v-for="(warning, i) in warnings?.get(`${documentKey}#${unit.anchor}`)" :key="i" class="notice notice--warn"><NuxtLink v-if="warningLink(warning, release)" :to="warningLink(warning, release)!">{{ warningSentence(warning, language) }}</NuxtLink><template v-else>{{ warningSentence(warning, language) }}</template></p><p v-if="unit.warnings_omitted" class="notice notice--warn">{{ messagesFor(language).warningMore.replace('{n}', String(unit.warnings_omitted)) }}</p></template></div></section>

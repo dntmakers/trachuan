@@ -9,6 +9,9 @@ import (
 
 func (e *Engine) readScope(ctx context.Context, tx pgx.Tx, c cursor) (readSequence, string, error) {
 	item := c.Item
+	if item.Timeline != nil {
+		return readTimelineScope(ctx, tx, c)
+	}
 	id, key, doc, source, code, err := e.readDocument(ctx, tx, item)
 	if err != nil || code != "" {
 		return readSequence{}, code, err

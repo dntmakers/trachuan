@@ -92,6 +92,13 @@ func validReadItem(item ReadItem) bool {
 	if !validReadText(item.Handle, ReadHandleMax) || !validReadText(item.From, ReadHandleMax) || !validReadText(item.To, ReadHandleMax) || !validReadText(item.Number, ReadNumberMax) {
 		return false
 	}
+	if item.has("timeline", item.Timeline != nil) {
+		_, anchor, err := ParseHandle(item.Handle)
+		return err == nil && item.Timeline != nil && *item.Timeline && anchor == "" &&
+			!item.has("number", item.Number != "") && !item.has("from", item.From != "") &&
+			!item.has("to", item.To != "") && !item.has("relations", item.Relations) &&
+			!item.has("next", item.Next != "")
+	}
 	if item.Next != "" {
 		return item.Handle == "" && item.Number == "" && item.From == "" && item.To == "" && !item.Relations
 	}

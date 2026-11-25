@@ -127,6 +127,8 @@ type cachedSequence struct {
 func sequenceKey(release string, item ReadItem) [32]byte {
 	mode := "provision"
 	switch {
+	case item.Timeline != nil:
+		mode = "timeline"
 	case item.Relations:
 		mode = "relations"
 	case item.From != "":
@@ -149,7 +151,7 @@ func (e *Engine) sequence(ctx context.Context, tx pgx.Tx, c cursor) (readSequenc
 	if cache != nil {
 		if raw, ok := cache.Get(e.release.Rel, cursorSequenceKey(e.release.Rel, c)); ok {
 			var stored cachedSequence
-			if json.Unmarshal(raw, &stored) == nil && (!c.Item.Relations || c.Unit == stored.Offset) {
+			if json.Unmarshal(raw, &stored) == nil && ((!c.Item.Relations && c.Item.Timeline == nil) || c.Unit == stored.Offset) {
 				seq := readSequence{doc: stored.Doc, source: stored.Source, files: stored.Files, filesTotal: stored.FilesTotal, units: stored.Units, parts: stored.Parts, gaps: stored.Gaps, offset: stored.Offset, more: stored.More, complete: stored.Complete}
 				if len(stored.Document) > 0 {
 					var doc DocumentEntry

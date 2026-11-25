@@ -141,6 +141,7 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
       else if (state.kind === 'search' || state.kind === 'reader' || state.kind === 'reader-files') {
         await page.route('**/api/v1/me', route => route.fulfill({ json: account }))
         await page.route('**/api/v1/search', route => route.fulfill({ json: { release: '20990101', abstain: false, hits: [{ citation: 'Điều 1', complete: true, text: 'Nội dung giả lập.' }] } }))
+        await page.route('**/api/v1/read', route => route.fulfill({ json: { release: '20990101', items: [{ complete: true, units: [{ kind: 'timeline', event: { kind: 'repeals', actor: { key: 'vn:vbpl:2', number: '123/2099/ND-CP', issued: '2099-01-01', in_release: true }, target: { scope: 'unresolved_provision', named: 'dieu-123-khoan-4' } } }] }] } }))
         await page.route('**/api/v1/documents/*', route => route.fulfill({ json: { release: '20990101', fetch_sha256: fileHash, files: state.kind === 'reader-files' ? files : [], files_omitted: state.kind === 'reader-files' ? 3 : 0, item: { complete: true, document: { number: '1/2099', title: 'Test law', status: { class: 'in_force', current: true }, text_source: 'none', text_complete: false }, units: [{ kind: 'provision', anchor: 'dieu-1', label: 'Điều 1', text: 'Text' }] } } }))
         await page.goto('/')
         const menu = page.locator('button[aria-controls="site-menu"]')
@@ -154,6 +155,8 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
           await expect(page.locator('.result-card .law-text')).toBeVisible()
         } else {
           await expect(page.locator('.reader-identity .num')).toBeVisible()
+          await page.locator('.reader-rail').getByText(language === 'vi' ? 'Dòng thời gian' : 'Timeline', { exact: true }).click()
+          await expect(page.locator('.reader-rail')).toContainText('dieu-123-khoan-4')
           await page.locator('.reader-rail').getByText(language === 'vi' ? 'Chi tiết kỹ thuật' : 'Technical details', { exact: true }).click()
           await expect(page.locator('.reader-technical')).toBeVisible()
           if (state.kind === 'reader-files') {

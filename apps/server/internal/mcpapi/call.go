@@ -57,6 +57,9 @@ func lawToolCall[In, Out any](cfg Config, name string, run func(context.Context,
 		input.Properties["items"].MaxItems = ptrInt(retrieval.ReadItemsMax)
 		input.Properties["items"].Types = nil
 		input.Properties["items"].Type = "array"
+		timeline := input.Properties["items"].Items.Properties["timeline"]
+		timeline.Types = nil
+		timeline.Type = "boolean"
 	}
 	resolved, err := input.Resolve(nil)
 	if err != nil {

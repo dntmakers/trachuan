@@ -4542,6 +4542,7 @@ export interface components {
             from?: string;
             to?: string;
             relations?: boolean;
+            timeline?: boolean;
             next?: string;
         };
         ReadInput: {
@@ -4564,10 +4565,37 @@ export interface components {
             /** Format: int64 */
             size?: number;
             relation?: components["schemas"]["ListedRelation"];
+            event?: components["schemas"]["TimelineEvent"];
             /** Format: int64 */
             part?: number;
             /** Format: int64 */
             parts?: number;
+        };
+        TimelineActor: {
+            key: string;
+            number?: string;
+            /** Format: date */
+            issued?: string;
+            /** Format: date */
+            effective_from?: string;
+            /** Format: date */
+            effective_to?: string;
+            in_release: boolean;
+        };
+        TimelineTarget: {
+            /** @enum {string} */
+            scope: "document" | "provision" | "unresolved_provision";
+            anchor?: string;
+            citation?: string;
+            named?: string;
+        };
+        TimelineEvent: {
+            /** @enum {string} */
+            kind: "issued" | "effective_from" | "effective_to" | "repeals" | "replaces" | "suspends" | "amends_supplements" | "consolidates";
+            /** Format: date */
+            date?: string;
+            actor?: components["schemas"]["TimelineActor"];
+            target?: components["schemas"]["TimelineTarget"];
         };
         ItemResult: {
             doc?: string;

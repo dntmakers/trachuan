@@ -37,7 +37,7 @@ func requestCursor(item ReadItem, req ReadRequest) (cursor, string) {
 	}
 	if req.WholeDocument {
 		key, anchor, err := ParseHandle(c.Item.Handle)
-		if err != nil || anchor != "" || c.Item.Number != "" || c.Item.Relations || c.Item.From != "" || (req.DocumentKey != "" && key != req.DocumentKey) {
+		if err != nil || anchor != "" || c.Item.Number != "" || c.Item.Relations || c.Item.Timeline != nil || c.Item.From != "" || (req.DocumentKey != "" && key != req.DocumentKey) {
 			if item.Next != "" {
 				return cursor{}, "invalid_next"
 			}
