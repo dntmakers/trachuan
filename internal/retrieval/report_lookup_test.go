@@ -59,11 +59,11 @@ func (f failingMetadataTx) Rollback(ctx context.Context) error {
 }
 
 func TestMetadataTx_SetupFailureBoundsRollback(t *testing.T) {
-	ctx := context.WithValue(t.Context(), rollbackContextKey{}, "kept")
+	ctx := WithRollbackDeadline(context.WithValue(t.Context(), rollbackContextKey{}, "kept"), time.Now().Add(10*time.Millisecond))
 	ctx, cancel := context.WithCancel(ctx)
 	cancel()
 	observed := make(chan error, 1)
-	err := configureMetadataTx(ctx, failingMetadataTx{stalledReportRollback: stalledReportRollback{observed: observed}}, 2*time.Second, 10*time.Millisecond)
+	err := configureMetadataTx(ctx, failingMetadataTx{stalledReportRollback: stalledReportRollback{observed: observed}}, 2*time.Second)
 	if err == nil || strings.Contains(err.Error(), "PRIVATE") {
 		t.Fatal("setup failure was not sanitized", err)
 	}

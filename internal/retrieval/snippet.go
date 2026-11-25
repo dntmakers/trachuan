@@ -10,15 +10,20 @@ const OmissionMarker = "[…]"
 
 // Snippet returns a bounded verbatim excerpt and whether it is complete.
 func Snippet(h Hit, capRunes int) (text string, complete bool) {
+	text, complete, _ = snippetRanges(h, capRunes)
+	return text, complete
+}
+
+func snippetRanges(h Hit, capRunes int) (text string, complete bool, ranges []snippetRange) {
 	source := []rune(h.Text)
 	if capRunes < 0 {
 		capRunes = 0
 	}
 	if len(source) <= capRunes {
-		return h.Text, h.Complete
+		return h.Text, h.Complete, []snippetRange{{0, len(source)}}
 	}
 	if capRunes < len([]rune(OmissionMarker)) {
-		return "", false
+		return "", false, nil
 	}
 
 	leadEnd := 0
@@ -53,9 +58,12 @@ func Snippet(h Hit, capRunes int) (text string, complete bool) {
 	if leadCut {
 		out = strings.TrimRightFunc(out, unicode.IsSpace)
 	}
+	if len([]rune(out)) > 0 {
+		ranges = append(ranges, snippetRange{0, len([]rune(out))})
+	}
 	omitted := leadCut || best > ownStart
 	if out != "" && len([]rune(out))+markerLen+1 > capRunes {
-		return OmissionMarker, false
+		return OmissionMarker, false, nil
 	}
 	if omitted && out != "" {
 		out += " " + OmissionMarker
@@ -76,20 +84,23 @@ func Snippet(h Hit, capRunes int) (text string, complete bool) {
 	body := source[best:]
 	if len(body) <= remaining {
 		out += separator + string(body)
-		return out, false
+		ranges = append(ranges, snippetRange{best, len(source)})
+		return out, false, ranges
 	}
 	remaining -= markerLen + 1
 	if remaining > 0 {
 		end := cutAt(body, remaining)
-		out += separator + strings.TrimRightFunc(string(body[:end]), unicode.IsSpace)
+		retained := strings.TrimRightFunc(string(body[:end]), unicode.IsSpace)
+		out += separator + retained
+		ranges = append(ranges, snippetRange{best, best + len([]rune(retained))})
 	}
 	if out == "" {
-		return OmissionMarker, false
+		return OmissionMarker, false, nil
 	}
 	if !strings.HasSuffix(out, OmissionMarker) && len([]rune(out))+1+markerLen <= capRunes {
 		out += " " + OmissionMarker
 	}
-	return out, false
+	return out, false, ranges
 }
 
 // cutAt selects a word or combining-mark-safe boundary within limit.

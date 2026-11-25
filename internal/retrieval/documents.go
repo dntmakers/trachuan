@@ -44,7 +44,7 @@ func (e *Engine) loadDocuments(ctx context.Context, keys []string) (map[string]D
 	if err != nil {
 		return nil, databaseFailure("begin documents transaction", err)
 	}
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer rollback(ctx, tx)
 	if err = setLocal(ctx, tx, "statement_timeout", strconv.FormatInt(e.deadline().Milliseconds(), 10)); err != nil {
 		return nil, fmt.Errorf("set documents deadline: %w", err)
 	}

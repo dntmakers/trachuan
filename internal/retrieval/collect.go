@@ -40,7 +40,7 @@ func (e *Engine) collectWithCandidates(ctx context.Context, p Prepared, depths D
 	if err != nil {
 		return Arms{}, databaseFailure("begin retrieval failed", err)
 	}
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer rollback(ctx, tx)
 	if err = setLocal(ctx, tx, "statement_timeout", strconv.FormatInt(e.deadline().Milliseconds(), 10)); err != nil {
 		return Arms{}, err
 	}

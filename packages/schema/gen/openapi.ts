@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/api/v1/public/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        "X-Sample-Status-Date"?: string;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicSampleResult"];
+                    };
+                };
+                /** @description Request failed */
+                400: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicSummaryError"];
+                    };
+                };
+                /** @description Request failed */
+                404: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicSummaryError"];
+                    };
+                };
+                /** @description Request failed */
+                503: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PublicSummaryError"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/google/start": {
         parameters: {
             query?: never;
@@ -4008,6 +4076,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        PublicSampleResult: {
+            release: string;
+            /** @constant */
+            abstain: false;
+            hits: components["schemas"]["PublicSampleHit"][];
+            documents: {
+                "vn:vbpl:179252": components["schemas"]["PublicSampleDocument"];
+            };
+        };
+        PublicSampleHit: {
+            handle: string;
+            /** @constant */
+            doc: "vn:vbpl:179252";
+            citation: string;
+            snippet: string;
+            /** @constant */
+            complete: false;
+        };
+        PublicSampleDocument: {
+            /** @constant */
+            number: "91/2025/QH15";
+            status: components["schemas"]["PublicSampleStatus"];
+            /** @enum {string} */
+            text_source: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
+            text_complete: boolean;
+            title?: string;
+            type?: string;
+            issuer?: string;
+            /** Format: date */
+            issued?: string;
+            /** Format: date */
+            effective_from?: string;
+            /** Format: date */
+            effective_to?: string;
+            /** @constant */
+            source_url?: "https://vbpl.vn/van-ban/chi-tiet/179252";
+        };
+        PublicSampleStatus: {
+            current: boolean;
+            class?: string;
+            basis?: string;
+            status_basis?: string;
+        };
         LoginDestination: {
             next: string;
         };

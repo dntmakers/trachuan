@@ -159,7 +159,9 @@ func serve(ctx context.Context, cfg config, pool *pgxpool.Pool, queries *store.Q
 	flows := &accountflow.Service{DB: pool, Ring: cfg.accountKeys, SignupEmails: cfg.signupEmails, Logger: tools.Logger}
 	passwordLogin.Flows, passwordLogin.Factors, passwordLogin.Enrollment = flows, flows, cfg.totpEnrollment
 	passwordLogin.Evict = func(id int64) { sessions.EvictAccount(id); verifier.EvictAccount(id) }
-	mux := newWebMux(webDeps{summaries: publicsummary.NewHandler(summaryManager, cfg.publicSummaries, clock), password: passwordLogin, store: bounded, reportStore: queries, sessions: sessions, login: login, verifier: verifier, tools: tools, loginLimit: newLoginLimiter(clock, cfg.trustedProxies), oauthDB: pool, oauthClients: cfg.oauthClients, publicURL: cfg.publicURL, mcpOrigins: cfg.mcpOrigins, mcpOriginMode: cfg.mcpOriginMode})
+	flights, closeSample := newPublicSample(ctx, pool, cfg.corpusURL, resolver, clock, tools.Logger)
+	defer closeSample()
+	mux := newWebMux(webDeps{publicSample: cfg.publicSample, sampleFlights: flights, summaries: publicsummary.NewHandler(summaryManager, cfg.publicSummaries, clock), password: passwordLogin, store: bounded, reportStore: queries, sessions: sessions, login: login, verifier: verifier, tools: tools, loginLimit: newLoginLimiter(clock, cfg.trustedProxies), oauthDB: pool, oauthClients: cfg.oauthClients, publicURL: cfg.publicURL, mcpOrigins: cfg.mcpOrigins, mcpOriginMode: cfg.mcpOriginMode})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.Handle("GET /readyz", readiness(ctx, func(ctx context.Context) error {
 		return readyCheck(ctx, pool.Ping, func(ctx context.Context) error {

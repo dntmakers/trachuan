@@ -202,12 +202,20 @@ also runs `check_remote`, which fetches the previous release's report and
 recomputes the comparison with today's rules. It needs the S3 key, so
 `resign-check` does not run it.
 
-### Refresh the home sample
+### Check the home sample
 
-The home page shows one stored search result whose stamp states its release
-date. After the host activates a new corpus release (`corpus_status` on
-`https://trachuan.vn` names it), refresh the sample from the MacBook with a
-personal token, typed at a hidden prompt rather than on the command line:
+With `SERVER_PUBLIC_SAMPLE=true`, the server computes the home sample once per
+activation ([public home sample](../design/web-home-sample.md)). After an
+activation or rollback, check that
+`curl -sS https://trachuan.vn/api/v1/public/sample` returns 200 with the active
+release (`corpus_status` names it) and an `X-Sample-Status-Date` header, and
+that the home page shows that release. A 503 leaves the stored sample on the
+page, labelled as stored; investigate it from the server's sample log line
+without blocking or repeating the activation.
+
+While the flag is off, or to renew the stored fallback, refresh it from the
+MacBook with a personal token, typed at a hidden prompt rather than on the
+command line:
 
 ```sh
 read -rs TRACHUAN_TOKEN && export TRACHUAN_TOKEN

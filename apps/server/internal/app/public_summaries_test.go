@@ -126,6 +126,11 @@ func TestPublicSummaries_MountedCredentialEquivalenceWithoutAuthOrAddressLimits(
 			}
 		}
 	}
+	sample := httptest.NewRecorder()
+	mux.ServeHTTP(sample, httptest.NewRequest("GET", "/api/v1/public/sample", nil))
+	if sample.Code != http.StatusNotFound || sample.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("sample route: %d %v", sample.Code, sample.Header())
+	}
 	if reads.Load() != 0 || readerCalls.Load() != 0 || len(limiter.calls) != 0 {
 		t.Fatalf("summary crossed boundary: auth=%d reader=%d buckets=%v", reads.Load(), readerCalls.Load(), limiter.calls)
 	}

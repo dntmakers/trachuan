@@ -21,6 +21,7 @@ type config struct {
 	strictDeployment                                                                                   bool
 	totpEnrollment                                                                                     bool
 	publicSummaries                                                                                    bool
+	publicSample                                                                                       bool
 	frameworks                                                                                         bool
 	frameworksKey                                                                                      []byte
 	omitCompactRelated                                                                                 bool
@@ -47,6 +48,15 @@ func loadConfig() (config, error) {
 		case "false":
 		default:
 			return config{}, errors.New("invalid SERVER_PUBLIC_SUMMARIES")
+		}
+	}
+	if raw, present := os.LookupEnv("SERVER_PUBLIC_SAMPLE"); present {
+		switch raw {
+		case "true":
+			c.publicSample = true
+		case "false":
+		default:
+			return config{}, errors.New("invalid SERVER_PUBLIC_SAMPLE")
 		}
 	}
 	if raw, present := os.LookupEnv("SERVER_FRAMEWORKS"); present {

@@ -4,7 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { computed, defineComponent, h, onMounted, ref, Suspense } from 'vue'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import Home from '../app/pages/index.vue'
-import sample from '../app/data/sample-result.json'
+import { storedSample } from '../server/utils/home-sample'
+
+let sample = storedSample()!
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -17,7 +19,8 @@ beforeEach(() => {
   vi.stubGlobal('useStructuredData', () => {})
   vi.stubGlobal('useRoute', () => ({ query: {} }))
   vi.stubGlobal('useApi', () => ({}))
-  vi.stubGlobal('useAsyncData', async () => ({ data: ref({ status: null }) }))
+  sample = storedSample()!
+  vi.stubGlobal('useAsyncData', async (key: string) => ({ data: ref(key === 'home-sample' ? sample : { status: null }) }))
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -34,17 +37,7 @@ it('describes the actual sample citation and its source', async () => {
   expect(wrapper.get('.home-explanation ul').text()).toContain('Liên kết về bản gốc, khi nguồn có công bố.')
 })
 
-it('describes the source only when the sample has an https URL', async () => {
-  const key = sample.hits[0]!.doc as keyof typeof sample.documents
-  const doc = sample.documents[key] as { source_url?: string }
-  const original = doc.source_url
-  try {
-    doc.source_url = 'http://example.invalid/source'
-    expect((await render()).get('.home-explanation ul').text()).not.toContain('Liên kết về bản gốc, khi nguồn có công bố.')
-    doc.source_url = 'https://example.invalid/source'
-    expect((await render()).get('.home-explanation ul').text()).toContain('Liên kết về bản gốc, khi nguồn có công bố.')
-  } finally {
-    if (original === undefined) delete doc.source_url
-    else doc.source_url = original
-  }
+it('describes the source only when the projected sample has a URL', async () => {
+  delete sample.result.documents['vn:vbpl:179252'].source_url
+  expect((await render()).get('.home-explanation ul').text()).not.toContain('Liên kết về bản gốc, khi nguồn có công bố.')
 })

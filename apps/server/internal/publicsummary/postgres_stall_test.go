@@ -147,7 +147,7 @@ func TestSummary_HandshakeDisconnectsReleaseAdmission(t *testing.T) {
 	}
 	cancel()
 	receivePromptly(t, done, "disconnected handshake caller held admission")
-	if len(h.gate) != 0 {
+	if len(h.gate.shared) != 0 {
 		t.Error("disconnected caller kept its admission slot")
 	}
 	h.manager.Close()
