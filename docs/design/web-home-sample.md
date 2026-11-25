@@ -173,8 +173,12 @@ and public assets; only the validated projection can leave Nitro. The page's
 existing cache and headers remain in force.
 
 Enable the server route before switching the web page to it; an old server or a
-disabled route simply leaves the stored sample visible. No corpus, recipe,
-database schema or credentials change. Replace the
+disabled route simply leaves the stored sample visible. The host bundle sets
+`SERVER_PUBLIC_SAMPLE=true` from 2026-11-25: the owner enabled it after the
+one-time check below passed on release `20261124_1`, before the capacity run on
+the serving host, because the route runs one search per activation; the sample
+stream of the overload phase runs in the same host window as the summaries. No
+corpus, recipe, database schema or credentials change. Replace the
 [release restore runbook's manual refresh](../runbooks/release-restore.md#check-the-home-sample)
 when the feature ships: after activation or rollback verify that a live sample
 names the active release and that the home page uses it or clearly labels the

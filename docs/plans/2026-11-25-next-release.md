@@ -20,7 +20,7 @@
 - Live home sample: before setting `SERVER_PUBLIC_SAMPLE=true` on the host, run the fixed query once on the active release and confirm a 200 rendered as the live sample (`docs/design/web-home-sample.md` "Acceptance"); then add the flag to the host server environment and run the capacity phase D sample stream on A1.
 
 - 2026-11-25: `v0.1.55` is live with A1, A2 and A3 (the sample route answers `not_found` with the flag off; the home page shows the stored sample with its label).
-- Live home sample: the one-time check on release `20261124_1` first refused the fixed query's hit (`no_proven_cut`); the cut proof now counts leaf provisions of source-tree text (#535, `v0.1.56`), and with it a local server and Nitro on that release return 200 and render the live sample. Still open before `SERVER_PUBLIC_SAMPLE=true` on the host: the owner's decision whether to enable before the A1 capacity window (host access between 01:00 and 03:00), and the phase D sample stream that `loadcheck` does not send yet. The sample answers `busy` until a signed-in search has opened the release engine.
+- Live home sample: the one-time check on release `20261124_1` first refused the fixed query's hit (`no_proven_cut`); the cut proof now counts leaf provisions of source-tree text (#535, `v0.1.56`), and with it a local server and Nitro on that release return 200 and render the live sample. The owner approved enabling before the A1 capacity window on 2026-11-25; the host bundle sets `SERVER_PUBLIC_SAMPLE=true`. Still open: the phase D sample stream that `loadcheck` does not send yet, to run in the summaries' A1 window (host access between 01:00 and 03:00). The sample answers `busy` until a signed-in search has opened the release engine.
 
 ## Group B: needs a corpus release (open issues, discuss after Group A)
 
@@ -34,7 +34,7 @@
 
 - Measured 2026-11-25: in the latest evaluation artifact (run of 2026-11-24, legacy cohort, gate skipped) all three unaccented cases abstain with `low_confidence` in every arm and limit. Removing the gate alone gives users an accepted query and no evidence. B1 needs a route for unaccented text before the recipe change: candidates are restoring diacritics from the top lexical hits before the dense embedding, or a lexical-only route with its own abstention statistic; measure on the golden questions folded to unaccented form (a calibration input, not a gate).
 
-### B2 Công báo information
+### B2 Công báo information (closed by the owner 2026-11-25: no adapter; evidence in `docs/research/vn-sources-2026-11.md`)
 - ADR 0012 rejected Công báo as a source because its search missed known documents (`docs/research/vn-sources-2026-11.md`); the new role is metadata only (gazette issue number and publication date), recorded as an ADR 0012 History entry. `sbv_hanoi` stays dropped.
 - banhmi knowledge (not code, ADR 0001): RSS of the newest 50 documents and an exact-number search whose items carry `danh_sach_dang_trong_cong_bao` and `danh_sach_ky_cong_bao` (`banhmi/pkg/ingest/congbao/search.go`). Record fresh fixtures from a Vietnam egress first.
 - Identity: match by normalized number, issuer and issue date as for `chinhphu`; a miss is a gap, never absence.
@@ -51,6 +51,10 @@
 - Decided: the signing date is the document's stored issue date. The commencement form `<subject> có hiệu lực [thi hành] [kể] từ ngày ký [ban hành]` resolves to D = `issue_date` in `docs/design/validity-status.md` and `apps/corpus/internal/validity/date.go`; 80 of the 313 ambiguous entries of vn/20261117_7 use it (backlog 2026-11-18).
 - The date is what the document states, not a finding that it took effect then: basis `derived_from_text`, and every existing guard stays (one commencement sentence, no `trừ`, no clause-scoped commencement, subject is the document itself, rule A candidates only). A source `eff_from` that differs from the issue date stays a date conflict in the review queue; no rule overrides it.
 - Not in the rule: `sau N ngày kể từ ngày ký` (day-count convention is unsettled; resolve only if a later decision says how) and gazette-relative forms (B2).
+
+### B5 effective dates (owner decision 2026-11-25)
+- No new model batch over the whole corpus: the review of 2026-11-18 (#404) already adjudicated the queue, and on release `20261124_1` 2,258 of 2,280 primary non-consolidated documents carry an effective date. Instead resolve the 22 documents without one and the date conflicts (for example 85/2004/QĐ-TTg: text says from signing, 2004-05-13; source says 2004-06-09), each as a manual correction with a verbatim quote, drafted by a model and read by the primary.
+- 211/QĐ-NHNN landed in #538.
 
 ### Later, outside this plan
 - Provision-level validity (Plan 16, 349 open `partial_without_provision_effect`), redline comparison after A3, scheduled corpus runs, wider scope (court precedents, guidance letters, TCVN and QCVN, provincial documents), citation dossiers and DOCX export, abbreviation expansion.

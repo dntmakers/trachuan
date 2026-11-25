@@ -72,3 +72,13 @@ framework), 367/QĐ-TTg (law implementation plan), 804/QĐ-TTg (datasets),
    signed PDF in the text extraction plan.
 3. Drop Công báo and `sbv_hanoi`. Do not add `sbv.gov.vn` now; State Bank
    decisions that are not law stay out until a case needs them.
+
+## Gazette search probe (2026-11-25)
+
+Recorded from a Vietnam address, 24 document numbers at 1.5 s intervals, against
+the gazette's search API (`api-searchcongbao.chinhphu.vn`, group `vbqpp`): 0
+exact number matches. All 970 returned items were issued in 2010 or later, and
+each carries its gazette issues. The 329 served documents of release
+`20261124_1` whose commencement counts from gazette publication were all issued
+from 2003 to 2008, so that search cannot date them; 325 of them already have a
+source effective date. The owner closed the gazette adapter on 2026-11-25.
