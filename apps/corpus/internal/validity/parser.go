@@ -24,10 +24,11 @@ type Reason struct{ Kind, Sentence string }
 
 // Result holds the reading and any reasons it is unresolved.
 type Result struct {
-	Usable       bool
-	Commencement Date
-	Items        []Item
-	Reasons      []Reason
+	Usable                  bool
+	Commencement            Date
+	CommencementFromSigning bool
+	Items                   []Item
+	Reasons                 []Reason
 }
 
 // Select reports whether heading identifies an effect article.
@@ -64,10 +65,15 @@ func Parse(documentType, article string) Result {
 		}
 		if strings.Contains(lower, "có hiệu lực") {
 			date, exception, ok := parseCommencement(documentType, clean)
+			signing, signingException := parseSigningCommencement(documentType, sentence)
+			if signing {
+				ok, exception = true, signingException
+			}
 			if ok {
 				count++
 				if count == 1 {
 					result.Commencement = date
+					result.CommencementFromSigning = signing
 				}
 				if exception {
 					result.Reasons = append(result.Reasons, Reason{"exception", sentence})

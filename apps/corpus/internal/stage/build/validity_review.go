@@ -26,7 +26,11 @@ func (e *validityEngine) review(kind string, d validityDocument, targetKey, targ
 				r.sentences = append(r.sentences, item.Sentence)
 			}
 		}
-		if date := parsedDate(d.article.Commencement); date != "" {
+		date := parsedDate(d.article.Commencement)
+		if d.article.CommencementFromSigning && !e.corrections[d.key].Hold && !d.dateGap {
+			date = d.issue
+		}
+		if date != "" {
 			status := "in_force"
 			r.proposed = &source.Correction{Key: d.key, Number: d.number, Set: source.CorrectionSet{StatusClass: &status, EffFrom: &date}, Evidence: source.CorrectionEvidence{Anchor: d.anchor, Quote: d.quote}}
 		}

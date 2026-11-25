@@ -6,7 +6,7 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/source"
 )
 
-func TestDecisions_RuleVersion3(t *testing.T) {
+func TestDecisions_RuleVersion4(t *testing.T) {
 	commenced := testDoc("n", "3/2099/NĐ-CP", "2099-01-01", "")
 	commenced.statusCode, commenced.sourceClass = "CCHL", "not_yet"
 	commenced.article = testArticle("1/2/2099", "")
@@ -26,14 +26,14 @@ func TestDecisions_RuleVersion3(t *testing.T) {
 			t.Fatalf("%s history=%+v", key, h)
 		}
 		for _, decision := range h {
-			if decision.version != "validity/3" {
+			if decision.version != "validity/4" {
 				t.Errorf("%s %s version=%q", key, decision.layer, decision.version)
 			}
 		}
 	}
 }
 
-func TestCorrections_UnverifiedSourceDecisionVersion3(t *testing.T) {
+func TestCorrections_UnverifiedSourceDecisionVersion4(t *testing.T) {
 	l := gapLoader()
 	entries, held, err := l.validateCorrectionGaps([]source.Correction{gapCorrection()}, map[string]correctionDocument{"a": {number: "A"}})
 	if err != nil {
@@ -47,7 +47,7 @@ func TestCorrections_UnverifiedSourceDecisionVersion3(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := result.documents["a"].history
-	if len(h) != 2 || h[0].layer != "source" || h[0].version != "validity/3" || h[1].version != "correction_unverified" {
+	if len(h) != 2 || h[0].layer != "source" || h[0].version != "validity/4" || h[1].version != "correction_unverified" {
 		t.Fatalf("history=%+v", h)
 	}
 }

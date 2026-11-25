@@ -136,6 +136,16 @@ func (e *validityEngine) commencement(d validityDocument) {
 		e.operative[d.key] = *correction.Set.EffFrom
 		return
 	}
+	if d.article != nil && d.article.Usable && d.article.CommencementFromSigning {
+		if d.issue != "" && d.from != "" && d.from != d.issue {
+			e.review("date_conflict", d, "", "", d.issue)
+			return
+		}
+		if correction.Hold || d.dateGap || d.issue == "" {
+			e.review("unresolved_article", d, "", "", "")
+			return
+		}
+	}
 	candidate := d.sourceClass == "not_yet" || (strings.TrimSpace(d.statusCode) == "" && strings.TrimSpace(d.statusName) == "")
 	if strings.TrimSpace(d.statusCode) == "" && strings.TrimSpace(d.statusName) != "" && d.sourceClass == "unknown" {
 		e.review("rule_a_status_name", d, "", "", "")
@@ -143,6 +153,9 @@ func (e *validityEngine) commencement(d validityDocument) {
 	date := ""
 	if d.article != nil && d.article.Usable {
 		date = parsedDate(d.article.Commencement)
+		if d.article.CommencementFromSigning {
+			date = d.issue
+		}
 	}
 	if candidate && !correction.Hold && date != "" {
 		blocked := ""

@@ -71,7 +71,7 @@ func TestParse_ClauseScopedDateMakesArticleUnusable(t *testing.T) {
 	}
 }
 func TestParse_UnparsedEffectSentenceUnresolved(t *testing.T) {
-	for _, s := range []string{"Luật này có hiệu lực kể từ ngày ký.", "Các văn bản trước đây hết hiệu lực kể từ ngày Luật này có hiệu lực."} {
+	for _, s := range []string{"Các văn bản trước đây hết hiệu lực kể từ ngày Luật này có hiệu lực."} {
 		t.Run(s, func(t *testing.T) {
 			r := Parse("Luật", article(s))
 			if r.Usable || !hasReason(r, "unparsed_effect_sentence") {
@@ -174,5 +174,29 @@ func TestParse_ReplacementTitleWithDoiVoiAccepted(t *testing.T) {
 	r := Parse("Nghị định", article("Nghị định này có hiệu lực từ ngày 1/7/2024. Nghị định này thay thế Nghị định số 1/2020/NĐ-CP ngày 1/1/2020 của Chính phủ quy định đối với thanh toán."))
 	if !r.Usable {
 		t.Fatal(r)
+	}
+}
+
+func TestParse_SigningDate(t *testing.T) {
+	for _, tc := range []struct {
+		text   string
+		usable bool
+	}{
+		{"Nghị định này có hiệu lực từ ngày ký.", true},
+		{"Nghị định này có hiệu lực thi hành kể từ ngày ký ban hành.", true},
+		{"Nghị định này có hiệu lực từ ngày ký, trừ Điều 2.", false},
+		{"Nghị định này có hiệu lực sau 10 ngày kể từ ngày ký.", false},
+		{"Nghị định này có hiệu lực kể từ ngày ký và thay thế văn bản khác.", false},
+		{"Nghị định này có hiệu lực từ ngày ký kết.", false},
+		{"Nghị định này có hiệu lực từ ngày ký “Hợp đồng mua bán”.", false},
+		{"Điều 2 có hiệu lực từ ngày ký.", false},
+		{"Nghị định này có hiệu lực từ ngày đăng Công báo.", false},
+	} {
+		t.Run(tc.text, func(t *testing.T) {
+			r := Parse("Nghị định", article(tc.text))
+			if r.Usable != tc.usable || (tc.usable && (!r.CommencementFromSigning || r.Commencement != (Date{}))) {
+				t.Fatalf("%+v", r)
+			}
+		})
 	}
 }

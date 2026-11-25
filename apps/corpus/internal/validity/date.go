@@ -36,3 +36,9 @@ func parseCommencement(documentType, sentence string) (Date, bool, bool) {
 	date, ok := parseDate(match[1])
 	return date, match[2] != "", ok
 }
+
+func parseSigningCommencement(documentType, sentence string) (bool, bool) {
+	pattern := `(?i)^\s*` + regexp.QuoteMeta(strings.TrimSpace(documentType)) + `\s+này\s+có\s+hiệu\s+lực(?:\s+thi\s+hành)?(?:\s+kể)?\s+từ\s+ngày\s+ký(?:\s+ban\s+hành)?(?:\s*,\s*(trừ)(?:\s+[^.]*)?)?\s*\.\s*$`
+	match := regexp.MustCompile(pattern).FindStringSubmatch(sentence)
+	return match != nil, match != nil && match[1] != ""
+}
