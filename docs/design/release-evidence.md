@@ -48,9 +48,11 @@ new run requires exactly one of:
 Neither or both refuses the start, so a forgotten flag cannot look like a
 baseline. Both are unrelated to `--previous-manifest`, the ingest baseline. The
 snapshot freezes the **decision**: the file's SHA-256 and store path, or `none`.
-Two decisions are the same when their SHA-256 are equal. While the run has no
-`eval` item a start may replace the decision and prints both SHA-256; after that
-a different decision is refused.
+Two decisions are the same when their SHA-256 values are equal. Through schema
+8, a start may replace the decision until the run has an `eval` item and prints
+both SHA-256 values when it does. The
+[schema 9 build lock](release-changes-serving.md#build-and-evidence) moves the
+cutoff to build item creation.
 
 The `eval` stage reads the stored file, fails when its SHA-256 differs, and puts
 the frozen SHA-256 in its input hash, so another previous report cannot reuse an
@@ -269,3 +271,6 @@ the `evidence` recipe means a run with a decision started earlier takes a new
 selecting what to import and re-checking their own mappings. An effect has no
 date. The acting document's `eff_from` describes that document only; a provision
 may commence later, so no date of effect is to be inferred from it.
+
+[Serving release changes](release-changes-serving.md) proposes a release
+projection checked against `changes.jsonl` before signing.

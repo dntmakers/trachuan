@@ -53,6 +53,9 @@ rejection is a fixed plain-text 429 without a render.
 | `/vn/documents/{key}` | Reader: table of contents, text scrolled to the anchor, header with validity, side rail with a timeline, relations, nodes, fetched files and hashes, and the release id                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `/account`            | Email, sessions, personal tokens (create, name, revoke), authorized MCP clients (revoke), security (below), delete account                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
+The proposed [release changes page](release-changes-serving.md#mcp-and-web)
+opens from `/sources`.
+
 Under the applies-on control, the search form shows a separate issue-date range
 with labels "Ban hành từ ngày" / "Issued from" and "Ban hành đến ngày" / "Issued
 to". Leave either input blank to omit its bound. Reject invalid dates or a

@@ -13,6 +13,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [text detector inputs](detector-inputs.md)                                       | Frozen OCR item locations and tree volume, coverage and cutover                                                  |
 | [knowledge entries](knowledge-entries.md)                                        | File format of reviewed knowledge, provision dependencies, validator outcomes                                    |
 | [release evidence](release-evidence.md)                                          | `findings.json`, `identity.jsonl` and `changes.jsonl`: shapes, bindings and the release gate                     |
+| [release changes](release-changes-serving.md)                                    | Proposed corpus comparison projection, signed-in serving and rollout                                             |
 | [retrieval](retrieval.md)                                                        | Query validation, ranking, validity, subject filter, release pinning, MCP tools, web API                         |
 | [taxonomy](taxonomy.md)                                                          | Subject tree import, classification layers, evaluation gate                                                      |
 | [pipeline](pipeline.md)                                                          | Write path on Temporal, stages, batch submissions, release artifact                                              |

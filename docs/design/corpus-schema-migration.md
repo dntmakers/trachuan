@@ -41,3 +41,5 @@ changes. A server image that reads version 8 ships and runs before any version-8
 release is activated. A release of an earlier version stays a valid rollback
 target: it lacks the summary capability, so summaries are unavailable while it
 is active and the reader is unaffected.
+
+Version 9 is proposed for [serving release changes](release-changes-serving.md).

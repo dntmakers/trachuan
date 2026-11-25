@@ -38,6 +38,12 @@ by measurement before the first release.
 | OAuth lifetimes                                                           | Pending authorization request 10 min; code 60 s; access token 1 h; refresh family 30 days from the code exchange                                                                                                                                                                                                                           |
 | OAuth state kept                                                          | 10 token families per grant (the oldest is revoked); 10,000 unexpired pending requests; `last_used_at` written at most hourly; cleanup every 10 min in batches of 1,000, up to 50 batches per step per run; replay retention 1 day (start events in [OAuth](oauth.md#retention)); grants without an unexpired family retired after 30 days |
 
+The proposed [release changes](release-changes-serving.md) page defaults to 20
+items and accepts limits from 1 to 50 inclusive in requests and cursors. The
+compact JSON payload cap is 32 KiB, including continuation, and each serialized
+item is at most 4 KiB. A cursor is at most 512 bytes. Document keys use the
+`read` handle length limit.
+
 ## Accounts
 
 Limits for [email accounts and TOTP](accounts.md).
@@ -201,6 +207,11 @@ item deadline, leaving retryable infrastructure failures; resource estimates do
 not authorize raising ceilings. The primary measures local RSS, disk, build
 time, sparse nnz and dump size before accepting these limits. No new paid
 service is added. Host latency and memory acceptance remain separate.
+
+The proposed
+[release changes projection](release-changes-serving.md#build-and-evidence)
+allows up to 128 MiB of canonical serialized rows per release. Measure the
+physical table and indexes separately against the host disk budget.
 
 ## Retrieval
 
