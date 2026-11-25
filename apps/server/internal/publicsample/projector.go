@@ -105,11 +105,11 @@ func Project(raw retrieval.Response, presented retrieval.SearchResult, release s
 	if ph.Handle != retrieval.Handle(rh.Identity) || ph.Citation != rh.Citation || ph.Snippet != snippet || ph.Complete != complete || strings.Join(strings.Fields(rh.Number), " ") != doc.Number || strings.Join(strings.Fields(rh.Title), " ") != doc.Title || url != doc.SourceURL || rh.Stamp.Current != doc.Status.Current || rh.Stamp.StatusClass != doc.Status.Class || rh.Stamp.Basis != doc.Status.Basis || rh.Stamp.StatusBasis != doc.Status.StatusBasis {
 		return zero, ReasonMismatch
 	}
-	if !cut {
+	if !cut || doc.TextSource != "source_tree" {
 		return zero, ReasonNoProvenCut
 	}
 	key, anchor, err := retrieval.ParseHandle(ph.Handle)
-	if err != nil || key != DocumentKey || anchor == "" || strings.Contains(anchor, "\n") || release == "" || ph.Citation == "" || ph.Snippet == "" || complete || !utf8.ValidString(ph.Snippet) || len([]rune(ph.Snippet)) > retrieval.SnippetCap || !validSource(doc.TextSource) || !validDate(doc.Issued) || !validDate(doc.EffectiveFrom) || !validDate(doc.EffectiveTo) {
+	if err != nil || key != DocumentKey || anchor == "" || strings.Contains(anchor, "\n") || release == "" || ph.Citation == "" || ph.Snippet == "" || complete || !utf8.ValidString(ph.Snippet) || len([]rune(ph.Snippet)) > retrieval.SnippetCap || !validDate(doc.Issued) || !validDate(doc.EffectiveFrom) || !validDate(doc.EffectiveTo) {
 		return zero, ReasonSchema
 	}
 	if !validUTF8(release, ph.Handle, ph.Doc, ph.Citation, ph.Snippet, doc.Number, doc.Status.Class, doc.Status.Basis, doc.Status.StatusBasis, doc.TextSource, doc.Title, doc.Type, doc.Issuer, doc.SourceURL) {
@@ -137,13 +137,6 @@ func validUTF8(values ...string) bool {
 	return true
 }
 
-func validSource(s string) bool {
-	switch s {
-	case "source_tree", "html_transcription", "pdf_text", "ocr", "none":
-		return true
-	}
-	return false
-}
 func validDate(d *retrieval.Date) bool {
 	if d == nil {
 		return true

@@ -16,10 +16,37 @@ func sample() (retrieval.Response, retrieval.SearchResult) {
 	id := retrieval.Identity{Country: "vn", DocumentKey: DocumentKey, Anchor: "art_9"}
 	text := strings.Repeat("body text ", 100)
 	url := CanonicalURL
-	h := retrieval.Hit{Identity: id, Number: DocumentNumber, Title: "title", Citation: "citation", SourceURL: &url, Text: text, Fragments: []retrieval.Fragment{{Identity: id, Role: "body", Start: 0, End: len([]rune(text)), TextStart: 0, TextEnd: len([]rune(text))}}}
+	p := retrieval.Provision{ID: 1, NodeID: "a", Identity: id, Text: text}
+	c := retrieval.Candidate{ChunkID: 1, GroupID: 1, ProvisionID: 1, Group: id, Identity: id, Provision: p, Ancestors: []retrieval.Provision{p}, Descendants: []retrieval.Provision{p}, Cosine: .5}
+	a := retrieval.Arms{Validation: retrieval.Validation{Accepted: true}, Depths: retrieval.Depths{Dense: 50, Lexical: 50}, Primary: retrieval.ArmGroup{Dense: []retrieval.Candidate{c}, Members: []retrieval.Candidate{c}}}
+	recipe := retrieval.Recipe2()
+	threshold := .5
+	recipe.Abstention.Threshold = &threshold
+	hits, err := retrieval.ShapeGroups(a, recipe, 1, "dense")
+	if err != nil || len(hits) != 1 {
+		panic("cannot build sample hit")
+	}
+	h := hits[0]
+	h.Number, h.Title, h.Citation, h.SourceURL = DocumentNumber, "title", "citation", &url
+	h.Stamp = retrieval.Validity{}
 	snippet, complete := retrieval.Snippet(h, retrieval.SnippetCap)
 	return retrieval.Response{Release: "20990101", Hits: []retrieval.Hit{h}}, retrieval.SearchResult{Release: "20990101", Hits: []retrieval.PresentedHit{{Handle: retrieval.Handle(id), Doc: DocumentKey, Citation: "citation", Snippet: snippet, Complete: complete, Text: "SECRET"}}, Documents: map[string]retrieval.DocumentEntry{DocumentKey: {Number: DocumentNumber, TextSource: "source_tree", Title: "title", SourceURL: CanonicalURL}}}
 }
+func TestProjectRequiresSourceTree(t *testing.T) {
+	for _, source := range []string{"html_transcription", "pdf_text", "ocr", "none", ""} {
+		t.Run(source, func(t *testing.T) {
+			raw, presented := sample()
+			doc := presented.Documents[DocumentKey]
+			doc.TextSource = source
+			presented.Documents[DocumentKey] = doc
+			_, reason := Project(raw, presented, "20990101")
+			if reason != ReasonNoProvenCut {
+				t.Fatalf("source %q: got %q, want %q", source, reason, ReasonNoProvenCut)
+			}
+		})
+	}
+}
+
 func TestProject(t *testing.T) {
 	raw, presented := sample()
 	presented.Hits[0].Path = []retrieval.PresentedPathNode{{Heading: "SECRET_PATH"}}
@@ -95,9 +122,6 @@ func TestProjectRefusals(t *testing.T) {
 		{"schema", func(r *retrieval.Response, p *retrieval.SearchResult, s *string) { *s = "" }, ReasonSchema},
 		{"invalid handle", func(r *retrieval.Response, p *retrieval.SearchResult, s *string) {
 			r.Hits[0].Identity.Anchor = "a\nb"
-			for i := range r.Hits[0].Fragments {
-				r.Hits[0].Fragments[i].Identity = r.Hits[0].Identity
-			}
 			p.Hits[0].Handle = retrieval.Handle(r.Hits[0].Identity)
 		}, ReasonSchema},
 		{"cap", func(r *retrieval.Response, p *retrieval.SearchResult, s *string) {

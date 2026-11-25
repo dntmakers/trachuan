@@ -1,6 +1,7 @@
 package retrieval
 
 const (
+	minimumSampleRuleChars = 20
 	// SnippetCap is the snippet limit in docs/design/budgets.md.
 	SnippetCap = 600
 	// CompactDefaultLimit is the compact search default in docs/design/budgets.md.
