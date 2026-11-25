@@ -20,7 +20,7 @@
 - Live home sample: before setting `SERVER_PUBLIC_SAMPLE=true` on the host, run the fixed query once on the active release and confirm a 200 rendered as the live sample (`docs/design/web-home-sample.md` "Acceptance"); then add the flag to the host server environment and run the capacity phase D sample stream on A1.
 
 - 2026-11-25: `v0.1.55` is live with A1, A2 and A3 (the sample route answers `not_found` with the flag off; the home page shows the stored sample with its label).
-- Live home sample, found on the one-time check with release `20261124_1` on the local stack: the fixed query returns Điều 19 of 91/2025/QH15 but the server refuses it (`no_proven_cut`), because the cut lies in the article's clauses and points; the cut rule in `docs/design/web-home-sample.md` is being widened to the hit's subtree (Astra review, then code). The sample answers `busy` until a signed-in search has opened the release engine. `loadcheck` does not send the phase D sample stream yet. The A1 capacity window needs host access between 01:00 and 03:00; owner decides whether the flag may go on before it.
+- Live home sample: the one-time check on release `20261124_1` first refused the fixed query's hit (`no_proven_cut`); the cut proof now counts leaf provisions of source-tree text (#535, `v0.1.56`), and with it a local server and Nitro on that release return 200 and render the live sample. Still open before `SERVER_PUBLIC_SAMPLE=true` on the host: the owner's decision whether to enable before the A1 capacity window (host access between 01:00 and 03:00), and the phase D sample stream that `loadcheck` does not send yet. The sample answers `busy` until a signed-in search has opened the release engine.
 
 ## Group B: needs a corpus release (open issues, discuss after Group A)
 
@@ -48,7 +48,7 @@
 - Needs a public shape: documents added and removed, status and date changes, text changes per document, from the cause classes in release-evidence.md.
 - A first release with `baseline` changes has nothing to list. Signed-in accounts only; email alerts later.
 
-### B4 commencement from the signing date (owner decision 2026-11-25)
+### B4 commencement from the signing date (owner decision 2026-11-25; landed in #536, takes effect with the next corpus build under `validity/4`)
 - Decided: the signing date is the document's stored issue date. The commencement form `<subject> có hiệu lực [thi hành] [kể] từ ngày ký [ban hành]` resolves to D = `issue_date` in `docs/design/validity-status.md` and `apps/corpus/internal/validity/date.go`; 80 of the 313 ambiguous entries of vn/20261117_7 use it (backlog 2026-11-18).
 - The date is what the document states, not a finding that it took effect then: basis `derived_from_text`, and every existing guard stays (one commencement sentence, no `trừ`, no clause-scoped commencement, subject is the document itself, rule A candidates only). A source `eff_from` that differs from the issue date stays a date conflict in the review queue; no rule overrides it.
 - Not in the rule: `sau N ngày kể từ ngày ký` (day-count convention is unsettled; resolve only if a later decision says how) and gazette-relative forms (B2).
