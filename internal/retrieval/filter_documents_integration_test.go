@@ -31,7 +31,7 @@ func (trace *filterDocumentTrace) TraceQueryStart(ctx context.Context, _ *pgx.Co
 	slices.Sort(keys)
 	keys = slices.Compact(keys)
 	switch {
-	case data.SQL == `SELECT key,doc_type,issuer FROM document WHERE key=ANY($1::text[])`:
+	case data.SQL == `SELECT key,doc_type,issuer,issue_date FROM document WHERE key=ANY($1::text[])`:
 		trace.filters++
 		trace.filterKeys = keys
 	case strings.HasPrefix(data.SQL, `SELECT key, number, title, doc_type, issuer,`):

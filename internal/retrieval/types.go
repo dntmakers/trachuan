@@ -36,6 +36,8 @@ type Request struct {
 	DocTypes    []string
 	Issuers     []string
 	Documents   []string
+	IssuedFrom  *Date
+	IssuedTo    *Date
 	Cursor      string
 }
 

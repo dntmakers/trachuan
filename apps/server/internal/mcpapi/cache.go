@@ -80,6 +80,8 @@ func (cfg Config) cachedSearch(ctx context.Context, in searchInput, validate fun
 		force = *in.InForceOnly
 	}
 	canonical := map[string]any{"country": in.Country, "query": in.Query, "as_of": in.AsOf, "in_force_only": force, "detail": detail, "limit": req.Limit, "release": rel, "nodes": canonicalFilter(in.Nodes), "doc_types": canonicalFilter(in.DocTypes), "issuers": canonicalFilter(in.Issuers), "documents": canonicalFilter(in.Documents), "document_keys": exactDocumentFilter(in.Documents), "cursor": in.Cursor}
+	canonical["issued_from"] = in.IssuedFrom
+	canonical["issued_to"] = in.IssuedTo
 	raw, _ := json.Marshal([]any{rel, now.Format(time.DateOnly), canonical})
 	key := sha256.Sum256(raw)
 	if raw, ok := scope.Search.Get(rel, key); ok {

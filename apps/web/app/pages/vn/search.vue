@@ -37,6 +37,16 @@ const facets = ref<components['schemas']['CorpusStatus'] | null>(null)
 const facetsFailed = ref(false)
 const query = ref('')
 const asOf = ref('')
+const issuedFrom = ref('')
+const issuedTo = ref('')
+const issuedError = ref(false)
+const filters = ref<InstanceType<typeof SearchFilters> | null>(null)
+function validDate(value: string) {
+  if (!value) return true
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false
+  const date = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value
+}
 const inForce = ref(true)
 const result = ref<SearchResult | null>(null)
 const submitted = ref<SearchInput | null>(null)
@@ -66,10 +76,12 @@ onMounted(() => {
     search()
   }
 })
-const activeCount = computed(() => Number(inForce.value) + Number(!!asOf.value) + nodes.value.length + docTypes.value.length + issuers.value.length)
+const activeCount = computed(() => Number(inForce.value) + Number(!!asOf.value) + Number(!!issuedFrom.value) + Number(!!issuedTo.value) + nodes.value.length + docTypes.value.length + issuers.value.length)
 const activeFilters = computed(() => [
   ...(inForce.value ? [messages.value.searchInForce] : []),
   ...(asOf.value ? [formatDate(asOf.value, language.value)] : []),
+  ...(issuedFrom.value ? [`${labels.value.issuedFrom}: ${formatDate(issuedFrom.value, language.value)}`] : []),
+  ...(issuedTo.value ? [`${labels.value.issuedTo}: ${formatDate(issuedTo.value, language.value)}`] : []),
   ...nodes.value.map(node => nodeLabels.value[node] || node), ...docTypes.value, ...issuers.value,
 ])
 async function focusOutcome() {
@@ -79,7 +91,8 @@ async function focusOutcome() {
 async function clearFilters() {
   const submittedQuery = submitted.value?.query
   if (!submittedQuery || loading.value) return
-  inForce.value = false; asOf.value = ''; nodes.value = []; docTypes.value = []; issuers.value = []
+  filters.value?.clearDates()
+  inForce.value = false; asOf.value = ''; issuedFrom.value = ''; issuedTo.value = ''; nodes.value = []; docTypes.value = []; issuers.value = []
   await search(false, submittedQuery)
   await focusOutcome()
 }
@@ -93,7 +106,10 @@ async function openFilters() {
   await nextTick()
   dialog.value?.showModal()
 }
-function closeFilters() { dialog.value?.close() }
+function closeFilters() {
+  if (Object.values(filters.value?.invalidDates() || {}).some(Boolean)) issuedError.value = true
+  dialog.value?.close()
+}
 function dialogClosed() { dialogOpen.value = false; filterButton.value?.focus() }
 function fillExample(value: string) { query.value = value }
 function onQueryKeydown(event: KeyboardEvent) {
@@ -135,10 +151,13 @@ async function search(more = false, submittedQuery = query.value) {
   if (loading.value) return
   if (!more) {
     if (!submittedQuery.trim()) return
+    const invalid = filters.value?.invalidDates()
+    issuedError.value = Object.values(invalid || {}).some(Boolean) || !validDate(asOf.value) || !validDate(issuedFrom.value) || !validDate(issuedTo.value) || (!!issuedFrom.value && !!issuedTo.value && issuedFrom.value > issuedTo.value)
+    if (issuedError.value) return
     controller?.abort()
     controller = new AbortController()
     action = api.captureAction()
-    submitted.value = { country: 'vn', query: submittedQuery, ...(asOf.value ? { as_of: asOf.value } : {}), in_force_only: inForce.value, detail: 'full', limit: 20, ...(nodes.value.length ? { nodes: [...nodes.value] } : {}), ...(docTypes.value.length ? { doc_types: [...docTypes.value] } : {}), ...(issuers.value.length ? { issuers: [...issuers.value] } : {}) }
+    submitted.value = { country: 'vn', query: submittedQuery, ...(asOf.value ? { as_of: asOf.value } : {}), ...(issuedFrom.value ? { issued_from: issuedFrom.value } : {}), ...(issuedTo.value ? { issued_to: issuedTo.value } : {}), in_force_only: inForce.value, detail: 'full', limit: 20, ...(nodes.value.length ? { nodes: [...nodes.value] } : {}), ...(docTypes.value.length ? { doc_types: [...docTypes.value] } : {}), ...(issuers.value.length ? { issuers: [...issuers.value] } : {}) }
   }
   if (!submitted.value || !action || !controller) return
   if (more && !result.value?.next_cursor) return
@@ -170,10 +189,13 @@ async function runRequest(input: SearchInput, more: boolean) {
           <textarea id="search-query" v-model="query" class="input" rows="1" autocomplete="off" :placeholder="messages.searchQuery" @keydown="onQueryKeydown" />
           <button class="btn btn-primary" type="submit" :disabled="loading">{{ messages.searchSubmit }}</button>
         </form>
+        <p v-if="issuedError && !dialogOpen" role="alert">{{ labels.issuedInvalid }}</p>
         <div class="search-mobile-chips">
           <button ref="filterButton" class="chip" type="button" @click="openFilters">{{ labels.filters }} · {{ activeCount }}</button>
           <button v-if="inForce" type="button" class="chip" @click="inForce = false">{{ messages.searchInForce }} ×</button>
           <button v-if="asOf" type="button" class="chip" @click="asOf = ''">{{ formatDate(asOf, language) }} ×</button>
+          <button v-if="issuedFrom" type="button" class="chip" @click="issuedFrom = ''">{{ labels.issuedFrom }}: {{ formatDate(issuedFrom, language) }} ×</button>
+          <button v-if="issuedTo" type="button" class="chip" @click="issuedTo = ''">{{ labels.issuedTo }}: {{ formatDate(issuedTo, language) }} ×</button>
           <button v-for="type in docTypes" :key="type" type="button" class="chip" @click="docTypes = docTypes.filter(item => item !== type)">{{ type }} ×</button>
           <button v-for="issuer in issuers" :key="issuer" type="button" class="chip" @click="issuers = issuers.filter(item => item !== issuer)">{{ issuer }} ×</button>
           <button v-for="node in nodes" :key="node" type="button" class="chip" @click="nodes = nodes.filter(item => item !== node)">{{ nodeLabels[node] || messages.searchNodes }} ×</button>
@@ -181,11 +203,11 @@ async function runRequest(input: SearchInput, more: boolean) {
       </div>
     </template>
     <div class="search-page">
-      <aside class="search-rail" :aria-label="labels.filters"><SearchFilters v-model:in-force="inForce" v-model:as-of="asOf" v-model:nodes="nodes" v-model:doc-types="docTypes" v-model:issuers="issuers" :facets="facets" :failed="facetsFailed" @retry="loadFacets" @labels="nodeLabels = { ...nodeLabels, ...$event }" /></aside>
-      <dialog v-if="dialogOpen" ref="dialog" class="search-dialog" :aria-label="labels.filters" @close="dialogClosed">
+      <dialog ref="dialog" class="search-dialog" :aria-label="labels.filters" @cancel.prevent="closeFilters" @close="dialogClosed">
         <button type="button" class="btn btn-secondary search-dialog-close" @click="closeFilters">{{ labels.close }}</button>
-        <SearchFilters v-model:in-force="inForce" v-model:as-of="asOf" v-model:nodes="nodes" v-model:doc-types="docTypes" v-model:issuers="issuers" :facets="facets" :failed="facetsFailed" @retry="loadFacets" @labels="nodeLabels = { ...nodeLabels, ...$event }" />
+        <div id="search-dialog-filters" />
       </dialog>
+      <aside class="search-rail" :aria-label="labels.filters"><Teleport to="#search-dialog-filters" :disabled="!dialogOpen"><SearchFilters ref="filters" v-model:in-force="inForce" v-model:as-of="asOf" v-model:issued-from="issuedFrom" v-model:issued-to="issuedTo" v-model:nodes="nodes" v-model:doc-types="docTypes" v-model:issuers="issuers" :issued-error="issuedError" :facets="facets" :failed="facetsFailed" @retry="loadFacets" @labels="nodeLabels = { ...nodeLabels, ...$event }" /></Teleport></aside>
       <div ref="searchMain" class="search-main" aria-live="polite">
         <div v-if="loading" class="search-loading" role="status"><span class="search-spinner" aria-hidden="true" />{{ labels.loading }}</div>
         <div v-if="error" class="notice search-state" role="alert"><h1 tabindex="-1">{{ rateLimited ? labels.rate : error === 'unavailable' ? labels.unavailable : errorMessage(language, error) }}</h1><button v-if="error === 'unavailable'" type="button" class="btn btn-secondary" @click="retrySearch">{{ shellMessages(language).retry }}</button><span v-if="retryAfter">{{ messages.searchRetry }} {{ retryAfter }} {{ messages.searchSeconds }}</span></div>

@@ -3819,6 +3819,14 @@ components:
           maxItems: 20
           description: Ordering preference that never hides hits.
           items: {type: string}
+        issued_from:
+          type: string
+          format: date
+          description: Inclusive issue-date ordering preference that never hides hits.
+        issued_to:
+          type: string
+          format: date
+          description: Inclusive issue-date ordering preference that never hides hits.
         cursor:
           type: string
           description: At most 2048 UTF-8 bytes.

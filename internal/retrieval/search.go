@@ -35,7 +35,7 @@ func (e *Engine) Search(ctx context.Context, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("plan search: %w", err)
 	}
 	var docs map[string]DocumentEntry
-	if len(req.DocTypes)+len(req.Issuers) > 0 {
+	if len(req.DocTypes)+len(req.Issuers) > 0 || req.IssuedFrom != nil || req.IssuedTo != nil {
 		var keys []string
 		for _, gs := range [][]Group{walk.primary, walk.nonCurrent} {
 			for _, g := range gs {

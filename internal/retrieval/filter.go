@@ -4,12 +4,24 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
 
 func normalizeFilters(req Request) (Request, error) {
+	for _, d := range []*Date{req.IssuedFrom, req.IssuedTo} {
+		if d != nil {
+			t := time.Date(d.Year, d.Month, d.Day, 0, 0, 0, 0, time.UTC)
+			if d.Year < 1 || d.Year > 9999 || t.Year() != d.Year || t.Month() != d.Month || t.Day() != d.Day {
+				return Request{}, ErrInvalidRequest
+			}
+		}
+	}
+	if req.IssuedFrom != nil && req.IssuedTo != nil && dateOrder(*req.IssuedFrom) > dateOrder(*req.IssuedTo) {
+		return Request{}, ErrInvalidRequest
+	}
 	fields := []*[]string{&req.Nodes, &req.DocTypes, &req.Issuers, &req.Documents}
 	for i, field := range fields {
 		budget := 20
@@ -40,7 +52,11 @@ func normalizeFilters(req Request) (Request, error) {
 }
 
 func hasFilters(req Request) bool {
-	return len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) > 0
+	return len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) > 0 || req.IssuedFrom != nil || req.IssuedTo != nil
+}
+
+func dateOrder(d Date) int {
+	return d.Year*10000 + int(d.Month)*100 + d.Day
 }
 
 func nodeCodePredicateSQL(code string) string {
@@ -48,6 +64,11 @@ func nodeCodePredicateSQL(code string) string {
 }
 
 func matchesFilter(req Request, id Identity, nodes []string, doc DocumentEntry) bool {
+	if req.IssuedFrom != nil || req.IssuedTo != nil {
+		if doc.Issued == nil || req.IssuedFrom != nil && dateOrder(*doc.Issued) < dateOrder(*req.IssuedFrom) || req.IssuedTo != nil && dateOrder(*doc.Issued) > dateOrder(*req.IssuedTo) {
+			return false
+		}
+	}
 	if len(req.Documents) > 0 && !slices.Contains(req.Documents, id.DocumentKey) {
 		return false
 	}

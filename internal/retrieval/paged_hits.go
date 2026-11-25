@@ -4,7 +4,7 @@ import "fmt"
 
 // PagedHits returns consecutive search pages from already collected arms.
 func PagedHits(arms Arms, recipe Recipe, req Request, pageLimit, maxHits int) ([]Response, error) {
-	if pageLimit < 1 || pageLimit > MaxLimit || maxHits < 1 || req.Cursor != "" || len(req.DocTypes)+len(req.Issuers)+len(req.Documents) != 0 {
+	if pageLimit < 1 || pageLimit > MaxLimit || maxHits < 1 || req.Cursor != "" || len(req.DocTypes)+len(req.Issuers)+len(req.Documents) != 0 || req.IssuedFrom != nil || req.IssuedTo != nil {
 		return nil, ErrInvalidRequest
 	}
 	var err error

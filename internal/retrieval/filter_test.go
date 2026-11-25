@@ -7,6 +7,22 @@ import (
 	"testing"
 )
 
+func TestFilter_IssuedBounds(t *testing.T) {
+	from := &Date{Year: 2024, Month: 1, Day: 1}
+	to := &Date{Year: 2024, Month: 12, Day: 31}
+	for _, tc := range []struct {
+		doc  *Date
+		want bool
+	}{
+		{nil, false}, {&Date{Year: 2023, Month: 12, Day: 31}, false},
+		{from, true}, {to, true}, {&Date{Year: 2025, Month: 1, Day: 1}, false},
+	} {
+		if got := matchesFilter(Request{IssuedFrom: from, IssuedTo: to}, Identity{}, nil, DocumentEntry{Issued: tc.doc}); got != tc.want {
+			t.Fatalf("date %v: got %t", tc.doc, got)
+		}
+	}
+}
+
 func TestFilter_KindsAndValues(t *testing.T) {
 	req, err := normalizeFilters(Request{Nodes: []string{" 1.1 ", "1.1"}, DocTypes: []string{" Café ", "Cafe\u0301"}, Issuers: []string{" Cơ quan ", "Other"}, Documents: []string{"vn:1", "vn:2"}})
 	if err != nil {
