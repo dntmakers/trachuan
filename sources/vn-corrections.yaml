@@ -2405,3 +2405,11 @@
     anchor: "dieu-2"
     quote: "Quyết định này có hiệu lực thi hành kể từ ngày ký"
   reviewed: "2026-11-25"
+- key: vn:vbpl:27998
+  number: "25/2012/TT-NHNN"
+  set: {eff_from: "2012-10-20"}
+  reason: "VBPL gives effective date 2012-10-20 with an end date of 2000-10-07; the end precedes the start, so normalization clears both dates. Điều 2 states the same start date. The end date stays unset: the source value is not usable and the text gives none."
+  evidence:
+    anchor: "dieu-2"
+    quote: "Thông tư này có hiệu lực thi hành kể từ ngày 20 tháng 10 năm 2012"
+  reviewed: "2026-11-25"
