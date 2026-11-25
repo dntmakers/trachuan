@@ -18,7 +18,7 @@ type Engine struct {
 	embedder       Embedder
 	queryRecipe    embedding.Recipe
 	numberSegments map[string]struct{}
-	sparse         sparseLifecycle
+	sparse         *sparseLifecycle
 }
 
 func (e *Engine) Prepare(ctx context.Context, req Request) (Prepared, error) {

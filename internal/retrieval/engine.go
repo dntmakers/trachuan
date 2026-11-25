@@ -59,7 +59,7 @@ func openEngine(ctx context.Context, db *pgxpool.Pool, embedder Embedder, r Rele
 	if err = validateDenseRecipe(r.DenseRecipe, running, typmod); err != nil {
 		return nil, err
 	}
-	engine := &Engine{db: db, embedder: embedder, queryRecipe: running, release: r, options: options}
+	engine := &Engine{db: db, embedder: embedder, queryRecipe: running, release: r, options: options, sparse: &sparseLifecycle{}}
 	engine.numberSegments, err = engine.loadNumberSegments(ctx)
 	if err != nil {
 		return nil, err

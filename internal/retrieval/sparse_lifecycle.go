@@ -48,7 +48,10 @@ func (s *sparseLifecycle) init() {
 }
 
 func (e *Engine) StartSparsePostings(report func(PostingsOutcome)) {
-	s := &e.sparse
+	s := e.sparse
+	if s == nil {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.started || s.closed || s.retired {
@@ -89,7 +92,10 @@ func (e *Engine) StartSparsePostings(report func(PostingsOutcome)) {
 }
 
 func (e *Engine) publishPostings(index *sparsePostings) bool {
-	s := &e.sparse
+	s := e.sparse
+	if s == nil {
+		return false
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.retired {
@@ -100,7 +106,10 @@ func (e *Engine) publishPostings(index *sparsePostings) bool {
 }
 
 func (e *Engine) Retire() {
-	s := &e.sparse
+	s := e.sparse
+	if s == nil {
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.retired = true
@@ -110,7 +119,10 @@ func (e *Engine) Retire() {
 }
 
 func (e *Engine) Close() {
-	s := &e.sparse
+	s := e.sparse
+	if s == nil {
+		return
+	}
 	s.mu.Lock()
 	s.closed = true
 	if s.cancel != nil {
@@ -121,13 +133,25 @@ func (e *Engine) Close() {
 	s.index.Store(nil)
 }
 
-func (e *Engine) SparsePostingsReady() bool { return e.sparse.index.Load() != nil }
+func (e *Engine) SparsePostingsReady() bool { return e.sparse != nil && e.sparse.index.Load() != nil }
 
 func (e *Engine) LexicalSources() LexicalSources {
+	if e.sparse == nil {
+		return LexicalSources{}
+	}
 	return LexicalSources{SQL: e.sparse.sql.Load(), Postings: e.sparse.postings.Load(), Reused: e.sparse.reused.Load(), FallbackSearches: e.sparse.fallbackSearches.Load(), FallbackGroups: e.sparse.fallbackGroups.Load(), Searches: e.sparse.searches.Load()}
 }
 
+func (e *Engine) countSearch() {
+	if e.sparse != nil {
+		e.sparse.searches.Add(1)
+	}
+}
+
 func (e *Engine) postingsFor(query lexical.Vector) *sparsePostings {
+	if e.sparse == nil {
+		return nil
+	}
 	for _, entry := range query {
 		if entry.Value != 1 {
 			return nil

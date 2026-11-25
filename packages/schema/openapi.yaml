@@ -7,6 +7,43 @@ info:
 security:
 - session: []
 paths:
+  /api/v1/public/sample:
+    get:
+      tags: [public-sample]
+      security: []
+      responses:
+        '200':
+          description: Success
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+            X-Sample-Status-Date:
+              schema: {type: string, format: date}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSampleResult'
+        '400': &sample-error
+          description: Request failed
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSummaryError'
+        '404': *sample-error
+        '503':
+          description: Request failed
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+            Retry-After:
+              schema: {type: integer}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicSummaryError'
   /api/v1/auth/google/start:
     get:
       tags: [weblogin]
@@ -3015,6 +3052,59 @@ components:
       in: cookie
       name: __Host-pending
   schemas:
+    PublicSampleResult:
+      type: object
+      additionalProperties: false
+      required: [release, abstain, hits, documents]
+      properties:
+        release: {type: string, minLength: 1}
+        abstain: {type: boolean, const: false}
+        hits:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items: {$ref: '#/components/schemas/PublicSampleHit'}
+        documents:
+          type: object
+          additionalProperties: false
+          required: ['vn:vbpl:179252']
+          properties:
+            'vn:vbpl:179252': {$ref: '#/components/schemas/PublicSampleDocument'}
+    PublicSampleHit:
+      type: object
+      additionalProperties: false
+      required: [handle, doc, citation, snippet, complete]
+      properties:
+        handle: {type: string, pattern: '^vn:vbpl:179252#.+$'}
+        doc: {type: string, const: 'vn:vbpl:179252'}
+        citation: {type: string, minLength: 1}
+        snippet: {type: string, minLength: 1, maxLength: 600}
+        complete: {type: boolean, const: false}
+    PublicSampleDocument:
+      type: object
+      additionalProperties: false
+      required: [number, status, text_source, text_complete]
+      properties:
+        number: {type: string, const: '91/2025/QH15'}
+        status: {$ref: '#/components/schemas/PublicSampleStatus'}
+        text_source: {type: string, enum: [source_tree, html_transcription, pdf_text, ocr, none]}
+        text_complete: {type: boolean}
+        title: {type: string}
+        type: {type: string}
+        issuer: {type: string}
+        issued: {type: string, format: date}
+        effective_from: {type: string, format: date}
+        effective_to: {type: string, format: date}
+        source_url: {type: string, const: 'https://vbpl.vn/van-ban/chi-tiet/179252'}
+    PublicSampleStatus:
+      type: object
+      additionalProperties: false
+      required: [current]
+      properties:
+        current: {type: boolean}
+        class: {type: string}
+        basis: {type: string}
+        status_basis: {type: string}
     LoginDestination:
       type: object
       additionalProperties: false

@@ -19,11 +19,15 @@ type Handler struct {
 	manager *Manager
 	enabled bool
 	clock   func() time.Time
-	gate    chan struct{}
+	gate    *Admission
 }
 
 func NewHandler(manager *Manager, enabled bool, clock func() time.Time) *Handler {
-	return &Handler{manager: manager, enabled: enabled, clock: clock, gate: make(chan struct{}, 8)}
+	return &Handler{manager: manager, enabled: enabled, clock: clock, gate: NewAdmission()}
+}
+
+func (h *Handler) Admission() *Admission {
+	return h.gate
 }
 
 func (h *Handler) Available(ctx context.Context, release string) (bool, error) {
@@ -47,13 +51,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		apierror.Write(w, 400, "invalid_request")
 		return
 	}
-	select {
-	case h.gate <- struct{}{}:
-		defer func() { <-h.gate }()
-	default:
+	if !h.gate.TrySummary() {
 		writeFailure(w, ErrBusy)
 		return
 	}
+	defer h.gate.DoneSummary()
 	if h.manager == nil {
 		writeFailure(w, ErrUnavailable)
 		return

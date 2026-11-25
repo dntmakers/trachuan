@@ -138,10 +138,10 @@ func TestSummary_CancelledMetadataWaitersReleaseAdmission(t *testing.T) {
 	}
 	<-entered
 	deadline := time.Now().Add(100 * time.Millisecond)
-	for len(h.gate) != 8 && time.Now().Before(deadline) {
+	for len(h.gate.shared) != 8 && time.Now().Before(deadline) {
 		runtime.Gosched()
 	}
-	if len(h.gate) != 8 {
+	if len(h.gate.shared) != 8 {
 		t.Error("requests did not enter admission")
 	}
 	cancel()
@@ -153,7 +153,7 @@ func TestSummary_CancelledMetadataWaitersReleaseAdmission(t *testing.T) {
 		close(drained)
 	}()
 	receivePromptly(t, drained, "disconnected callers held admission while metadata stalled")
-	if len(h.gate) != 0 {
+	if len(h.gate.shared) != 0 {
 		t.Error("admission slots still held")
 	}
 	close(finish)

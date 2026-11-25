@@ -11,6 +11,7 @@ import (
 	"danny.vn/trachuan/apps/server/internal/mcpapi"
 	"danny.vn/trachuan/apps/server/internal/oauth"
 	"danny.vn/trachuan/apps/server/internal/passwordauth"
+	"danny.vn/trachuan/apps/server/internal/publicsample"
 	"danny.vn/trachuan/apps/server/internal/publicsummary"
 	"danny.vn/trachuan/apps/server/internal/reportsapi"
 	"danny.vn/trachuan/apps/server/internal/webapi"
@@ -20,6 +21,8 @@ import (
 
 type webDeps struct {
 	summaries     *publicsummary.Handler
+	publicSample  bool
+	sampleFlights *publicsample.Flights
 	password      *passwordauth.Handler
 	store         accountapi.Store
 	reportStore   reportsapi.Store
@@ -61,6 +64,7 @@ func newWebMux(d webDeps) *webMux {
 	if summaries == nil {
 		summaries = publicsummary.NewHandler(nil, false, d.loginLimit.clock)
 	}
+	mux.Handle("GET /api/v1/public/sample", publicsample.NewHandler(d.publicSample, summaries.Admission()).WithFlights(d.sampleFlights))
 	mux.Handle("GET /api/v1/public/documents", summaries)
 	mux.Handle("GET /api/v1/public/documents/{key}", summaries)
 	mux.Handle("GET /api/v1/public/status", publicLimit.publicMiddleware(webapi.NewPublicStatus(d.tools, summaries.Available)))

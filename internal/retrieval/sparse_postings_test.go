@@ -69,7 +69,7 @@ func TestSparseCandidates_ContainsSQLBoundaryTies(t *testing.T) {
 }
 
 func TestSparseQuery_NonUnitWeightsFallBack(t *testing.T) {
-	e := &Engine{}
+	e := &Engine{sparse: &sparseLifecycle{}}
 	e.sparse.index.Store(&sparsePostings{})
 	for _, weight := range []float32{0, -1, 2, math.Nextafter32(1, 2), float32(math.NaN())} {
 		if e.postingsFor(lexical.Vector{{Index: 1, Value: weight}}) != nil {
@@ -83,7 +83,7 @@ func TestSparseQuery_NonUnitWeightsFallBack(t *testing.T) {
 
 func TestSparseLifecycle_CloseAndRetireBlockPublication(t *testing.T) {
 	for _, retire := range []bool{false, true} {
-		e := &Engine{}
+		e := &Engine{sparse: &sparseLifecycle{}}
 		e.sparse.init()
 		if retire {
 			e.Retire()
@@ -101,7 +101,7 @@ func TestSparseLifecycle_CloseAndRetireBlockPublication(t *testing.T) {
 }
 
 func TestSparseLifecycle_CloseWaitsForLoader(t *testing.T) {
-	e := &Engine{}
+	e := &Engine{sparse: &sparseLifecycle{}}
 	e.sparse.init()
 	entered, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	e.sparse.wg.Add(1)
@@ -118,7 +118,7 @@ func TestSparseLifecycle_CloseWaitsForLoader(t *testing.T) {
 }
 
 func TestSparseLifecycle_EvaluationReportsDisabledOnce(t *testing.T) {
-	e := &Engine{options: Options{Profile: "evaluation"}}
+	e := &Engine{options: Options{Profile: "evaluation"}, sparse: &sparseLifecycle{}}
 	e.sparse.init()
 	var outcomes []PostingsOutcome
 	for range 2 {

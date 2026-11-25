@@ -17,6 +17,7 @@ import (
 
 func candidateEngine() *Engine {
 	return &Engine{
+		sparse:      &sparseLifecycle{},
 		queryRecipe: embedding.QueryRecipe1(),
 		release:     Release{Rel: "20990101", RetrievalRecipe: Recipe2(), LexicalRecipe: lexical.Recipe1()},
 		options:     Options{Profile: "serving", Now: func() time.Time { return time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC) }},
@@ -340,7 +341,7 @@ func TestCandidates_FallbackCounters(t *testing.T) {
 }
 
 func TestSearch_CountsRequests(t *testing.T) {
-	e := &Engine{}
+	e := &Engine{sparse: &sparseLifecycle{}}
 	_, _ = e.Search(t.Context(), Request{})
 	v := reflect.ValueOf(e.LexicalSources()).FieldByName("Searches")
 	if !v.IsValid() || v.Uint() != 1 {
