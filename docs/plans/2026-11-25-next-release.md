@@ -8,11 +8,16 @@
 
 |Stage|Contents|Depends on|State|
 |-|-|-|-|
-|A0 design|Sol draft of A1 to A4 into the design notes, Astra review, primary edits and accepts|plan merged|planned|
-|A1 issue-date filter|`issued_from` and `issued_to` on MCP `search`, `/api/v1` search and the web search form, under the filter contract (reorder, `in_filter`, cursor digest); OpenAPI and generated client|A0|planned|
-|A2 source files|`files` on the document entry of a `read` of a document handle and on the web reader: name, role, size, SHA-256 and the source URL, from `source_file`|A0|planned|
-|A3 timeline|a dated view of one document: issue, effective dates and the acting documents that repeal, replace, suspend, amend or consolidate it, with their dates; MCP `read` and the web reader|A0, A2|planned|
-|A4 live home sample|one fixed search on the active release, served without a session and cached per release; home page reads it and falls back to the stored sample; removes the manual refresh step from `docs/runbooks/release-restore.md`|A0|planned|
+|A0 design|Sol draft of A1 to A4 into the design notes, Astra review, primary edits and accepts|plan merged|landed (#527)|
+|A1 issue-date filter|`issued_from` and `issued_to` on MCP `search`, `/api/v1` search and the web search form, under the filter contract (reorder, `in_filter`, cursor digest); OpenAPI and generated client|A0|landed (#528)|
+|A2 source files|`files` on the document entry of a `read` of a document handle and on the web reader: name, role, size, SHA-256 and the source URL, from `source_file`|A0|landed (#529)|
+|A3 timeline|a dated view of one document: issue, effective dates and the acting documents that repeal, replace, suspend, amend or consolidate it, with their dates; MCP `read` and the web reader|A0, A2|landed (#531)|
+|A4 live home sample|one fixed search on the active release, served without a session and cached per release; home page reads it and falls back to the stored sample; removes the manual refresh step from `docs/runbooks/release-restore.md`|A0|landed (#530); flag off|
+
+## Group A release
+
+- Tag the next patch release from `main` and deploy; the website shows the issue-date filter, source files and the timeline at once.
+- Live home sample: before setting `SERVER_PUBLIC_SAMPLE=true` on the host, run the fixed query once on the active release and confirm a 200 rendered as the live sample (`docs/design/web-home-sample.md` "Acceptance"); then add the flag to the host server environment and run the capacity phase D sample stream on A1.
 
 ## Group B: needs a corpus release (open issues, discuss after Group A)
 
