@@ -136,37 +136,38 @@ func (r summaryRecord) relation() relationIdentity {
 }
 
 type lineWriter struct {
-	w   *bufio.Writer
-	buf bytes.Buffer
-	enc *json.Encoder
+	w *bufio.Writer
 }
 
 func newLineWriter(w io.Writer) *lineWriter {
-	l := &lineWriter{w: bufio.NewWriterSize(w, 1<<16)}
-	l.enc = json.NewEncoder(&l.buf)
-	l.enc.SetEscapeHTML(false)
-	return l
+	return &lineWriter{w: bufio.NewWriterSize(w, 1<<16)}
 }
 
 func encodeLine(value any) ([]byte, error) {
+	if err := validateLineUTF8(value); err != nil {
+		return nil, err
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(value); err != nil {
 		return nil, fmt.Errorf("encode summary line: %w", err)
 	}
+	if buf.Len()-1 > lineLimit {
+		return nil, refuse("summary line exceeds %d bytes", lineLimit)
+	}
 	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }
 
 func (l *lineWriter) write(value any) error {
-	l.buf.Reset()
-	if err := l.enc.Encode(value); err != nil {
-		return fmt.Errorf("encode summary line: %w", err)
+	line, err := encodeLine(value)
+	if err != nil {
+		return err
 	}
-	if l.buf.Len()-1 > lineLimit {
-		return refuse("summary line exceeds %d bytes", lineLimit)
+	if _, err := l.w.Write(line); err != nil {
+		return fmt.Errorf("write summary line: %w", err)
 	}
-	if _, err := l.w.Write(l.buf.Bytes()); err != nil {
+	if err := l.w.WriteByte('\n'); err != nil {
 		return fmt.Errorf("write summary line: %w", err)
 	}
 	return nil
