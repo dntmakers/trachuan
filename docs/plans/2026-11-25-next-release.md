@@ -41,5 +41,10 @@
 - Needs a public shape: documents added and removed, status and date changes, text changes per document, from the cause classes in release-evidence.md.
 - A first release with `baseline` changes has nothing to list. Signed-in accounts only; email alerts later.
 
+### B4 commencement from the signing date (owner decision 2026-11-25)
+- Decided: the signing date is the document's stored issue date. The commencement form `<subject> có hiệu lực [thi hành] [kể] từ ngày ký [ban hành]` resolves to D = `issue_date` in `docs/design/validity-status.md` and `apps/corpus/internal/validity/date.go`; 80 of the 313 ambiguous entries of vn/20261117_7 use it (backlog 2026-11-18).
+- The date is what the document states, not a finding that it took effect then: basis `derived_from_text`, and every existing guard stays (one commencement sentence, no `trừ`, no clause-scoped commencement, subject is the document itself, rule A candidates only). A source `eff_from` that differs from the issue date stays a date conflict in the review queue; no rule overrides it.
+- Not in the rule: `sau N ngày kể từ ngày ký` (day-count convention is unsettled; resolve only if a later decision says how) and gazette-relative forms (B2).
+
 ### Later, outside this plan
 - Provision-level validity (Plan 16, 349 open `partial_without_provision_effect`), redline comparison after A3, scheduled corpus runs, wider scope (court precedents, guidance letters, TCVN and QCVN, provincial documents), citation dossiers and DOCX export, abbreviation expansion.
