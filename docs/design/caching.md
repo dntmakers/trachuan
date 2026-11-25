@@ -41,7 +41,9 @@ the rules.
   hits pass the public admission gate instead
   ([serving public summaries](web-public-documents-serving.md)). Nitro keeps
   rendered summaries in a separate 32 MiB cache and public status for 30 seconds
-  ([caching and freshness](web-public-documents.md#caching-and-freshness)).
+  ([caching and freshness](web-public-documents.md#caching-and-freshness)). The
+  [home sample](web-home-sample.md#admission-activation-and-caching) has its own
+  one-result slot and shared flight, not the LRU and independent-miss rules.
 - Metrics report hits, misses, evictions and bytes per cache, with no key or
   account labels.
 
@@ -67,12 +69,12 @@ arms and presentation. Maximum age 1 hour.
 ## Read items
 
 The server caches the immutable part of a `read` item's fixed unit and part
-sequence (the document entry without its status, leads, provisions, outline
-entries or relations and their parts). The key is
-`sha256(release, canonical original item JSON, mode)`. For an item given as
-`{next}`, the server first validates and decodes the token exactly as without a
-cache, then keys by the token's original item and mode; the token's position is
-applied only when paging. For every response the server computes the document
+sequence (the document entry without its status, source files, leads,
+provisions, outline entries, relations or timeline events and their parts). The
+key is `sha256(release, canonical original item JSON, mode)`. For an item given
+as `{next}`, the server first validates and decodes the token exactly as without
+a cache, then keys by the token's original item and mode; the token's position
+is applied only when paging. For every response the server computes the document
 status from the injected clock, adds it to the document entry, and only then
 sizes units, cuts pages under the call cap and issues `next` tokens, so paging,
 continuation and completeness behave exactly as without the cache. Release

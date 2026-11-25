@@ -98,10 +98,10 @@ Errors, in this precedence:
 
 In this order:
 
-1. **Public admission.** A process-wide gate of 8 in-flight requests covers both
-   endpoints, cache hits included, through serialization. A request that finds
-   it full gets 503 `busy` at once, before release resolution or any cache
-   lookup.
+1. **Public admission.** The [process-wide gate](budgets.md#request-limits)
+   covers both endpoints and the [home sample](web-home-sample.md), cache hits
+   included, through serialization. A request that finds it full gets 503 `busy`
+   at once, before release resolution or any cache lookup.
 2. **Resolution.** A metadata-only resolver reads the active release id and its
    summary capability from the release record. It never opens the reader engine,
    the embedder or postings.
@@ -163,12 +163,23 @@ measured results, including web and server memory against their rows in
 accounts, sampling and A1 window are in
 [summary capacity harness](web-public-documents-capacity.md).
 
-| Phase               | Traffic                                                                                                                                                                                          | Duration       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
-| A, baseline         | three accounts: distinct-query searches at 2 per second in total; completed reader loads (HTML and the first document page) at 1 per second                                                      | 10 min         |
-| B, cold coverage    | A, plus every summary URL at 8 per second from 16 addresses; a `busy` answer is retried at most 3 times with backoff                                                                             | until complete |
-| C, warm working set | A, plus 500 summary URLs each requested twice within 60 seconds; the second must be a Nitro cache hit by the render counter                                                                      | 5 min          |
-| D, overload         | A, plus 40 summary pages per second from 40 addresses, 50 direct public API calls per second, the full list 10 times per second, 5% of requests aborted, and one activation; 429 and 503 ignored | 5 min          |
+| Phase               | Traffic                                                                                                                                                                                                                                                                                           | Duration       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| A, baseline         | three accounts: distinct-query searches at 2 per second in total; completed reader loads (HTML and the first document page) at 1 per second                                                                                                                                                       | 10 min         |
+| B, cold coverage    | A, plus every summary URL at 8 per second from 16 addresses; a `busy` answer is retried at most 3 times with backoff                                                                                                                                                                              | until complete |
+| C, warm working set | A, plus 500 summary URLs each requested twice within 60 seconds; the second must be a Nitro cache hit by the render counter                                                                                                                                                                       | 5 min          |
+| D, overload         | A, plus 40 summary pages per second from 40 addresses, 50 direct public API calls per second, the full list 10 times per second, and 20 direct home sample calls per second. Abort 5% of public requests; keep all traffic running across activation. Ignore public 429 and 503 for latency gates | 5 min          |
+
+In phase D, enable `SERVER_PUBLIC_SAMPLE` and send `GET /api/v1/public/sample`
+directly to the API, without credentials or a Nitro or HTTP cache. Start with a
+cold sample slot, and keep this stream running through the harness's release
+switch and switch back. Observe actual sample search starts and outcomes for
+each activation at the server. Require a start before and after each switch,
+exactly one start per activation, with no overlapping sample searches. Check
+that each valid 200 names the activation served, and that requests started after
+a switch was observed never reuse the retired sample. Report signed-in search
+and completed reader latency and error counts before and after the switch and
+enforce the gates below as usual. Restore the sample flag after the test window.
 
 | Gate                               | Proposal                                                                                                                                                                             |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

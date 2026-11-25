@@ -59,6 +59,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [web visual system](web-visual.md)                                               | Colour tokens, type, shape, stamps, logo, motion, contrast table                                                 |
 | [web voice](web-voice.md)                                                        | Voice rules, claims, voice and typeface per content field, maker panel                                           |
 | [public document summaries](web-public-documents.md)                             | The summary URL with no session, fields, outline and heading approval, availability, caching, head tags, sitemap |
+| [public home sample](web-home-sample.md)                                         | Fixed search, public projection, serving limits, fallback and rollout                                            |
 | [framework pages](web-frameworks.md)                                             | Framework list, version, control and search pages, words per field, access labels, caching and the flag          |
 | [serving public summaries](web-public-documents-serving.md)                      | Summary rows, public document endpoints, admission and capacity, tests, capacity acceptance                      |
 | [discovery](discovery.md)                                                        | Indexable routes, robots.txt, sitemap, head tags, structured data, llms.txt, measurement                         |
@@ -85,7 +86,8 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [retrieval recipe](retrieval-recipe.md)                                          | Shared Go API, recipes 2 and 3, evidence shaping                                                                 |
 | [retrieval validity](retrieval-validity.md)                                      | Eligibility, served status at the reference date, dated filtering                                                |
 | [sibling clause merge](retrieval-siblings.md)                                    | Candidate recipe 3 rule: clause hits of one article merge into one article hit, measured first                   |
-| [search results](mcp-results.md)                                                 | Compact search hits, snippets, related pointers, batch `read`, guide flow                                        |
+| [search results](mcp-results.md)                                                 | Compact search hits, snippets, related pointers and guide flow                                                   |
+| [batch reading](mcp-read.md)                                                     | Read forms, source files, timeline and paging                                                                    |
 | [evaluation](evaluation.md)                                                      | Cohorts, identity mapping, calibration, metrics and caches                                                       |
 | [MRR@8 tolerance](evaluation-mrr-tolerance.md)                                   | The bounded exception to MRR@8 non-regression on a corpus-only release, against a high-water mark                |
 | [period cases](evaluation-period-cases.md)                                       | Development cases about a past period: a reported cohort under the agent's period request, not gated             |
