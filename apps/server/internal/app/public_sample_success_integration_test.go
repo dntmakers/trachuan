@@ -75,7 +75,7 @@ func makeSampleCorpus(t *testing.T, ctx context.Context, db *pgxpool.Pool, rel s
 		t.Fatal(err)
 	}
 	hash := strings.Repeat("a", 64)
-	body := publicsample.Query + " " + strings.Repeat("Ngân hàng phải bảo vệ dữ liệu cá nhân của khách hàng theo quy định. ", 50)
+	body := "Khoản 1. " + publicsample.Query + " " + strings.Repeat("Ngân hàng phải bảo vệ dữ liệu cá nhân của khách hàng theo quy định. ", 50)
 	texts := &sampleFixtureTexts{values: []string{body}}
 	stats, err := lexical.Train(ctx, texts, lexical.Recipe1())
 	if err != nil {

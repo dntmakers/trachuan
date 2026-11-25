@@ -178,6 +178,9 @@ func shapeHit(g Group, arms Arms, recipe Recipe) (Hit, error) {
 	}
 	nodes := append([]string{}, arms.EffectiveNodes[c.GroupID]...)
 	h := Hit{Nodes: nodes, Locator: locator, Identity: g.Identity, Path: path, BestMember: bestMember, BestTextStart: bestStart, Number: c.Document.Number, Class: c.Document.Class, Source: c.Document.Source, Title: c.Document.Title, Citation: citation(c.Ancestors), Text: text, Fragments: fragments, Complete: complete, SourceURL: c.Document.SourceURL, Score: g.Score, BestCosine: g.BestCosine, Stamp: validity, Relations: rels, Warnings: c.Warnings, WarningsOmitted: c.WarningsOmitted, Gaps: gaps}
+	h.rulePrefixes = rulePrefixes(c.Descendants)
+	h.ruleLeaves = ruleLeaves(c.Descendants)
+	h.ambiguousTree = renderTree(c.Descendants, c.GroupID).ambiguous
 	if !complete {
 		v := 1
 		h.NextPart = &v

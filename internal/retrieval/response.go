@@ -90,6 +90,9 @@ type PathNode struct {
 
 // Hit is one provision returned by search.
 type Hit struct {
+	rulePrefixes    map[Identity]int
+	ruleLeaves      map[Identity]bool
+	ambiguousTree   bool
 	Identity        Identity   `json:"identity"`
 	Path            []PathNode `json:"path"`
 	BestMember      Identity   `json:"best_member"`

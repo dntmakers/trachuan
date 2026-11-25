@@ -34,9 +34,29 @@ some rule text of the hit's own subtree, with at least one non-whitespace
 character on each side. The subtree is the provision named by the hit's handle
 together with its descendants, found through `parent_id` when the hit is built,
 never by comparing anchors. Rule text is a provision's text without its label
-and heading line, so an excerpt that drops only a heading and keeps every
-sentence does not qualify; when the builder cannot separate the heading from the
-rest of a provision's text, that provision proves nothing.
+and heading. The label is taken as the source prints it at the start of the
+text: the stored label (`Điều 19`, with `.` or `:`) or its ordinal alone with
+`.` or `)` (`1.`, `b)`), compared after NFC and case folding, then the heading
+directly after it when the provision has one. An excerpt that drops only a label
+or a heading and keeps every sentence does not qualify; a provision whose label
+or heading the builder cannot find there proves nothing.
+
+One rule closes the class of cuts that remove no rule: only leaf provisions
+count. A leaf is a provision of the subtree with no child provision in the
+release, which is the named provision itself when it has none. Count letters and
+digits only, in a leaf's text after its verified label and heading. Text that a
+parent holds outside its children never counts, on the kept side or the omitted
+side: a line that introduces clauses, a repeated label or heading, whole or cut
+by the hit's own size limit. The cut is proven only when at least 20 such
+characters are omitted and at least 20 are kept.
+
+Only a document whose `text_source` is `source_tree` can give a live sample:
+each provision is then a node as the source publishes it, so a leaf's text after
+its label and heading is that provision's content, with no page headers or
+repeated headings from transcription or OCR. Any other text source uses the
+stored sample. The corpus is signed input that no visitor or container can
+change, so this proof guards against text shapes the rule did not foresee, not
+against a hostile corpus.
 
 Prove this from the snippet builder's retained source ranges and the hit's
 `body` fragments of the subtree. [Chunk rendering](chunk.md#tree-rendering) can
@@ -173,16 +193,19 @@ credential equivalence, one attempt across concurrent cold requests, warm hits,
 abstention and embedder failure, activation and rollback while a flight is
 running, and unchanged signed-in search and reader capacity under the
 [public overload gates](web-public-documents-serving.md#capacity-acceptance). A
-long lead cut with a complete named subtree, an excerpt that drops only a
-heading or only white space, an excerpt whose every seemingly omitted position
-survives in a parent or lead copy, and an unproven cut each fall back. A proven
-cut inside the named body or inside one of its descendants succeeds. Feed Nitro
-hostile 200 responses with extra hits, a wrong document key, extra nested
-fields, `hit.text`, and oversized decoded bodies, including an unknown length.
-Each must fall back before the page gets the data. Inspect the API body,
-rendered page, client assets and decoded hydration data for markers planted in
-forbidden fields and a nonselected hit on both paths. Check the live status date
-across Vietnam midnight and the fallback after an outage and a release mismatch.
+long lead cut with a complete named subtree, an excerpt that drops only a label,
+a heading, a heading repeated in a parent's own text, a parent's introducing
+line or white space, a document whose text is not the source's tree, an excerpt
+that omits or keeps fewer leaf characters than the minimum, an excerpt whose
+every seemingly omitted position survives in a parent or lead copy, and an
+unproven cut each fall back. A proven cut inside the named body or inside one of
+its descendants succeeds. Feed Nitro hostile 200 responses with extra hits, a
+wrong document key, extra nested fields, `hit.text`, and oversized decoded
+bodies, including an unknown length. Each must fall back before the page gets
+the data. Inspect the API body, rendered page, client assets and decoded
+hydration data for markers planted in forbidden fields and a nonselected hit on
+both paths. Check the live status date across Vietnam midnight and the fallback
+after an outage and a release mismatch.
 
 Before the first production enablement, run the fixed query once against a real
 release and confirm a 200 that Nitro renders as the live sample. If the fixed
