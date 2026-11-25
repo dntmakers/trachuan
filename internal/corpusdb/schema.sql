@@ -172,9 +172,39 @@ CREATE TABLE document_summary (
  CHECK (eff_to IS NULL OR eff_from IS NULL OR eff_to >= eff_from)
 );
 
+CREATE TABLE release_change_set (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+ version integer NOT NULL CHECK (version > 0),
+ country text COLLATE "C" NOT NULL CHECK (country <> '' AND country !~ E'[\t\n]'),
+ release text COLLATE "C" NOT NULL CHECK (release <> '' AND release !~ E'[\t\n]'),
+ predecessor text COLLATE "C" CHECK (predecessor <> '' AND predecessor !~ E'[\t\n]'),
+ predecessor_identity_hash text COLLATE "C" CHECK (predecessor_identity_hash ~ '^[0-9a-f]{64}$'),
+ baseline boolean NOT NULL,
+ document_added bigint NOT NULL CHECK (document_added >= 0),
+ document_removed bigint NOT NULL CHECK (document_removed >= 0),
+ document_validity bigint NOT NULL CHECK (document_validity >= 0),
+ provision_validity bigint NOT NULL CHECK (provision_validity >= 0),
+ provision_text bigint NOT NULL CHECK (provision_text >= 0),
+ document_key bigint NOT NULL CHECK (document_key >= 0),
+ digest text COLLATE "C" NOT NULL CHECK (digest ~ '^[0-9a-f]{64}$'),
+ CHECK (NOT baseline OR (document_added = 0 AND document_removed = 0 AND document_validity = 0 AND provision_validity = 0 AND provision_text = 0 AND document_key = 0))
+);
+
+CREATE TABLE release_change (
+ ordinal bigint PRIMARY KEY CHECK (ordinal > 0),
+ kind text COLLATE "C" NOT NULL CHECK (kind IN ('document_added','document_removed','document_validity','provision_validity','provision_text','document_key')),
+ key text COLLATE "C" CHECK (key <> '' AND key !~ E'[\t\n]'),
+ key2 text COLLATE "C" CHECK (key2 <> '' AND key2 !~ E'[\t\n]'),
+ payload text NOT NULL CHECK (payload IS JSON OBJECT WITH UNIQUE KEYS AND payload !~ E'[\t\n]')
+);
+CREATE INDEX ON release_change (kind, key, ordinal);
+CREATE INDEX ON release_change (kind, key2, ordinal);
+CREATE INDEX ON release_change (key, ordinal);
+CREATE INDEX ON release_change (key2, ordinal);
+
 CREATE TABLE release (
  singleton boolean PRIMARY KEY CHECK (singleton), country text COLLATE "C" NOT NULL CHECK (country = 'vn'),
- rel text COLLATE "C" NOT NULL UNIQUE, schema_version integer NOT NULL CHECK (schema_version = 8),
+ rel text COLLATE "C" NOT NULL UNIQUE, schema_version integer NOT NULL CHECK (schema_version = 9),
  taxonomy_version text COLLATE "C" NOT NULL,
  dense_recipe jsonb NOT NULL CHECK (jsonb_typeof(dense_recipe) = 'object'),
  chunk_recipe jsonb NOT NULL CHECK (jsonb_typeof(chunk_recipe) = 'object'),

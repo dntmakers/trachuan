@@ -10,12 +10,20 @@ import (
 	"testing"
 )
 
-func TestSchemaCompatibility_Version6To8Serve(t *testing.T) {
-	for _, version := range []int{6, 7, 8} {
+func TestSchemaCompatibility_Version6To9Serve(t *testing.T) {
+	for _, version := range []int{6, 7, 8, 9} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			db, _, embedder := fixture(t)
 			ctx := t.Context()
 			textSource := "source_tree"
+			if version < 9 {
+				readExec(t, db, `DROP TABLE release_change, release_change_set`)
+			}
+			if version == 8 {
+				readExec(t, db, `ALTER TABLE release DROP CONSTRAINT release_schema_version_check;
+UPDATE release SET schema_version=8;
+ALTER TABLE release ADD CHECK (schema_version=8)`)
+			}
 			if version == 6 {
 				readExec(t, db, `DROP TABLE document_summary;
 ALTER TABLE release DROP CONSTRAINT release_schema_version_check;
