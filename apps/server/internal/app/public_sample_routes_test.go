@@ -13,6 +13,16 @@ import (
 	"danny.vn/trachuan/apps/server/internal/websession"
 )
 
+func TestPublicSample_MethodNoStore(t *testing.T) {
+	sessions := &websession.Manager{PublicURL: "http://localhost"}
+	mux := newWebMux(webDeps{store: routeAccountStore{}, sessions: sessions, login: &weblogin.Handler{}, tools: mcpapi.Config{Limiter: &routeLimiter{}}, loginLimit: newLoginLimiter(time.Now, nil), publicURL: sessions.PublicURL})
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/v1/public/sample", nil))
+	if w.Code != http.StatusMethodNotAllowed || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("status %d headers %v", w.Code, w.Header())
+	}
+}
+
 func TestPublicSample_MountedFlights(t *testing.T) {
 	now := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 	flights := publicsample.NewFlights(context.Background(), func(context.Context) (publicsample.Activation, error) {

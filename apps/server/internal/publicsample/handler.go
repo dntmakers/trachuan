@@ -2,7 +2,6 @@ package publicsample
 
 import (
 	"errors"
-	"io"
 	"net/http"
 
 	"danny.vn/trachuan/apps/server/internal/apierror"
@@ -26,6 +25,10 @@ func (h *Handler) WithFlights(f *Flights) *Handler {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	if hasBody(r) {
+		r.Close = true
+		w.Header().Set("Connection", "close")
+	}
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -66,13 +69,5 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func hasBody(r *http.Request) bool {
-	if r.Body == nil || r.Body == http.NoBody {
-		return false
-	}
-	if r.ContentLength > 0 {
-		return true
-	}
-	var b [1]byte
-	n, err := r.Body.Read(b[:])
-	return n > 0 || err != io.EOF
+	return r.ContentLength != 0 || len(r.TransferEncoding) != 0
 }

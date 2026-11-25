@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+func TestSnippetBodyCutOverlappingChild(t *testing.T) {
+	parentID := int64(1)
+	parent := Identity{Country: "vn", DocumentKey: "vn:vbpl:179252", Anchor: "art_1"}
+	child := Identity{Country: "vn", DocumentKey: parent.DocumentKey, Anchor: "art_1/cl_1"}
+	childText := strings.Repeat("child text ", 20)
+	tree := renderTree([]Provision{{ID: 1, Identity: parent, Text: "own words " + childText}, {ID: 2, ParentID: &parentID, Identity: child, Text: childText}}, 1)
+	h := Hit{Identity: parent, Text: string(tree.text), Fragments: tree.fragments}
+	_, _, cut := SnippetWithBodyCut(h, 30)
+	if cut {
+		t.Fatal("child-only omission counted as parent body cut")
+	}
+}
+
 func TestSnippetBodyCut(t *testing.T) {
 	id := Identity{DocumentKey: "vn:vbpl:179252", Anchor: "art_1"}
 	child := Identity{DocumentKey: id.DocumentKey, Anchor: "art_1/cl_1"}

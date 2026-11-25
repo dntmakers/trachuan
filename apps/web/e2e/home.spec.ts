@@ -25,7 +25,7 @@ test('signed-in home search submits its draft without putting the question in a 
   expect(urls.every(url => !url.includes(encodeURIComponent(query)) && !url.includes(query))).toBe(true)
 })
 
-test('home keeps the sample current, public and usable on mobile', async ({ page }) => {
+test('home keeps the stored sample public and usable on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.route('**/api/v1/me', route => route.fulfill({ status: 204 }))
   await page.goto('/')

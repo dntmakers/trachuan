@@ -118,7 +118,7 @@ func (e *Engine) nodeIndex(ctx context.Context, codes []string) (map[string]Node
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = tx.Rollback(context.Background()) }()
+	defer rollback(ctx, tx)
 	refs, err := e.loadNodeIndex(ctx, tx, codes)
 	if err != nil {
 		return nil, err

@@ -105,32 +105,23 @@ func sampleMetadata(read func(context.Context) (publicsummary.Release, error)) f
 	}
 }
 
-func sampleReady(pools *samplePools, resolve func(string) *release.Lease) func(publicsample.Activation) bool {
-	return func(a publicsample.Activation) bool {
+func sampleAcquire(pools *samplePools, resolve func(string) *release.Lease, run func(context.Context, *release.Lease, samplePool, time.Time) ([]byte, error)) func(publicsample.Activation) (func(context.Context, time.Time) ([]byte, error), bool) {
+	return func(a publicsample.Activation) (func(context.Context, time.Time) ([]byte, error), bool) {
 		if !pools.available() {
-			return false
+			return nil, false
 		}
 		lease := resolve(a.Database)
 		if lease == nil {
-			return false
+			return nil, false
 		}
-		lease.Done()
-		return true
-	}
-}
-
-func sampleSearch(pools *samplePools, resolve func(string) *release.Lease, run func(context.Context, *release.Lease, samplePool, time.Time) ([]byte, error)) func(context.Context, publicsample.Activation, time.Time) ([]byte, error) {
-	return func(ctx context.Context, a publicsample.Activation, instant time.Time) ([]byte, error) {
-		lease := resolve(a.Database)
-		if lease == nil {
-			return nil, errors.New("sample engine unavailable")
-		}
-		defer lease.Done()
-		pool, err := pools.get(ctx, a)
-		if err != nil {
-			return nil, err
-		}
-		return run(ctx, lease, pool, instant)
+		return func(ctx context.Context, instant time.Time) ([]byte, error) {
+			defer lease.Done()
+			pool, err := pools.get(ctx, a)
+			if err != nil {
+				return nil, err
+			}
+			return run(ctx, lease, pool, instant)
+		}, true
 	}
 }
 
@@ -154,10 +145,9 @@ func newPublicSample(ctx context.Context, metadataDB publicsummary.MetadataDB, t
 		}
 		return a, err
 	}
-	ready := sampleReady(pools, resolver.ReadyLaw)
-	search := sampleSearch(pools, resolver.ReadyLaw, func(ctx context.Context, lease *release.Lease, pool samplePool, instant time.Time) ([]byte, error) {
+	acquire := sampleAcquire(pools, resolver.ReadyLaw, func(ctx context.Context, lease *release.Lease, pool samplePool, instant time.Time) ([]byte, error) {
 		return publicsample.SearchSample(ctx, lease.Engine.WithPool(pool.(*pgxpool.Pool)), lease.Release, instant)
 	})
-	flights := publicsample.NewFlights(ctx, metadata, ready, search, clock).WithObserver(sampleAttemptLogger(logger))
+	flights := publicsample.NewFlights(ctx, metadata, nil, nil, clock).WithAcquire(acquire).WithObserver(sampleAttemptLogger(logger))
 	return flights, func() { flights.Close(); pools.Close() }
 }

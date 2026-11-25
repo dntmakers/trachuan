@@ -25,6 +25,7 @@ func (a Activation) equal(b Activation) bool {
 type sampleFlight struct {
 	activation Activation
 	done       chan struct{}
+	expired    <-chan struct{}
 	cancel     context.CancelFunc
 }
 
@@ -34,12 +35,15 @@ type flights struct {
 	metadata    func(context.Context) (Activation, error)
 	ready       func(Activation) bool
 	search      func(context.Context, Activation, time.Time) ([]byte, error)
+	acquire     func(Activation) (func(context.Context, time.Time) ([]byte, error), bool)
 	clock       func() time.Time
+	timeout     time.Duration
 	observer    func(Reason)
 	observation chan struct{}
 	mu          sync.Mutex
 	active      Activation
 	observed    bool
+	attempted   bool
 	cached      bool
 	body        []byte
 	date        string
@@ -54,7 +58,12 @@ func NewFlights(ctx context.Context, metadata func(context.Context) (Activation,
 
 func newFlights(ctx context.Context, metadata func(context.Context) (Activation, error), ready func(Activation) bool, search func(context.Context, Activation, time.Time) ([]byte, error), clock func() time.Time) *flights {
 	work, cancel := context.WithCancel(ctx)
-	return &flights{ctx: work, cancel: cancel, metadata: metadata, ready: ready, search: search, clock: clock, observation: make(chan struct{}, 1)}
+	return &flights{ctx: work, cancel: cancel, metadata: metadata, ready: ready, search: search, clock: clock, timeout: 5 * time.Second, observation: make(chan struct{}, 1)}
+}
+
+func (f *flights) WithAcquire(acquire func(Activation) (func(context.Context, time.Time) ([]byte, error), bool)) *Flights {
+	f.acquire = acquire
+	return f
 }
 
 func (f *flights) WithObserver(observer func(Reason)) *Flights {
@@ -65,6 +74,9 @@ func (f *flights) WithObserver(observer func(Reason)) *Flights {
 func (f *flights) Close() { f.cancel() }
 
 func (f *flights) observe(ctx context.Context) (Activation, error) {
+	if err := ctx.Err(); err != nil {
+		return Activation{}, err
+	}
 	select {
 	case f.observation <- struct{}{}:
 	case <-ctx.Done():
@@ -74,13 +86,13 @@ func (f *flights) observe(ctx context.Context) (Activation, error) {
 	}
 	defer func() { <-f.observation }()
 	a, err := f.metadata(ctx)
-	if err != nil || a.Database == "" || a.ActivatedAt.IsZero() {
+	if err != nil || ctx.Err() != nil || a.Database == "" || a.ActivatedAt.IsZero() {
 		return Activation{}, errUnavailable
 	}
 	f.mu.Lock()
 	if !f.observed || !f.active.equal(a) {
 		f.active, f.observed = a, true
-		f.cached, f.body, f.date = false, nil, ""
+		f.cached, f.body, f.date, f.attempted = false, nil, "", false
 		if f.job != nil {
 			f.job.cancel()
 		}
@@ -109,15 +121,32 @@ func (f *flights) Get(ctx context.Context) ([]byte, string, error) {
 	}
 	job := f.job
 	if job == nil {
-		if !f.ready(a) {
+		if f.attempted {
 			f.mu.Unlock()
-			return nil, "", errBusy
+			return nil, "", errUnavailable
 		}
-		work, cancel := context.WithTimeout(f.ctx, 5*time.Second)
-		job = &sampleFlight{activation: a, done: make(chan struct{}), cancel: cancel}
+		var search func(context.Context, time.Time) ([]byte, error)
+		if f.acquire != nil {
+			var ok bool
+			search, ok = f.acquire(a)
+			if !ok || search == nil {
+				f.mu.Unlock()
+				return nil, "", errBusy
+			}
+		} else {
+			if !f.ready(a) {
+				f.mu.Unlock()
+				return nil, "", errBusy
+			}
+			search = func(ctx context.Context, now time.Time) ([]byte, error) { return f.search(ctx, a, now) }
+		}
+		deadlineCtx, deadlineCancel := context.WithTimeout(f.ctx, f.timeout)
+		work, cancel := context.WithCancel(deadlineCtx)
+		job = &sampleFlight{activation: a, done: make(chan struct{}), expired: deadlineCtx.Done(), cancel: cancel}
 		f.job = job
+		f.attempted = true
 		now := f.clock().In(time.FixedZone("Asia/Ho_Chi_Minh", 7*60*60))
-		go f.run(work, job, now)
+		go func() { defer deadlineCancel(); f.run(work, job, now, search) }()
 	} else if !job.activation.equal(a) {
 		f.mu.Unlock()
 		return nil, "", errBusy
@@ -128,6 +157,12 @@ func (f *flights) Get(ctx context.Context) ([]byte, string, error) {
 		return nil, "", ctx.Err()
 	case <-f.ctx.Done():
 		return nil, "", errUnavailable
+	case <-job.expired:
+		select {
+		case <-job.done:
+		default:
+			return nil, "", errUnavailable
+		}
 	case <-job.done:
 	}
 	current, err := f.observe(ctx)
@@ -145,17 +180,26 @@ func (f *flights) Get(ctx context.Context) ([]byte, string, error) {
 	return bytes.Clone(f.body), f.date, nil
 }
 
-func (f *flights) run(ctx context.Context, job *sampleFlight, date time.Time) {
+func (f *flights) run(ctx context.Context, job *sampleFlight, date time.Time, search func(context.Context, time.Time) ([]byte, error)) {
 	defer job.cancel()
-	body, err := f.search(ctx, job.activation, date)
-	if f.observer != nil {
-		f.observer(attemptReason(ctx, body, err))
+	body, err := search(ctx, date)
+	current, checkErr := f.observe(ctx)
+	if checkErr != nil || !current.equal(job.activation) {
+		err = errUnavailable
 	}
-	if ctx.Err() != nil || len(body) == 0 {
+	if ctx.Err() != nil || (len(body) == 0 && err == nil) {
 		err = errUnavailable
 	}
 	f.mu.Lock()
-	if f.active.equal(job.activation) && f.ctx.Err() == nil {
+	valid := checkErr == nil && current.equal(job.activation) && f.active.equal(job.activation) && f.ctx.Err() == nil
+	if f.observer != nil {
+		reason := attemptReason(ctx, body, err)
+		if checkErr == nil && !valid {
+			reason = ReasonCanceled
+		}
+		f.observer(reason)
+	}
+	if valid {
 		f.cached = true
 		if err == nil {
 			f.body, f.date = bytes.Clone(body), date.Format(time.DateOnly)

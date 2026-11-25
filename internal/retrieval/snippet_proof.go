@@ -8,12 +8,25 @@ type sourcePosition struct {
 	char     rune
 	retained bool
 	body     bool
+	overlaps bool
 }
 
 func SnippetWithBodyCut(h Hit, capRunes int) (string, bool, bool) {
 	text, complete, ranges := snippetRanges(h, capRunes)
 	source := []rune(h.Text)
 	positions := map[int]sourcePosition{}
+	overlaps := make([]bool, len(source))
+	for _, f := range h.Fragments {
+		if f.Identity == h.Identity || f.Role != "body" {
+			continue
+		}
+		if f.TextStart < 0 || f.TextEnd < f.TextStart || f.TextEnd > len(source) {
+			return text, complete, false
+		}
+		for i := f.TextStart; i < f.TextEnd; i++ {
+			overlaps[i] = true
+		}
+	}
 	for _, f := range h.Fragments {
 		if f.Identity != h.Identity {
 			continue
@@ -35,12 +48,12 @@ func SnippetWithBodyCut(h Hit, capRunes int) (string, bool, bool) {
 					break
 				}
 			}
-			positions[p] = sourcePosition{char: ch, retained: kept, body: old.body || f.Role == "body"}
+			positions[p] = sourcePosition{char: ch, retained: kept, body: old.body || f.Role == "body", overlaps: old.overlaps || overlaps[i]}
 		}
 	}
 	kept, omitted := false, false
 	for _, p := range positions {
-		if p.body && !unicode.IsSpace(p.char) {
+		if p.body && !p.overlaps && !unicode.IsSpace(p.char) {
 			if p.retained {
 				kept = true
 			} else {

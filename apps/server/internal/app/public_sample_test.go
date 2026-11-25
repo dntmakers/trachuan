@@ -101,39 +101,31 @@ func TestSamplePool_RetirementPreventsOverlap(t *testing.T) {
 	p.Close()
 }
 
-func TestSampleReadyAndSearch_UsesLeaseAndPool(t *testing.T) {
+func TestSampleAcquire_UsesReservedLease(t *testing.T) {
 	a := publicsample.Activation{Database: "corpus_vn_20990101", ActivatedAt: time.Unix(1, 0)}
 	p := &samplePools{open: func(context.Context, string) (samplePool, error) { return &fakeSamplePool{close: func() {}}, nil }}
 	p.observe(a)
 	defer p.Close()
-	var available bool
-	resolve := func(database string) *release.Lease {
-		if database != a.Database || !available {
+	calls := 0
+	resolve := func(string) *release.Lease {
+		calls++
+		if calls > 1 {
 			return nil
 		}
 		return &release.Lease{Release: "20990101"}
 	}
-	ready := sampleReady(p, resolve)
-	if ready(a) {
-		t.Fatal("engine not ready")
-	}
-	available = true
-	if !ready(a) {
-		t.Fatal("ready engine rejected")
-	}
-	instant := time.Unix(2, 0)
-	search := sampleSearch(p, resolve, func(_ context.Context, lease *release.Lease, pool samplePool, got time.Time) ([]byte, error) {
-		if lease.Release != "20990101" || pool == nil || !got.Equal(instant) {
-			t.Fatal("wrong search dependencies")
-		}
-		return []byte("sample"), nil
+	acquire := sampleAcquire(p, resolve, func(_ context.Context, lease *release.Lease, _ samplePool, _ time.Time) ([]byte, error) {
+		return []byte(lease.Release), nil
 	})
-	body, err := search(context.Background(), a, instant)
-	if err != nil || string(body) != "sample" {
-		t.Fatalf("body %s, error %v", body, err)
+	search, ok := acquire(a)
+	if !ok {
+		t.Fatal("lease rejected")
 	}
-	available = false
-	if _, err := search(context.Background(), a, instant); err == nil {
+	body, err := search(context.Background(), time.Now())
+	if err != nil || string(body) != "20990101" || calls != 1 {
+		t.Fatalf("body %q err %v resolves %d", body, err, calls)
+	}
+	if _, ok = acquire(a); ok {
 		t.Fatal("missing lease accepted")
 	}
 }

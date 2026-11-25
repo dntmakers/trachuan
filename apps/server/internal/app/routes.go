@@ -64,7 +64,7 @@ func newWebMux(d webDeps) *webMux {
 	if summaries == nil {
 		summaries = publicsummary.NewHandler(nil, false, d.loginLimit.clock)
 	}
-	mux.Handle("GET /api/v1/public/sample", publicsample.NewHandler(d.publicSample, summaries.Admission()).WithFlights(d.sampleFlights))
+	mux.Handle("/api/v1/public/sample", publicsample.NewHandler(d.publicSample, summaries.Admission()).WithFlights(d.sampleFlights))
 	mux.Handle("GET /api/v1/public/documents", summaries)
 	mux.Handle("GET /api/v1/public/documents/{key}", summaries)
 	mux.Handle("GET /api/v1/public/status", publicLimit.publicMiddleware(webapi.NewPublicStatus(d.tools, summaries.Available)))

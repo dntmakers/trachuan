@@ -80,6 +80,12 @@ func Project(raw retrieval.Response, presented retrieval.SearchResult, release s
 	if len(raw.Hits) == 0 || len(presented.Hits) == 0 {
 		return zero, ReasonNoHit
 	}
+	if release == "" {
+		return zero, ReasonSchema
+	}
+	if raw.Release != release || presented.Release != release {
+		return zero, ReasonMismatch
+	}
 	rh, ph := raw.Hits[0], presented.Hits[0]
 	if ph.Doc != DocumentKey || rh.Identity.DocumentKey != DocumentKey {
 		return zero, ReasonWrongDocument
@@ -92,7 +98,11 @@ func Project(raw retrieval.Response, presented retrieval.SearchResult, release s
 		return zero, ReasonWrongNumber
 	}
 	snippet, complete, cut := retrieval.SnippetWithBodyCut(rh, retrieval.SnippetCap)
-	if ph.Handle != retrieval.Handle(rh.Identity) || ph.Snippet != snippet || ph.Complete != complete {
+	url := ""
+	if rh.SourceURL != nil {
+		url = *rh.SourceURL
+	}
+	if ph.Handle != retrieval.Handle(rh.Identity) || ph.Citation != rh.Citation || ph.Snippet != snippet || ph.Complete != complete || strings.Join(strings.Fields(rh.Number), " ") != doc.Number || strings.Join(strings.Fields(rh.Title), " ") != doc.Title || url != doc.SourceURL || rh.Stamp.Current != doc.Status.Current || rh.Stamp.StatusClass != doc.Status.Class || rh.Stamp.Basis != doc.Status.Basis || rh.Stamp.StatusBasis != doc.Status.StatusBasis {
 		return zero, ReasonMismatch
 	}
 	if !cut {
@@ -102,12 +112,15 @@ func Project(raw retrieval.Response, presented retrieval.SearchResult, release s
 	if err != nil || key != DocumentKey || anchor == "" || strings.Contains(anchor, "\n") || release == "" || ph.Citation == "" || ph.Snippet == "" || complete || !utf8.ValidString(ph.Snippet) || len([]rune(ph.Snippet)) > retrieval.SnippetCap || !validSource(doc.TextSource) || !validDate(doc.Issued) || !validDate(doc.EffectiveFrom) || !validDate(doc.EffectiveTo) {
 		return zero, ReasonSchema
 	}
+	if !validUTF8(release, ph.Handle, ph.Doc, ph.Citation, ph.Snippet, doc.Number, doc.Status.Class, doc.Status.Basis, doc.Status.StatusBasis, doc.TextSource, doc.Title, doc.Type, doc.Issuer, doc.SourceURL) {
+		return zero, ReasonSchema
+	}
 	output := PublicSampleResult{Release: release, Hits: []Hit{{Handle: ph.Handle, Doc: DocumentKey, Citation: ph.Citation, Snippet: ph.Snippet}}, Documents: Documents{Document: Document{Number: doc.Number, Status: Status{Current: doc.Status.Current, Class: doc.Status.Class, Basis: doc.Status.Basis, StatusBasis: doc.Status.StatusBasis}, TextSource: doc.TextSource, TextComplete: doc.TextComplete, Title: doc.Title, Type: doc.Type, Issuer: doc.Issuer, Issued: doc.Issued, EffectiveFrom: doc.EffectiveFrom, EffectiveTo: doc.EffectiveTo}}}
 	if doc.SourceURL == CanonicalURL {
 		output.Documents.Document.SourceURL = CanonicalURL
 	}
 	b, err := json.Marshal(output)
-	if err != nil || !utf8.Valid(b) || strings.ContainsRune(string(b), '�') {
+	if err != nil {
 		return zero, ReasonSchema
 	}
 	if len(b) > BodyCap {
@@ -115,6 +128,15 @@ func Project(raw retrieval.Response, presented retrieval.SearchResult, release s
 	}
 	return output, ""
 }
+func validUTF8(values ...string) bool {
+	for _, value := range values {
+		if !utf8.ValidString(value) {
+			return false
+		}
+	}
+	return true
+}
+
 func validSource(s string) bool {
 	switch s {
 	case "source_tree", "html_transcription", "pdf_text", "ocr", "none":

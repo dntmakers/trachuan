@@ -177,10 +177,10 @@ func TestPublicSample_PostgresSuccessAndPoolCapacity(t *testing.T) {
 	if before.MaxConns() != 1 {
 		t.Fatalf("max conns %d", before.MaxConns())
 	}
-	search := sampleSearch(pools, resolver.ReadyLaw, func(ctx context.Context, lease *release.Lease, pool samplePool, instant time.Time) ([]byte, error) {
+	acquire := sampleAcquire(pools, resolver.ReadyLaw, func(ctx context.Context, lease *release.Lease, pool samplePool, instant time.Time) ([]byte, error) {
 		return publicsample.SearchSample(ctx, lease.Engine.WithPool(pool.(*pgxpool.Pool)), lease.Release, instant)
 	})
-	flights := publicsample.NewFlights(ctx, func(context.Context) (publicsample.Activation, error) { return activation, nil }, sampleReady(pools, resolver.ReadyLaw), search, clock)
+	flights := publicsample.NewFlights(ctx, func(context.Context) (publicsample.Activation, error) { return activation, nil }, nil, nil, clock).WithAcquire(acquire)
 	defer flights.Close()
 	h := publicsample.NewHandler(true, publicsummary.NewAdmission()).WithFlights(flights)
 	contract, err := contracttest.Load()
