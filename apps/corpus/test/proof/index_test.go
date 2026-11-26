@@ -106,7 +106,7 @@ func (h *harness) indexSetup() {
 		h.t.Fatal("missing proof fetch artifact")
 	}
 	m := evaluation.IdentityMap{Version: 3, LegacySHA256: hash, Entries: []evaluation.MapEntry{{CaseID: "positive", CitationIndex: 0, State: "resolved", ExpectedNumber: "1/2026", Reason: "proof document", ReviewedAt: "2026-11-09", Evidence: []evaluation.Evidence{{DocumentKey: "vn:vbpl:1", DocumentNumber: "1/2026", FetchSHA256: fetchHash, QuotedSpan: "Document 1"}}, Alternatives: []evaluation.Alternative{{Country: "vn", DocumentKey: "vn:vbpl:1", DocumentNumber: "1/2026", Kind: "document"}}}}}
-	dir := filepath.Join(h.root, "fixtures")
+	dir := filepath.Join(h.root, "fixtures-"+h.rel)
 	if err = os.Mkdir(dir, 0700); err != nil {
 		h.t.Fatal(err)
 	}
@@ -295,6 +295,7 @@ func TestProof_LostCorpusDatabaseRestored(t *testing.T) {
 
 func (h *harness) registerIndexCleanup(builderURL string) {
 	h.t.Helper()
+	rel := h.rel
 	h.t.Cleanup(func() {
 		if h.worker != nil {
 			h.stopWorker()
@@ -307,7 +308,7 @@ func (h *harness) registerIndexCleanup(builderURL string) {
 			return
 		}
 		defer func() { _ = conn.Close(context.Background()) }()
-		rows, err := conn.Query(ctx, `SELECT datname, shobj_description(oid, 'pg_database') FROM pg_database WHERE datdba=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND (datname=$1 OR datname LIKE 'corpus_tmp_vn_%')`, "corpus_vn_"+h.rel)
+		rows, err := conn.Query(ctx, `SELECT datname, shobj_description(oid, 'pg_database') FROM pg_database WHERE datdba=(SELECT oid FROM pg_roles WHERE rolname=current_user) AND (datname=$1 OR datname LIKE 'corpus_tmp_vn_%')`, "corpus_vn_"+rel)
 		if err != nil {
 			h.t.Errorf("list index databases: %v", err)
 			return
@@ -330,10 +331,10 @@ func (h *harness) registerIndexCleanup(builderURL string) {
 				RecipeHash string `json:"build_recipe_hash"`
 				Instance   string `json:"instance"`
 			}
-			if json.Unmarshal([]byte(*raw), &marker) != nil || marker.RunKey != "vn/"+h.rel || len(marker.InputHash) != 64 || len(marker.RecipeHash) != 64 || (marker.Instance != "built" && marker.Instance != "restored") {
+			if json.Unmarshal([]byte(*raw), &marker) != nil || marker.RunKey != "vn/"+rel || len(marker.InputHash) != 64 || len(marker.RecipeHash) != 64 || (marker.Instance != "built" && marker.Instance != "restored") {
 				continue
 			}
-			if name != "corpus_vn_"+h.rel && name != "corpus_tmp_vn_"+marker.InputHash[:24] {
+			if name != "corpus_vn_"+rel && name != "corpus_tmp_vn_"+marker.InputHash[:24] {
 				continue
 			}
 			names = append(names, name)
@@ -345,7 +346,7 @@ func (h *harness) registerIndexCleanup(builderURL string) {
 			return
 		}
 		for _, name := range names {
-			if !testpg.DropCorpusDatabase(h.t, conn, name, "vn/"+h.rel) {
+			if !testpg.DropCorpusDatabase(h.t, conn, name, "vn/"+rel) {
 				testactivity.Log(h.t, conn, name)
 			}
 		}
