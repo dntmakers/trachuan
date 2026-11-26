@@ -40,7 +40,7 @@ func TestHeadingEvidence_RejectsDifferentScan(t *testing.T) {
 }
 
 func TestHeadingEvidence_BuildRecordMatchesSigningFixture(t *testing.T) {
-	record := map[string]any{}
+	record := map[string]any{"schema_version": 8}
 	recordHeadingEvidence(record, strings.Repeat("a", 64), strings.Repeat("b", 64))
 	got, err := json.Marshal(record)
 	if err != nil {
