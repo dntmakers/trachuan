@@ -59,10 +59,7 @@ func recoverySetupWith(t *testing.T, configure func(*Config), prepare ...func(*l
 	configure(&cfg)
 	st := New(cfg)
 	env := stage.Env{DB: pool, Artifacts: f.artifacts}
-	items, err := st.Plan(ctx, env, f.run)
-	if err != nil {
-		t.Fatal(err)
-	}
+	items := planLockedFixture(t, f, st, env)
 	admin, err := pgx.Connect(ctx, builder.URL)
 	if err != nil {
 		t.Fatal(err)

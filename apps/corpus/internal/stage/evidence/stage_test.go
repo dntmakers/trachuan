@@ -518,6 +518,17 @@ func TestProcess_ReportMustMatchRunAndDecision(t *testing.T) {
 	}
 }
 
+func TestPlan_RejectsSchema9WithoutLock(t *testing.T) {
+	f := newFixture(t, noneDecision())
+	f.build = f.publish("build", strings.Repeat("2", 64), map[string]string{"build.json": `{"schema_version":9}`})
+	f.report["build_artifact_sha256"] = f.build.SHA256
+	f.sync()
+	_, _, err := f.process()
+	if err == nil || !strings.Contains(err.Error(), "locked predecessor") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestPlan_VerifiesDumpOnceProcessReadsManifest(t *testing.T) {
 	f := newFixture(t, noneDecision())
 	lookups := 0

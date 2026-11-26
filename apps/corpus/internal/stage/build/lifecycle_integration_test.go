@@ -181,10 +181,7 @@ func processTemporaryRelease(t *testing.T, classified bool) {
 	}
 	st := New(cfg)
 	env := stage.Env{DB: pool, Artifacts: f.artifacts}
-	items, err := st.Plan(ctx, env, f.run)
-	if err != nil {
-		t.Fatal(err)
-	}
+	items := planLockedFixture(t, f, st, env)
 	temp := "corpus_tmp_vn_" + items[0].InputHash[:24]
 	admin, err := pgx.Connect(ctx, builder.URL)
 	if err != nil {
@@ -216,8 +213,8 @@ func processTemporaryRelease(t *testing.T, classified bool) {
 		if pinErr != nil {
 			t.Fatal(pinErr)
 		}
-		if want := st.inputHash(f.run.Country, f.run.Rel, inv, correction); record.BuildInputHash != want {
-			t.Fatalf("no-set build input = %s, want legacy %s", record.BuildInputHash, want)
+		if want := st.frozenInputHash(f.run, inv, correction); record.BuildInputHash != want {
+			t.Fatalf("no-set build input = %s, want %s", record.BuildInputHash, want)
 		}
 		if record.ClassificationSetSHA256 != "" || record.ClassificationPolicySHA256 != "" || record.Taxonomy.ClassificationStats != nil {
 			t.Fatal("no-set build records a classification layer")

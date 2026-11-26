@@ -22,6 +22,10 @@ UPDATE run SET generation = generation + 1, state = 'starting', next_stage = $2,
     until_stage = $3, workflow_id = $4, snapshot = $5, message = NULL, updated_at = now()
 WHERE id = $1;
 
+-- name: SetRunPredecessorLock :exec
+UPDATE run SET snapshot = jsonb_set(snapshot, '{locked_predecessor}', sqlc.arg(locked_predecessor)::jsonb), updated_at = now()
+WHERE id = sqlc.arg(id);
+
 -- name: ResetFailedItems :exec
 UPDATE run_item SET state = 'pending', updated_at = now()
 WHERE run_id = $1 AND stage = $2 AND state = 'failed';

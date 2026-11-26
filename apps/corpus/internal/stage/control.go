@@ -77,12 +77,22 @@ func PlanStage(ctx context.Context, env Env, st Stage, in StageInput, compiled m
 		}
 		return result, nil
 	}
-	items, err := st.Plan(ctx, env, run)
+	var items []Item
+	if planner, ok := st.(transactionalPlanner); ok {
+		items, err = planner.PlanInTransaction(ctx, env, tx, run)
+	} else {
+		items, err = st.Plan(ctx, env, run)
+	}
 	if err != nil {
 		return result, fmt.Errorf("plan stage %s: %w", in.Stage, err)
 	}
 	recipe := st.Recipe(snapshot)
 	for i, item := range items {
+		if in.Stage == "build" {
+			if err = prepareBuildItem(ctx, q, row, item); err != nil {
+				return result, err
+			}
+		}
 		var inputHash, message *string
 		if item.InputHash != "" {
 			inputHash = &item.InputHash
@@ -105,6 +115,11 @@ func PlanStage(ctx context.Context, env Env, st Stage, in StageInput, compiled m
 		}
 		if insertErr := q.InsertPlannedItem(ctx, store.InsertPlannedItemParams{RunID: in.RunID, Stage: in.Stage, ItemKey: item.Key, InputHash: inputHash, RecipeHash: &recipe, Batch: int32(i / 100), Message: message}); insertErr != nil {
 			return result, fmt.Errorf("insert planned item %q: %w", item.Key, insertErr)
+		}
+		if in.Stage == "build" {
+			if err = verifyBuildItem(ctx, q, in.RunID, item); err != nil {
+				return result, err
+			}
 		}
 	}
 	if resetErr := q.ResetOlderFailedStageItems(ctx, store.ResetOlderFailedStageItemsParams{RunID: in.RunID, Stage: in.Stage, Generation: int32(in.Generation)}); resetErr != nil {

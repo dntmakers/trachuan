@@ -59,7 +59,7 @@ func TestReportDetector_OneFindingPerRecord(t *testing.T) {
 	if f.Subject.Type != "report" || strings.Join(f.Subject.Fields, "|") != "eval|case-2099-2" || f.Discriminator != "none" {
 		t.Fatalf("finding = %+v", f)
 	}
-	if err = f.Subject.validate(); err != nil {
+	if err = f.Subject.Validate(); err != nil {
 		t.Fatal(err)
 	}
 	if !obs.ObservedCompletely(f.Subject) || !obs.ObservedCompletely(Subject{Type: "report", Fields: []string{"eval", "gone"}}) {

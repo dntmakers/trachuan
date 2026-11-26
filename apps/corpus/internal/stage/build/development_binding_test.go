@@ -31,9 +31,10 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 	}
 	t.Helper()
 	cfg := Config{Suite: evaluation.Suite{Hashes: evaluation.FixtureHashes{IdentityMap: "map", Development: "current-fixture"}}}
-	run := stage.Run{Country: "vn", Rel: "20990101", Snapshot: stage.Snapshot{SourceListHash: "sources", SourceList: []byte(`{"country":"vn","status_codes":{}}`), WorkerVersion: "worker"}}
+	lock := &stage.LockedPredecessor{ReportSHA256: "none", Release: "none", IdentitySHA256: "none"}
+	run := stage.Run{Country: "vn", Rel: "20990101", Snapshot: stage.Snapshot{SourceListHash: "sources", SourceList: []byte(`{"country":"vn","status_codes":{}}`), WorkerVersion: "worker", LockedPredecessor: lock}}
 	inv := Inventory{Country: "vn", SourceListHash: "sources"}
-	input := New(cfg).inputHash(run.Country, run.Rel, inv, correctionInput{})
+	input := New(cfg).frozenInputHash(run, inv, correctionInput{})
 	recipe := New(cfg).Recipe(run.Snapshot)
 	if opts.recipe2 {
 		recipe = New(cfg).recipeForRetrieval(run.Snapshot, retrieval.Recipe2())
@@ -49,6 +50,7 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 	calibration := []byte(`{"threshold":0}`)
 	record := map[string]any{
 		"heading_exclusions_sha256": hashBytes([]byte("[]")), "heading_scan_sha256": hashBytes([]byte("{}")), "taxonomy": TaxonomyStats{}, "version": 1, "country": run.Country, "rel": run.Rel, "database_name": "corpus_vn_20990101", "schema_version": corpusdb.SchemaVersion,
+		"predecessor_release": lock.Release, "predecessor_identity_sha256": lock.IdentitySHA256,
 		"build_input_hash": input, "build_recipe_hash": rowRecipe, "source_manifest_hash": inv.SourceManifestHash(), "identity_inventory_hash": inv.IdentityHash(), "identity_map_sha256": "map",
 		"worker_version": "worker", "built_at": time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC),
 		"durations_ms": map[string]int64{"total": 1},
@@ -93,6 +95,24 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 		t.Fatal(err)
 	}
 	return artifacts, art, run, cfg, rowRecipe
+}
+
+func TestVerifyBuildArtifact_RejectsMissingPredecessorLock(t *testing.T) {
+	binding := "current-fixture"
+	artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false)
+	run.Snapshot.LockedPredecessor = nil
+	if _, _, err := verifyBuildArtifact(artifacts, art, run, cfg); err == nil || !strings.Contains(err.Error(), "predecessor") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestVerifyBuildArtifact_RejectsPredecessorMismatch(t *testing.T) {
+	binding := "current-fixture"
+	artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false)
+	run.Snapshot.LockedPredecessor.Release = "another"
+	if _, _, err := verifyBuildArtifact(artifacts, art, run, cfg); err == nil || !strings.Contains(err.Error(), "predecessor") {
+		t.Fatalf("error = %v", err)
+	}
 }
 
 func TestVerifyBuildArtifact_Durations(t *testing.T) {

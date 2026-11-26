@@ -168,6 +168,14 @@ func TestDecide_ReplacesBeforeEvalAndRecordsIt(t *testing.T) {
 	}
 }
 
+func TestDecide_RefusesChangedReportAfterBuildLock(t *testing.T) {
+	path, _ := previousReportFile(t, nil)
+	snapshot := stage.Snapshot{PreviousReport: &stage.PreviousReport{SHA256: stage.NoPreviousReport}, LockedPredecessor: &stage.LockedPredecessor{ReportSHA256: stage.NoPreviousReport}}
+	if _, err := decide(context.Background(), decideInput(t, ReportChoice{Path: path}, true, &snapshot)); err == nil {
+		t.Fatal("changed report after build lock")
+	}
+}
+
 func TestDecide_RefusesDifferentDecisionOnceEvalItemExists(t *testing.T) {
 	path, _ := previousReportFile(t, nil)
 	original := stage.PreviousReport{SHA256: stage.NoPreviousReport}

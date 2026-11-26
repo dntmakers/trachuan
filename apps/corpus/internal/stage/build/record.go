@@ -23,6 +23,8 @@ type BuildRecord struct {
 	SchemaVersion              int              `json:"schema_version"`
 	BuildInputHash             string           `json:"build_input_hash"`
 	BuildRecipeHash            string           `json:"build_recipe_hash"`
+	PredecessorRelease         string           `json:"predecessor_release"`
+	PredecessorIdentitySHA256  string           `json:"predecessor_identity_sha256"`
 	ClassificationSetSHA256    string           `json:"classification_set_sha256,omitempty"`
 	ClassificationPolicySHA256 string           `json:"classification_policy_sha256,omitempty"`
 	SourceManifestHash         string           `json:"source_manifest_hash"`
@@ -119,8 +121,12 @@ func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Ru
 	if err != nil {
 		return record, "", err
 	}
+	lock := run.Snapshot.LockedPredecessor
+	if lock == nil || lock.Release != record.PredecessorRelease || lock.IdentitySHA256 != record.PredecessorIdentitySHA256 || (run.Snapshot.PreviousReport != nil && lock.ReportSHA256 != run.Snapshot.PreviousReport.SHA256) {
+		return record, "", fmt.Errorf("build predecessor differs from locked decision")
+	}
 	inputHash := recordInputHash(run.Country, run.Rel, inventory, record.IdentityMapSHA256, record.ProvenanceSHA256, record.CorrectionsSHA256, *record.DevelopmentCasesSHA256, record.TaxonomyVersion, record.HeadingExclusionsSHA256)
-	inputHash = withClassificationSet(withReports(withKnowledge(inputHash, knowledgeHash), reportsHash), run.Snapshot.ClassificationSetSHA256)
+	inputHash = predecessorInputHash(withClassificationSet(withReports(withKnowledge(inputHash, knowledgeHash), reportsHash), run.Snapshot.ClassificationSetSHA256), *lock)
 	if record.Version != 1 || record.Country != run.Country || record.Rel != run.Rel || record.DatabaseName != final || record.SchemaVersion != corpusdb.SchemaVersion || inventory.Country != run.Country || inventory.SourceListHash != run.Snapshot.SourceListHash || record.BuildInputHash != art.InputHash || record.BuildInputHash != inputHash || *record.DevelopmentCasesSHA256 != cfg.Suite.Hashes.Development || record.BuildRecipeHash != recipeHash || record.SourceManifestHash != inventory.SourceManifestHash() || record.IdentityInventoryHash != inventory.IdentityHash() || record.Dump.Format != "custom" || record.PostgresVersion != cfg.Versions.PostgreSQLMajor || record.PGVectorVersion != cfg.Versions.PGVector || record.LtreeVersion != cfg.Versions.Ltree || record.PgDumpVersion != cfg.Versions.PgDump || record.WorkerVersion != run.Snapshot.WorkerVersion || record.BuiltAt.IsZero() {
 		return record, "", fmt.Errorf("build artifact identity mismatch")
 	}

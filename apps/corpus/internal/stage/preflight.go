@@ -8,6 +8,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type transactionalPlanner interface {
+	PlanInTransaction(context.Context, Env, pgx.Tx, Run) ([]Item, error)
+}
+
 type preflighter interface {
 	Preflight(context.Context, Env, pgx.Tx, Run) (Finalization, error)
 }

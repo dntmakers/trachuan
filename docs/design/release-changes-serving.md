@@ -54,6 +54,12 @@ every attempt. Bump the build and evidence recipes. Upload and signing verify
 the report hash and identity hash or absence against the predecessor's signed
 manifest.
 
+A run planned before the lock existed has no locked decision. Its build item no
+longer matches the schema 9 build input hash, so the next build plan creates a
+new item and writes the lock. Until then the earlier rule applies: a changed
+report is refused once the run has an `eval` item. `eval` and `evidence` refuse
+a schema 9 build that has no locked decision.
+
 Build and evidence share the change-record generator and projection rules. The
 build uses the generator's records before the evidence header exists. Evidence
 runs the generator against the verified build and the same frozen predecessor,

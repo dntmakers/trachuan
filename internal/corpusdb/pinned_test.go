@@ -16,7 +16,7 @@ func TestSchema_PinsKeepVersion5Supported(t *testing.T) {
 		}
 	}
 	hash, err := SchemaSHA256(1024)
-	if err != nil || hash != "85d69c51bfe41da43fc190c07bf5805ce6cea4cee3a089671f575b0c80c3af11" {
+	if err != nil || hash != "d8c766d0d5c6a322b993eb3019450e583938cc1b1878b4ad1c5bc522e5f1305e" {
 		t.Fatalf("schema SHA256=%s err=%v", hash, err)
 	}
 

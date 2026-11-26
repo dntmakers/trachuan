@@ -66,6 +66,14 @@ func TestApplyTables_DefersANNIndex(t *testing.T) {
 	}
 }
 
+func TestSchema_ReleaseChangeIndexesAndHeaderBounds(t *testing.T) {
+	for _, part := range []string{"octet_length(country) <= 2", "octet_length(release) <= 11", "octet_length(predecessor) <= 11", "CREATE INDEX ON release_change (kind, ordinal)"} {
+		if !strings.Contains(schema, part) {
+			t.Errorf("schema missing %q", part)
+		}
+	}
+}
+
 func TestSchema_Version9Constraints(t *testing.T) {
 	if SchemaVersion != 9 {
 		t.Fatalf("schema version = %d, want 9", SchemaVersion)

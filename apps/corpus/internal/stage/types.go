@@ -18,8 +18,9 @@ type Snapshot struct {
 	Recipes                                          map[string]string
 	ExtractRecordContract                            string `json:"extract_record_contract,omitempty"`
 	TaxonomyVersion, WorkerVersion, PreviousManifest string
-	PreviousReport                                   *PreviousReport `json:",omitempty"`
-	ClassificationSetSHA256                          string          `json:"classification_set_sha256,omitempty"`
+	PreviousReport                                   *PreviousReport    `json:",omitempty"`
+	LockedPredecessor                                *LockedPredecessor `json:"locked_predecessor,omitempty"`
+	ClassificationSetSHA256                          string             `json:"classification_set_sha256,omitempty"`
 }
 
 const ExtractRecordLegacy = "legacy"
@@ -30,6 +31,12 @@ const EvidenceStage = "evidence"
 const NoPreviousReport = "none"
 
 const PreviousReportFile = "report.json"
+
+type LockedPredecessor struct {
+	ReportSHA256   string `json:"report_sha256"`
+	Release        string `json:"release"`
+	IdentitySHA256 string `json:"identity_sha256"`
+}
 
 type PreviousReport struct {
 	SHA256 string `json:"sha256"`

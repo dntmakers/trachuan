@@ -25,6 +25,9 @@ INSERT INTO run_item (run_id, stage, item_key, input_hash, recipe_hash, state, b
 VALUES (sqlc.arg(run_id), sqlc.arg(stage), sqlc.arg(item_key), sqlc.narg(input_hash), sqlc.narg(recipe_hash), 'pending', sqlc.arg(batch), sqlc.narg(message))
 ON CONFLICT (run_id, stage, item_key) DO NOTHING;
 
+-- name: GetPlannedItemInputHash :one
+SELECT input_hash FROM run_item WHERE run_id = $1 AND stage = $2 AND item_key = $3 FOR UPDATE;
+
 -- name: ResetOlderFailedStageItems :exec
 UPDATE run_item SET state = 'pending', updated_at = now()
 WHERE run_id = sqlc.arg(run_id) AND stage = sqlc.arg(stage)

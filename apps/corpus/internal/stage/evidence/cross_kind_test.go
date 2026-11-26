@@ -54,7 +54,7 @@ func TestRelationKindDisagreement_FiresOnDifferentKinds(t *testing.T) {
 			if f.Subject.Type != "relation" || strings.Join(f.Subject.Fields, "|") != "vn:src|vn:target|"+tc.text || f.Discriminator != "" || f.Severity != "" {
 				t.Fatalf("finding %+v", f)
 			}
-			if err := f.Subject.validate(); err != nil {
+			if err := f.Subject.Validate(); err != nil {
 				t.Fatal(err)
 			}
 		})

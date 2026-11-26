@@ -1,14 +1,43 @@
 package workflow
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
 	"danny.vn/trachuan/apps/corpus/internal/detector"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"go.temporal.io/sdk/temporal"
 )
+
+func TestActivityError_BuildReplacementRefusalIsNonRetryable(t *testing.T) {
+	refusal := &stage.BuildReplacementError{}
+	err := activityError(fmt.Errorf("plan: %w", refusal))
+	var application *temporal.ApplicationError
+	if !errors.As(err, &application) || !application.NonRetryable() || !errors.Is(err, refusal) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestActivityError_PredecessorRefusalIsNonRetryable(t *testing.T) {
+	refusal := &releasechange.InputError{Reason: "invalid predecessor"}
+	err := activityError(fmt.Errorf("plan: %w", refusal))
+	var application *temporal.ApplicationError
+	if !errors.As(err, &application) || !application.NonRetryable() || application.Type() != "invalid_predecessor" || !errors.Is(err, refusal) {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestActivityError_TransientIsUnchanged(t *testing.T) {
+	for _, transient := range []error{errors.New("database unavailable"), context.DeadlineExceeded} {
+		err := fmt.Errorf("plan: %w", transient)
+		if got := activityError(err); got != err || !errors.Is(got, transient) {
+			t.Fatalf("err=%v", got)
+		}
+	}
+}
 
 func TestActivityError_RecipeRefusalIsNonRetryable(t *testing.T) {
 	err := activityError(&stage.RecipeError{Stage: "extract"})

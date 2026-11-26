@@ -38,18 +38,20 @@ func TestReleaseChanges_GoldenAndBaseline(t *testing.T) {
 				t.Fatal(err)
 			}
 			var got []releasechanges.Row
-			_, err = ReadReleaseChanges(ctx, conn, ProjectionLimits{KeyCharacters: 100, PayloadBytes: 1000, TotalBytes: 10000}, func(row releasechanges.Row) error { got = append(got, row); return nil })
+			projection, err := ReadReleaseChanges(ctx, conn, ProjectionLimits{KeyCharacters: 100, PayloadBytes: 1000, TotalBytes: 10000}, func(row releasechanges.Row) error { got = append(got, row); return nil })
 			if err != nil || !reflect.DeepEqual(got, rows) {
 				t.Fatalf("rows %v: %v", got, err)
+			}
+			if !reflect.DeepEqual(projection.Header, header) || projection.Counts["document_added"] != len(rows) {
+				t.Fatalf("projection = %+v", projection)
 			}
 			if !baseline {
 				want, err := os.ReadFile("../releasechanges/testdata/projection.sha256")
 				if err != nil {
 					t.Fatal(err)
 				}
-				var digest string
-				if err := conn.QueryRow(ctx, `SELECT digest FROM release_change_set`).Scan(&digest); err != nil || digest != strings.TrimSpace(string(want)) {
-					t.Fatalf("digest %s: %v", digest, err)
+				if projection.Digest != strings.TrimSpace(string(want)) {
+					t.Fatalf("digest %s", projection.Digest)
 				}
 			}
 		})
@@ -59,15 +61,19 @@ func TestReleaseChanges_GoldenAndBaseline(t *testing.T) {
 func TestReleaseChanges_RejectsCorruption(t *testing.T) {
 	ctx := context.Background()
 	for name, query := range map[string]string{
-		"payload":          `UPDATE release_change SET payload='{"x":2}'`,
-		"deleted":          `DELETE FROM release_change`,
-		"missing set":      `DELETE FROM release_change_set`,
-		"unknown version":  `UPDATE release_change_set SET version=2`,
-		"gap":              `UPDATE release_change SET ordinal=2`,
-		"duplicate set":    `ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_pkey; ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_singleton_check; INSERT INTO release_change_set SELECT false,version,country,release,predecessor,predecessor_identity_hash,baseline,document_added,document_removed,document_validity,provision_validity,provision_text,document_key,digest FROM release_change_set`,
-		"oversize key":     `UPDATE release_change SET key=repeat('a',101)`,
-		"oversize payload": `UPDATE release_change SET payload='{"x":"' || repeat('a',1001) || '"}'`,
-		"oversize total":   `UPDATE release_change SET payload='{"x":"' || repeat('a',100) || '"}'`,
+		"payload":               `UPDATE release_change SET payload='{"x":2}'`,
+		"deleted":               `DELETE FROM release_change`,
+		"missing set":           `DELETE FROM release_change_set`,
+		"unknown version":       `UPDATE release_change_set SET version=2`,
+		"gap":                   `UPDATE release_change SET ordinal=2`,
+		"duplicate set":         `ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_pkey; ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_singleton_check; INSERT INTO release_change_set SELECT false,version,country,release,predecessor,predecessor_identity_hash,baseline,document_added,document_removed,document_validity,provision_validity,provision_text,document_key,digest FROM release_change_set`,
+		"oversize release":      `ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_release_length; UPDATE release_change_set SET release=repeat('a',10000)`,
+		"oversize country":      `ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_country_length; UPDATE release_change_set SET country=repeat('a',10000)`,
+		"oversize predecessor":  `ALTER TABLE release_change_set DROP CONSTRAINT release_change_set_predecessor_length; UPDATE release_change_set SET predecessor=repeat('a',10000)`,
+		"oversize key":          `UPDATE release_change SET key=repeat('a',101)`,
+		"oversize payload":      `UPDATE release_change SET payload='{"x":"' || repeat('a',1001) || '"}'`,
+		"oversize total":        `UPDATE release_change SET payload='{"x":"' || repeat('a',100) || '"}'`,
+		"oversize header total": `SELECT 1`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			conn := schemaDB(t)
@@ -89,6 +95,8 @@ func TestReleaseChanges_RejectsCorruption(t *testing.T) {
 			limits := ProjectionLimits{KeyCharacters: 100, PayloadBytes: 1000, TotalBytes: 10000}
 			if name == "oversize total" {
 				limits.TotalBytes = 100
+			} else if name == "oversize header total" {
+				limits.TotalBytes = 5
 			}
 			_, err = ReadReleaseChanges(ctx, conn, limits, nil)
 			if err == nil {
@@ -113,6 +121,9 @@ func TestReleaseChanges_Constraints(t *testing.T) {
 		"array":                `INSERT INTO release_change VALUES (1,'document_added',NULL,NULL,'[]')`,
 		"duplicate JSON key":   `INSERT INTO release_change VALUES (1,'document_added',NULL,NULL,'{"x":1,"x":2}')`,
 		"newline payload":      `INSERT INTO release_change VALUES (1,'document_added',NULL,NULL,E'{\n}')`,
+		"oversize country":     `INSERT INTO release_change_set VALUES (true,1,'vnn','r',NULL,NULL,false,0,0,0,0,0,0,repeat('a',64))`,
+		"oversize release":     `INSERT INTO release_change_set VALUES (true,1,'vn',repeat('a',12),NULL,NULL,false,0,0,0,0,0,0,repeat('a',64))`,
+		"oversize predecessor": `INSERT INTO release_change_set VALUES (true,1,'vn','r',repeat('a',12),NULL,false,0,0,0,0,0,0,repeat('a',64))`,
 		"bad digest":           `INSERT INTO release_change_set VALUES (true,1,'vn','r',NULL,NULL,false,0,0,0,0,0,0,'bad')`,
 		"bad predecessor hash": `INSERT INTO release_change_set VALUES (true,1,'vn','r',NULL,'BAD',false,0,0,0,0,0,0,repeat('a',64))`,
 		"baseline count":       `INSERT INTO release_change_set VALUES (true,1,'vn','r',NULL,NULL,true,1,0,0,0,0,0,repeat('a',64))`,

@@ -2,28 +2,14 @@ package evidence
 
 import (
 	"context"
-	"fmt"
 
 	"danny.vn/trachuan/apps/corpus/internal/detector"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type Subject struct {
-	Type   string   `json:"type"`
-	Fields []string `json:"fields"`
-}
-
-func (s Subject) validate() error {
-	want := map[string]int{"document": 1, "provision": 2, "relation": 3, "claim": 3, "check_item": 4, "report": 2, "absent_document": 1}[s.Type]
-	if want == 0 {
-		return fmt.Errorf("unknown subject type %q", s.Type)
-	}
-	if len(s.Fields) != want {
-		return fmt.Errorf("subject %s has %d fields, want %d", s.Type, len(s.Fields), want)
-	}
-	return nil
-}
+type Subject = releasechange.Subject
 
 type Fired struct {
 	Subject           Subject
