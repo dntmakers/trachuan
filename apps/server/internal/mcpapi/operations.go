@@ -11,10 +11,11 @@ import (
 type Operation func(context.Context, json.RawMessage) (json.RawMessage, error)
 
 type Operations struct {
-	Search Operation
-	Read   Operation
-	Status Operation
-	cfg    Config
+	Search  Operation
+	Read    Operation
+	Changes Operation
+	Status  Operation
+	cfg     Config
 }
 
 func NewOperations(cfg Config) *Operations {
@@ -23,7 +24,7 @@ func NewOperations(cfg Config) *Operations {
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
 	}
-	return &Operations{Search: operation(cfg, "search", cfg.search), Read: operation(cfg, "read", cfg.read), Status: operation(cfg, "corpus_status", cfg.status), cfg: cfg}
+	return &Operations{Search: operation(cfg, "search", cfg.search), Read: operation(cfg, "read", cfg.read), Changes: operation(cfg, "changes", cfg.changes), Status: operation(cfg, "corpus_status", cfg.status), cfg: cfg}
 }
 
 func operation[In, Out any](cfg Config, name string, run func(context.Context, In) (Out, error)) Operation {

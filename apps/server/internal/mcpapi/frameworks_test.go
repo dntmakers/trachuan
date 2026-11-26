@@ -53,7 +53,7 @@ func TestMCP_FrameworkToolsAndClosedSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 8 {
+	if len(listed.Tools) != 9 {
 		t.Fatalf("tools=%d", len(listed.Tools))
 	}
 	for _, name := range []string{"corpus_status", "search", "read", "quality_gaps", "mappings"} {

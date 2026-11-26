@@ -90,6 +90,7 @@ func registerTools(s *mcp.Server, cfg Config) {
 	register(s, cfg, "quality_gaps", "Page through recorded corpus quality gaps; use node to filter by topic.", cfg.gaps)
 	register(s, cfg, "search", "Search Vietnamese law; compact hits by default.", cfg.search)
 	register(s, cfg, "read", "Read chosen handles in one batch; follow every next token.", cfg.read)
+	register(s, cfg, "changes", "Compare corpus records with the previous release.", cfg.changes)
 	if cfg.Frameworks {
 		input, output, call := frameworkToolCall(cfg, "mappings", nil, nil, nil)
 		registerHandler(s, cfg, "mappings", "Read mapping edges at a framework control or between framework versions.", input, output, call, &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true})
