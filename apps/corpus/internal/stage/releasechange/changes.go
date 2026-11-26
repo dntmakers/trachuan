@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"io"
@@ -23,10 +23,11 @@ const (
 )
 
 type changeInputs struct {
-	current     string
-	predecessor string
-	members     members
-	bindings    changesBindings
+	current              string
+	predecessor          string
+	Members              Members
+	bindings             ChangesBindings
+	checkCurrentBindings bool
 }
 
 type valueChange[T any] struct {
@@ -96,7 +97,7 @@ type handOvers struct {
 	named  map[string]bool
 }
 
-func pairHandOvers(before, after map[string]summaryRecord, m members) handOvers {
+func pairHandOvers(before, after map[string]summaryRecord, m Members) handOvers {
 	h := handOvers{oldFor: map[string]string{}, newFor: map[string]string{}, named: map[string]bool{}}
 	naming := countValues(m.replacement)
 	for old, replacement := range m.replacement {
@@ -149,7 +150,7 @@ func compareDocument(out *documentChanges, key string, before, after summaryReco
 	}
 }
 
-func removalCause(m members, key string) (string, *string) {
+func removalCause(m Members, key string) (string, *string) {
 	switch m.disposition[key] {
 	case "source_replaced":
 		if replacement, ok := m.replacement[key]; ok {
@@ -162,7 +163,7 @@ func removalCause(m members, key string) (string, *string) {
 	return causeMembership, nil
 }
 
-func documentRecords(before, after map[string]summaryRecord, m members, h handOvers) documentChanges {
+func documentRecords(before, after map[string]summaryRecord, m Members, h handOvers) documentChanges {
 	var out documentChanges
 	for _, key := range sortedKeys(after) {
 		if !present(after, key) {
@@ -198,8 +199,8 @@ func documentRecords(before, after map[string]summaryRecord, m members, h handOv
 	return out
 }
 
-func readDocuments(path string, check func(identityHeader) error) (map[string]summaryRecord, error) {
-	var header identityHeader
+func readDocuments(path string, check func(IdentityHeader) error) (map[string]summaryRecord, error) {
+	var header IdentityHeader
 	r, err := openSummary(path, &header)
 	if err != nil {
 		return nil, err
@@ -235,14 +236,26 @@ func writeChanges(w io.Writer, in changeInputs) error {
 	if baseline != (in.bindings.PredecessorIdentitySHA256 == noneValue) {
 		return refuse("predecessor summary and its binding disagree")
 	}
-	if err := out.write(changesHeader{Schema: summarySchema, Bindings: in.bindings, Baseline: baseline}); err != nil {
+	if err := out.write(ChangesHeader{Schema: summarySchema, Bindings: in.bindings, Baseline: baseline}); err != nil {
 		return err
 	}
-	if baseline {
-		return out.flush()
+	in.checkCurrentBindings = true
+	if err := generate(in, out.write); err != nil {
+		return err
 	}
-	after, err := readDocuments(in.current, func(h identityHeader) error {
-		if h.Bindings != in.bindings.identityBindings {
+	return out.flush()
+}
+
+func generate(in changeInputs, emit func(any) error) error {
+	baseline := in.predecessor == ""
+	if baseline != (in.bindings.PredecessorIdentitySHA256 == noneValue) {
+		return refuse("predecessor summary and its binding disagree")
+	}
+	if baseline {
+		return nil
+	}
+	after, err := readDocuments(in.current, func(h IdentityHeader) error {
+		if in.checkCurrentBindings && h.Bindings != in.bindings.IdentityBindings {
 			return refuse("identity summary does not bind this release")
 		}
 		return nil
@@ -250,7 +263,7 @@ func writeChanges(w io.Writer, in changeInputs) error {
 	if err != nil {
 		return err
 	}
-	before, err := readDocuments(in.predecessor, func(h identityHeader) error {
+	before, err := readDocuments(in.predecessor, func(h IdentityHeader) error {
 		if h.Bindings.Rel != in.bindings.PredecessorRel {
 			return refuse("predecessor summary binds %s, not %s", h.Bindings.Rel, in.bindings.PredecessorRel)
 		}
@@ -259,11 +272,11 @@ func writeChanges(w io.Writer, in changeInputs) error {
 	if err != nil {
 		return err
 	}
-	h := pairHandOvers(before, after, in.members)
-	docs := documentRecords(before, after, in.members, h)
+	h := pairHandOvers(before, after, in.Members)
+	docs := documentRecords(before, after, in.Members, h)
 	for _, records := range [][]any{docs.documents, docs.keys, docs.legal, docs.metadata, docs.provenance} {
 		for _, record := range records {
-			if err = out.write(record); err != nil {
+			if err = emit(record); err != nil {
 				return err
 			}
 		}
@@ -273,12 +286,9 @@ func writeChanges(w io.Writer, in changeInputs) error {
 		return err
 	}
 	for _, kind := range []string{changeProvision, changeClassification, changeValidity} {
-		if err = plan.pass(kind, out); err != nil {
+		if err = plan.pass(kind, emit); err != nil {
 			return err
 		}
 	}
-	if err = writeRelationChanges(in, h, out); err != nil {
-		return err
-	}
-	return out.flush()
+	return writeRelationChanges(in, h, emit)
 }

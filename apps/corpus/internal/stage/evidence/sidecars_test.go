@@ -83,7 +83,7 @@ func TestProcess_WritesThreeBoundFiles(t *testing.T) {
 	var ch changesHeader
 	changes := f.artifactFile(output, changesFile)
 	firstLine(t, changes, &ch)
-	if ch != (changesHeader{Schema: 1, Bindings: changesBindings{identityBindings: want, PredecessorRel: "none", PredecessorIdentitySHA256: "none"}, Baseline: true}) || bytes.Count(changes, []byte("\n")) != 1 {
+	if ch != (changesHeader{Schema: 1, Bindings: changesBindings{IdentityBindings: want, PredecessorRel: "none", PredecessorIdentitySHA256: "none"}, Baseline: true}) || bytes.Count(changes, []byte("\n")) != 1 {
 		t.Fatalf("changes %s", changes)
 	}
 	if _, err = f.stage.Resolve(context.Background(), f.env, f.run, item, *output.Artifact); err != nil {

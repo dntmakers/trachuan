@@ -1,13 +1,12 @@
 package evidence
 
 import (
-	"bytes"
 	"context"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
-	"testing"
+
+	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 )
 
 func sortRowsByAnchor(rows []summaryProvision) {
@@ -85,59 +84,31 @@ func seed(node, family int64) assignment {
 	return assignment{Node: node, Family: family, Method: "phapdien_seed"}
 }
 
-func identityTestBindings(rel string) identityBindings {
-	return identityBindings{Rel: rel, DumpSHA256: hashPrefix + strings.Repeat("d", 64), BuildArtifactSHA256: hashPrefix + strings.Repeat("b", 64), ReportSHA256: hashPrefix + strings.Repeat("c", 64)}
-}
-
-func writeIdentityFile(t *testing.T, dir, name string, src *fakeSummary, m members, b identityBindings) string {
-	t.Helper()
-	var buf bytes.Buffer
-	if err := writeIdentity(context.Background(), &buf, src, m, b); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, buf.Bytes(), 0600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func golden(t *testing.T, name string, got []byte) {
-	t.Helper()
-	path := filepath.Join("testdata", name)
-	if os.Getenv("EVIDENCE_UPDATE_GOLDEN") == "1" {
-		if err := os.WriteFile(path, got, 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("%s differs from golden:\n--- got\n%s\n--- want\n%s", name, got, want)
-	}
-}
-
 func activeMembers(keys ...string) members {
-	m := members{active: map[string]bool{}, disposition: map[string]string{}, replacement: map[string]string{}}
+	entries := make([]membership.Entry, 0, len(keys))
 	for _, key := range keys {
-		m.active[key] = true
-		m.disposition[key] = "active"
+		entries = append(entries, membership.Entry{DocumentKey: key, Disposition: "active"})
+	}
+	m, err := releasechange.NewMembers(entries, "test", "test")
+	if err != nil {
+		panic(err)
 	}
 	return m
 }
 
-func (m members) with(key, disposition, replacement string) members {
-	m.disposition[key] = disposition
-	delete(m.active, key)
-	if disposition == "active" {
-		m.active[key] = true
-	}
+func withMembers(m members, key, disposition, replacement string) members {
+	entries := m.Entries()
+	entries = slices.DeleteFunc(entries, func(e membership.Entry) bool { return e.DocumentKey == key })
+	entry := membership.Entry{DocumentKey: key, Disposition: disposition}
 	if replacement != "" {
-		m.replacement[key] = replacement
+		entry.ReplacementKey = &replacement
 	}
-	return m
+	entries = append(entries, entry)
+	updated, err := releasechange.NewMembers(entries, "test", "test")
+	if err != nil {
+		panic(err)
+	}
+	return updated
 }
 
 func previousSummary() (*fakeSummary, members) {
@@ -186,9 +157,9 @@ func currentSummary() (*fakeSummary, members) {
 		},
 	}
 	m := activeMembers("vn:vbpl:2099001", "vn:vbpl:2099004", "vn:vbpl:2099005", "vn:vbpl:2099006", "vn:vbpl:2099009", "vn:vbpl:2099010")
-	m = m.with("vn:vbpl:2099002", "withdrawn", "")
-	m = m.with("vn:chinhphu:2099003", "source_replaced", "vn:vbpl:2099004")
-	m = m.with("vn:chinhphu:2099007", "source_replaced", "vn:vbpl:2099008")
-	m = m.with("vn:chinhphu:2099011", "source_replaced", "vn:vbpl:2099010")
+	m = withMembers(m, "vn:vbpl:2099002", "withdrawn", "")
+	m = withMembers(m, "vn:chinhphu:2099003", "source_replaced", "vn:vbpl:2099004")
+	m = withMembers(m, "vn:chinhphu:2099007", "source_replaced", "vn:vbpl:2099008")
+	m = withMembers(m, "vn:chinhphu:2099011", "source_replaced", "vn:vbpl:2099010")
 	return src, m
 }

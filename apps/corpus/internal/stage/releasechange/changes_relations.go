@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import "slices"
 
@@ -27,7 +27,7 @@ func remapEnd(end *relationEnd, remap map[string]string) {
 }
 
 func readRelations(path string, remap map[string]string) (map[string]*relationCount, error) {
-	r, err := openSummary(path, &identityHeader{})
+	r, err := openSummary(path, &IdentityHeader{})
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func readRelations(path string, remap map[string]string) (map[string]*relationCo
 	return out, nil
 }
 
-func writeRelationChanges(in changeInputs, h handOvers, out *lineWriter) error {
+func writeRelationChanges(in changeInputs, h handOvers, emit func(any) error) error {
 	after, err := readRelations(in.current, nil)
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func writeRelationChanges(in changeInputs, h handOvers, out *lineWriter) error {
 			continue
 		}
 		id := entry.identity
-		if err = out.write(relationChange{Type: changeRelation, Kind: id.Kind, Method: id.Method, Source: id.Source, Target: id.Target, Change: change, Count: diff}); err != nil {
+		if err = emit(relationChange{Type: changeRelation, Kind: id.Kind, Method: id.Method, Source: id.Source, Target: id.Target, Change: change, Count: diff}); err != nil {
 			return err
 		}
 	}

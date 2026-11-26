@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"encoding/json"

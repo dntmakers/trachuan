@@ -21,12 +21,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type inputError struct{ reason string }
-
-func (e *inputError) Error() string { return e.reason }
-
 func refuse(format string, args ...any) error {
-	return &inputError{reason: fmt.Sprintf(format, args...)}
+	return &inputError{Reason: fmt.Sprintf(format, args...)}
 }
 
 type inventoryItem struct {
@@ -130,7 +126,7 @@ func (f frozenInputs) identityBindings(rel string) identityBindings {
 }
 
 func (f frozenInputs) changesBindings(rel string) changesBindings {
-	return changesBindings{identityBindings: f.identityBindings(rel), PredecessorRel: f.predecessor.rel, PredecessorIdentitySHA256: prefixedOrNone(f.predecessor.identitySHA256)}
+	return changesBindings{IdentityBindings: f.identityBindings(rel), PredecessorRel: f.predecessor.rel, PredecessorIdentitySHA256: prefixedOrNone(f.predecessor.identitySHA256)}
 }
 
 func (f frozenInputs) bindings(rel string) Bindings {

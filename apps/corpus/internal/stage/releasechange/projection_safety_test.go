@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"strings"
@@ -39,7 +39,7 @@ func TestCompactContextValue_StoredBytes(t *testing.T) {
 
 func TestProjection_LongHandleOmitted(t *testing.T) {
 	source := func(yield func(any) error) error {
-		return yield(validityChange{Type: changeValidity, Key: strings.Repeat("k", 300), Anchor: strings.Repeat("a", 300), Added: []validityRow{}, Removed: []validityRow{{StatusClass: "expired", Method: "text"}}})
+		return yield(validityChange{Type: changeValidity, Key: strings.Repeat("k", 300), Anchor: strings.Repeat("a", 300), Added: []ValidityRow{}, Removed: []ValidityRow{{StatusClass: "expired", Method: "text"}}})
 	}
 	var rows []releasechanges.Row
 	err := ProjectRecords(false, source, func(row releasechanges.Row) error { rows = append(rows, row); return nil })

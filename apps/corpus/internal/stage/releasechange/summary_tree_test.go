@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"reflect"
@@ -8,10 +8,10 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-func treeRows(rows ...summaryProvision) []summaryProvision { return rows }
+func treeRows(rows ...SummaryProvision) []SummaryProvision { return rows }
 
-func row(id int64, parent int64, anchor string, assignments ...assignment) summaryProvision {
-	p := summaryProvision{ID: id, Anchor: anchor, TextSHA256: hashPrefix + strings.Repeat("0", 64), Assignments: assignments}
+func row(id int64, parent int64, anchor string, assignments ...Assignment) SummaryProvision {
+	p := SummaryProvision{ID: id, Anchor: anchor, TextSHA256: hashPrefix + strings.Repeat("0", 64), Assignments: assignments}
 	if parent != 0 {
 		p.ParentID = &parent
 	}
@@ -95,7 +95,7 @@ func TestProvisionLines_SuffixNeedsDigits(t *testing.T) {
 }
 
 func TestProvisionLines_RefusesBrokenTrees(t *testing.T) {
-	for name, rows := range map[string][]summaryProvision{
+	for name, rows := range map[string][]SummaryProvision{
 		"missing parent":   {row(1, 9, "dieu-1")},
 		"duplicate anchor": {row(1, 0, "dieu-1"), row(2, 0, "dieu-1")},
 		"out of order":     {row(1, 0, "dieu-2"), row(2, 0, "dieu-1")},
@@ -110,7 +110,7 @@ func TestProvisionLines_RefusesBrokenTrees(t *testing.T) {
 }
 
 func TestProvisionLines_EffectiveNodesFollowServingRules(t *testing.T) {
-	nodes := map[int64]taxonomyNode{
+	nodes := map[int64]TaxonomyNode{
 		11: {Code: "1.1.a", Served: true},
 		12: {Code: "1.1.b", Served: true},
 		13: {Code: "1.1.retired", Served: false},
@@ -118,16 +118,16 @@ func TestProvisionLines_EffectiveNodesFollowServingRules(t *testing.T) {
 		22: {Code: "2.1.b", Served: true},
 		31: {Code: "3.1.a", Served: true},
 	}
-	seed := func(node, family int64) assignment {
-		return assignment{Node: node, Family: family, Method: "phapdien_seed"}
+	seed := func(node, family int64) Assignment {
+		return Assignment{Node: node, Family: family, Method: "phapdien_seed"}
 	}
-	manual := func(node, family int64, exclude bool) assignment {
-		return assignment{Node: node, Family: family, Method: "manual", Exclude: exclude}
+	manual := func(node, family int64, exclude bool) Assignment {
+		return Assignment{Node: node, Family: family, Method: "manual", Exclude: exclude}
 	}
-	inherited := func(node, family int64) assignment {
-		return assignment{Node: node, Family: family, Method: "inherited"}
+	inherited := func(node, family int64) Assignment {
+		return Assignment{Node: node, Family: family, Method: "inherited"}
 	}
-	llm := func(node, family int64) assignment { return assignment{Node: node, Family: family, Method: "llm"} }
+	llm := func(node, family int64) Assignment { return Assignment{Node: node, Family: family, Method: "llm"} }
 	rows := treeRows(
 		row(1, 0, "dieu-1", seed(11, 1), seed(13, 1), seed(21, 2), inherited(22, 2), llm(31, 3)),
 		row(2, 1, "dieu-1/khoan-1"),
@@ -157,23 +157,23 @@ func TestProvisionLines_EffectiveNodesFollowServingRules(t *testing.T) {
 }
 
 func TestProvisionLines_UnknownNodeRefused(t *testing.T) {
-	rows := treeRows(row(1, 0, "dieu-1", assignment{Node: 99, Family: 1, Method: "manual"}))
-	if _, err := provisionLines("vn:vbpl:1", rows, map[int64]taxonomyNode{}); err == nil {
+	rows := treeRows(row(1, 0, "dieu-1", Assignment{Node: 99, Family: 1, Method: "manual"}))
+	if _, err := provisionLines("vn:vbpl:1", rows, map[int64]TaxonomyNode{}); err == nil {
 		t.Fatal("accepted")
 	}
 }
 
 func TestProvisionLines_ValidityRowsSortedAndEmptyListsKept(t *testing.T) {
-	first := validityRow{StatusClass: "expired", EffFrom: ptr("2099-01-01"), EffTo: ptr("2099-02-01"), Method: "text"}
-	second := validityRow{StatusClass: "expired", EffFrom: nil, EffTo: ptr("2099-03-01"), Method: "text"}
-	third := validityRow{StatusClass: "in_force", EffFrom: ptr("2099-01-01"), Method: "manual"}
+	first := ValidityRow{StatusClass: "expired", EffFrom: ptr("2099-01-01"), EffTo: ptr("2099-02-01"), Method: "text"}
+	second := ValidityRow{StatusClass: "expired", EffFrom: nil, EffTo: ptr("2099-03-01"), Method: "text"}
+	third := ValidityRow{StatusClass: "in_force", EffFrom: ptr("2099-01-01"), Method: "manual"}
 	p := row(1, 0, "dieu-1")
-	p.Validity = []validityRow{third, first, second}
-	lines, err := provisionLines("vn:vbpl:1", []summaryProvision{p, row(2, 0, "dieu-2")}, nil)
+	p.Validity = []ValidityRow{third, first, second}
+	lines, err := provisionLines("vn:vbpl:1", []SummaryProvision{p, row(2, 0, "dieu-2")}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := lines[0].Validity; !reflect.DeepEqual(got, []validityRow{second, first, third}) {
+	if got := lines[0].Validity; !reflect.DeepEqual(got, []ValidityRow{second, first, third}) {
 		t.Fatalf("validity %+v", got)
 	}
 	if lines[1].Validity == nil || len(lines[1].Validity) != 0 || lines[1].Nodes == nil || len(lines[1].Nodes) != 0 {
@@ -183,7 +183,7 @@ func TestProvisionLines_ValidityRowsSortedAndEmptyListsKept(t *testing.T) {
 
 func TestRelationIdentity_EndsFollowMCPMeaning(t *testing.T) {
 	key := func(s string) *string { return &s }
-	base := summaryRelation{Kind: "repeals", SourceKey: "vn:vbpl:1", SourceNumber: "1/2099/TT", SourceInRelease: true, TargetKey: key("vn:vbpl:2"), TargetNumber: "2/2099/TT", TargetInRelease: true}
+	base := SummaryRelation{Kind: "repeals", SourceKey: "vn:vbpl:1", SourceNumber: "1/2099/TT", SourceInRelease: true, TargetKey: key("vn:vbpl:2"), TargetNumber: "2/2099/TT", TargetInRelease: true}
 	for _, tc := range []struct {
 		name   string
 		method string
@@ -217,9 +217,9 @@ func TestRelationIdentity_EndsFollowMCPMeaning(t *testing.T) {
 }
 
 func TestRelationLines_SortAndCountEqualRows(t *testing.T) {
-	a := summaryRelation{Kind: "cites", Method: "vbpl_diagram", SourceKey: "vn:vbpl:2", SourceNumber: "2", TargetNumber: "x"}
-	b := summaryRelation{Kind: "amends_supplements", Method: "vbpl_diagram", SourceKey: "vn:vbpl:1", SourceNumber: "1", TargetNumber: "y"}
-	lines, err := relationLines([]summaryRelation{a, b, a, a})
+	a := SummaryRelation{Kind: "cites", Method: "vbpl_diagram", SourceKey: "vn:vbpl:2", SourceNumber: "2", TargetNumber: "x"}
+	b := SummaryRelation{Kind: "amends_supplements", Method: "vbpl_diagram", SourceKey: "vn:vbpl:1", SourceNumber: "1", TargetNumber: "y"}
+	lines, err := relationLines([]SummaryRelation{a, b, a, a})
 	if err != nil {
 		t.Fatal(err)
 	}

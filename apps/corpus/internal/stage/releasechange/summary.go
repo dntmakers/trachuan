@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"bufio"
@@ -20,31 +20,31 @@ const (
 	recordProvision = "provision"
 )
 
-type identityBindings struct {
+type IdentityBindings struct {
 	Rel                 string `json:"rel"`
 	DumpSHA256          string `json:"dump_sha256"`
 	BuildArtifactSHA256 string `json:"build_artifact_sha256"`
 	ReportSHA256        string `json:"report_sha256"`
 }
 
-type changesBindings struct {
-	identityBindings
+type ChangesBindings struct {
+	IdentityBindings
 	PredecessorRel            string `json:"predecessor_rel"`
 	PredecessorIdentitySHA256 string `json:"predecessor_identity_sha256"`
 }
 
-type identityHeader struct {
+type IdentityHeader struct {
 	Schema   int              `json:"schema"`
-	Bindings identityBindings `json:"bindings"`
+	Bindings IdentityBindings `json:"bindings"`
 }
 
-type changesHeader struct {
+type ChangesHeader struct {
 	Schema   int             `json:"schema"`
-	Bindings changesBindings `json:"bindings"`
+	Bindings ChangesBindings `json:"bindings"`
 	Baseline bool            `json:"baseline"`
 }
 
-type validityRow struct {
+type ValidityRow struct {
 	StatusClass string  `json:"status_class"`
 	EffFrom     *string `json:"eff_from"`
 	EffTo       *string `json:"eff_to"`
@@ -79,7 +79,7 @@ type provisionLine struct {
 	Ambiguous  bool          `json:"ambiguous,omitempty"`
 	TextSHA256 string        `json:"text_sha256"`
 	Nodes      []string      `json:"nodes"`
-	Validity   []validityRow `json:"validity"`
+	Validity   []ValidityRow `json:"validity"`
 }
 
 type relationEnd struct {
@@ -123,7 +123,7 @@ type summaryRecord struct {
 	Ambiguous        bool          `json:"ambiguous"`
 	TextSHA256       string        `json:"text_sha256"`
 	Nodes            []string      `json:"nodes"`
-	Validity         []validityRow `json:"validity"`
+	Validity         []ValidityRow `json:"validity"`
 	Kind             string        `json:"kind"`
 	Method           string        `json:"method"`
 	Source           relationEnd   `json:"source"`
@@ -199,7 +199,7 @@ func openSummary(path string, header any) (*lineReader, error) {
 		_ = file.Close()
 		return nil, refuse("%s has no header: %v", path, r.scanErr())
 	}
-	if err = strictDecode(r.scanner.Bytes(), header); err != nil {
+	if err = StrictDecode(r.scanner.Bytes(), header); err != nil {
 		_ = file.Close()
 		return nil, refuse("%s header: %v", path, err)
 	}
@@ -215,7 +215,7 @@ func (r *lineReader) scanErr() error {
 	return io.EOF
 }
 
-func strictDecode(data []byte, out any) error {
+func StrictDecode(data []byte, out any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(out); err != nil {
@@ -240,7 +240,7 @@ func (r *lineReader) next() (*summaryRecord, error) {
 		return nil, nil
 	}
 	var record summaryRecord
-	if err := strictDecode(r.scanner.Bytes(), &record); err != nil {
+	if err := StrictDecode(r.scanner.Bytes(), &record); err != nil {
 		return nil, refuse("decode %s line: %v", r.name, err)
 	}
 	if record.Type != recordDocument && record.Type != recordProvision && record.Type != recordRelation {

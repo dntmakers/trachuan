@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"encoding/json"
@@ -35,7 +35,7 @@ func TestProjection_ClosedSchema(t *testing.T) {
 
 func TestProjection_RemovedValidityHandleBudget(t *testing.T) {
 	source := func(yield func(any) error) error {
-		return yield(validityChange{Type: changeValidity, Key: "a", Anchor: strings.Repeat("x", 500), Added: []validityRow{}, Removed: []validityRow{{StatusClass: strings.Repeat("s", 3100), Method: "text"}}})
+		return yield(validityChange{Type: changeValidity, Key: "a", Anchor: strings.Repeat("x", 500), Added: []ValidityRow{}, Removed: []ValidityRow{{StatusClass: strings.Repeat("s", 3100), Method: "text"}}})
 	}
 	err := ProjectRecords(false, source, func(releasechanges.Row) error { return nil })
 	if err == nil || !strings.Contains(err.Error(), "ordinal 1") {
@@ -51,7 +51,7 @@ func TestProjection_ExactPayloads(t *testing.T) {
 			keyChange{Type: changeDocumentKey, Key: "c", Before: "old"},
 			legalChange{Type: changeLegal, Key: "c", IsCurrent: &valueChange[bool]{Before: true, After: false}},
 			provisionChange{Type: changeProvision, Key: "c", Anchor: "x", Change: "changed", TextSHA256: valueChange[*string]{}},
-			validityChange{Type: changeValidity, Key: "c", Anchor: "x", Added: []validityRow{{StatusClass: "in_force", Method: "text"}}, Removed: []validityRow{{StatusClass: "expired", Method: "text"}}},
+			validityChange{Type: changeValidity, Key: "c", Anchor: "x", Added: []ValidityRow{{StatusClass: "in_force", Method: "text"}}, Removed: []ValidityRow{{StatusClass: "expired", Method: "text"}}},
 		}
 		for _, r := range records {
 			if err := yield(r); err != nil {

@@ -1,7 +1,6 @@
 package evidence
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -27,14 +26,38 @@ func TestMembersFrom_ReadsDispositionsAndHandOvers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(m.active, map[string]bool{"vn:vbpl:2099001": true}) {
-		t.Fatalf("active %v", m.active)
+	if !m.IsActive("vn:vbpl:2099001") || m.IsActive("vn:vbpl:2099002") {
+		t.Fatal("incorrect active members")
 	}
-	if m.disposition["vn:vbpl:2099002"] != "withdrawn" || m.disposition["vn:chinhphu:2099008"] != "source_replaced" || len(m.disposition) != 5 {
-		t.Fatalf("dispositions %v", m.disposition)
+	if m.Disposition("vn:vbpl:2099002") != "withdrawn" || m.Disposition("vn:chinhphu:2099008") != "source_replaced" || len(m.Entries()) != 5 {
+		t.Fatal("incorrect dispositions")
 	}
-	if !reflect.DeepEqual(m.replacement, map[string]string{"vn:chinhphu:2099003": "vn:vbpl:2099004"}) {
-		t.Fatalf("replacements %v", m.replacement)
+	if replacement, ok := m.Replacement("vn:chinhphu:2099003"); !ok || replacement != "vn:vbpl:2099004" {
+		t.Fatalf("replacement %q, found %v", replacement, ok)
+	}
+	if _, ok := m.Replacement("vn:chinhphu:2099008"); ok {
+		t.Fatal("unexpected replacement")
+	}
+}
+
+func TestMembersFrom_ReturnsIndependentEntries(t *testing.T) {
+	inv := memberInventory()
+	m, err := membersFrom(inv, inv.IdentityHash())
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := m.Entries()
+	for i := range entries {
+		entries[i].Disposition = "withdrawn"
+		if entries[i].ReplacementKey != nil {
+			*entries[i].ReplacementKey = "changed"
+		}
+	}
+	if !m.IsActive("vn:vbpl:2099001") {
+		t.Fatal("changed returned entry altered active members")
+	}
+	if replacement, _ := m.Replacement("vn:chinhphu:2099003"); replacement != "vn:vbpl:2099004" {
+		t.Fatalf("changed returned entry altered replacement: %s", replacement)
 	}
 }
 

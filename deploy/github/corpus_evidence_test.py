@@ -237,7 +237,7 @@ class EvidenceGateTest(unittest.TestCase):
 
 class GoSummaryContractTest(unittest.TestCase):
     def test_go_golden_summaries_pass_the_line_validator_with_every_record_type(self):
-        testdata = Path(__file__).resolve().parents[2] / 'apps/corpus/internal/stage/evidence/testdata'
+        testdata = Path(__file__).resolve().parents[2] / 'apps/corpus/internal/stage/releasechange/testdata'
         for name, types in ((IDENTITY, corpus_evidence.IDENTITY_TYPES), (CHANGES, corpus_evidence.CHANGE_TYPES)):
             with self.subTest(name=name):
                 lines = (testdata / name).read_bytes().splitlines()
