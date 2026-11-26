@@ -188,7 +188,7 @@ class SelectedReportTest(unittest.TestCase):
         with redirect_stdout(output):
             self.run_cli('validate', list_files=True)
         self.assertEqual(output.getvalue().split(), ['corpus.dump', 'MANIFEST.sha256', 'report.json', 'release.json',
-                                                     'findings.json', 'identity.jsonl', 'changes.jsonl'])
+                                                     'build.json', 'findings.json', 'identity.jsonl', 'changes.jsonl'])
         with patch('corpus_previous.check_remote', return_value=None) as remote, redirect_stdout(io.StringIO()):
             self.run_cli('create', check=False)
         self.assertEqual(remote.call_args.kwargs['sidecars']['evidence'],

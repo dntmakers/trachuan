@@ -93,9 +93,13 @@ elif 'list-objects-v2' in args:
     print(os.getenv('FAKE_KEY_COUNT', str(count)))
 elif 'head-object' in args:
     filename = option('--key').rsplit('/', 1)[1]
+    if os.getenv('FAKE_HEAD_DENIED') == filename:
+        sys.exit('An error occurred (403) when calling the HeadObject operation: Forbidden')
     path = build / 'previous-report.json' if option('--key').startswith('vn/20990101_1/') else remote / filename
     if not path.exists():
         path = build / filename
+    if not path.exists():
+        sys.exit('An error occurred (404) when calling the HeadObject operation: Not Found')
     size = json.loads(os.getenv('FAKE_HEAD_SIZES', '{}')).get(filename, path.stat().st_size)
     result = dict(ContentLength=size + (1 if os.getenv('FAKE_BAD_SIZE') == filename else 0), ETag=etag(path))
     result['ETag'] = json.loads(os.getenv('FAKE_HEAD_ETAGS', '{}')).get(filename, result['ETag'])
@@ -225,13 +229,13 @@ class CorpusUploadTest(unittest.TestCase):
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
-    def test_uploads_four_objects_verifies_sizes_then_dispatches_main(self):
+    def test_uploads_five_objects_verifies_sizes_then_dispatches_main(self):
         result = self.run_upload()
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = self.calls()
         uploads = [call for call in calls if 'put-object' in call['args']]
-        self.assertEqual(len(uploads), 4)
-        self.assertEqual(len([call for call in calls if 'head-object' in call['args']]), 5)
+        self.assertEqual(len(uploads), 5)
+        self.assertEqual(len([call for call in calls if 'head-object' in call['args']]), 6)
         self.assertGreater(min(i for i, call in enumerate(calls) if 'head-object' in call['args'] and 'vn/20990101_1/report.json' not in call['args']),
                            max(i for i, call in enumerate(calls) if 'put-object' in call['args']))
         uploaded = support.digest((self.remote / 'report.json').read_bytes())
@@ -335,13 +339,13 @@ class CorpusUploadTest(unittest.TestCase):
         support.save_fixture(self.build, self.row, self.report)
         result = self.run_upload('--dry-run')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.count('Upload and verify size and ETag:'), 7)
+        self.assertEqual(result.stdout.count('Upload and verify size and ETag:'), 8)
         result = self.run_upload()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('Open findings allowed: review 0, info 0', result.stdout)
         self.assertIn('Findings against 20990101_1: new 0, gone 0', result.stdout)
         calls = self.calls()
-        self.assertEqual(sum('put-object' in call['args'] for call in calls), 7)
+        self.assertEqual(sum('put-object' in call['args'] for call in calls), 8)
         for name in SIDECARS:
             self.assertEqual((self.remote / name).read_bytes(), (self.build / name).read_bytes())
         self.assertEqual(calls[-1]['name'], 'gh')
@@ -389,7 +393,7 @@ class CorpusUploadTest(unittest.TestCase):
         self.log.unlink()
         result = self.run_upload()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sum('put-object' in call['args'] for call in self.calls()), 7)
+        self.assertEqual(sum('put-object' in call['args'] for call in self.calls()), 8)
 
     def resign_check(self, directory=True):
         return subprocess.run(['python3', str(self.repo_tool('corpus_production.py')), 'resign-check', '--repository',
@@ -449,15 +453,14 @@ class CorpusUploadTest(unittest.TestCase):
         self.assertEqual(sum('head-object' in call['args'] for call in calls), 6)
         self.assertEqual(calls[-1]['name'], 'gh')
 
-    def test_schema_seven_upload_keeps_four_objects_without_build_record(self):
-        self.row['schema_version'] = 7
-        save_fixture(self.build, self.row, self.report)
-        self.assertFalse((self.build / 'build.json').exists())
+    def test_schema_seven_upload_requires_and_uploads_build_record(self):
+        support.set_schema_build(self.build, self.row, self.report, 7)
+        save_older_shape(self.build, self.row)
         result = self.run_upload()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(sum('put-object' in call['args'] for call in self.calls()), 4)
+        self.assertEqual(sum('put-object' in call['args'] for call in self.calls()), 5)
         self.assertEqual({path.name for path in self.remote.iterdir()},
-                         {'corpus.dump', 'MANIFEST.sha256', 'report.json', 'release.json'})
+                         {'corpus.dump', 'MANIFEST.sha256', 'report.json', 'release.json', 'build.json'})
 
     def test_schema_eight_build_record_receipt_changes_prevent_dispatch(self):
         add_heading_build(self.build, self.row, self.report)
@@ -473,16 +476,16 @@ class CorpusUploadTest(unittest.TestCase):
                 self.assertFalse(any(call['name'] == 'gh' for call in self.calls()))
 
     def test_schema_seven_and_eight_dry_runs_list_the_required_objects(self):
-        self.row['schema_version'] = 7
-        save_fixture(self.build, self.row, self.report)
+        support.set_schema_build(self.build, self.row, self.report, 7)
+        save_older_shape(self.build, self.row)
         for version in (7, 8):
             with self.subTest(schema_version=version):
                 if version == 8:
                     add_heading_build(self.build, self.row, self.report)
                 result = self.run_upload('--dry-run')
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual('build.json' in result.stdout, version == 8)
-                self.assertEqual(result.stdout.count('Upload and verify size and ETag:'), 5 if version == 8 else 4)
+                self.assertIn('build.json', result.stdout)
+                self.assertEqual(result.stdout.count('Upload and verify size and ETag:'), 5)
                 self.assertEqual(self.calls(), [])
 
     def test_existing_prefix_bad_size_and_old_cli_never_dispatch(self):

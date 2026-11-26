@@ -2,6 +2,7 @@ import hashlib
 import json
 
 from manifest import require_match
+from corpus_projection import KINDS, project
 
 FINDINGS, IDENTITY, CHANGES = 'findings.json', 'identity.jsonl', 'changes.jsonl'
 SIDECARS = (FINDINGS, IDENTITY, CHANGES)
@@ -168,7 +169,54 @@ def changes_header(base, previous_rel):
     return check
 
 
-def validate_sidecars(row, report, report_bytes, directory, dump_hash, build_hash):
+class ProjectionReader:
+    def __init__(self, source):
+        self.source = source
+        self.digests = []
+        self.digest = None
+
+    def tell(self):
+        return self.source.tell()
+
+    def seek(self, offset, whence=0):
+        if self.digest is not None:
+            self.digests.append(self.digest.hexdigest())
+        self.digest = hashlib.sha256()
+        return self.source.seek(offset, whence)
+
+    def readline(self, size):
+        data = self.source.readline(size)
+        self.digest.update(data)
+        return data
+
+    def sums(self):
+        return self.digests + [self.digest.hexdigest()]
+
+
+def validate_projection(row, record, path, changes_hash):
+    if not isinstance(record, dict):
+        raise ValueError('missing projection build record')
+    stored = record.get('changes_projection')
+    counts = record.get('changes_counts')
+    if not isinstance(stored, dict) or set(stored) != {'version', 'sha256'}:
+        raise ValueError('invalid changes projection')
+    if type(stored['version']) is not int or stored['version'] != 1:
+        raise ValueError('unsupported changes projection version')
+    require_match(r'[0-9a-f]{64}', stored['sha256'], 'changes projection hash')
+    if (not isinstance(counts, dict) or set(counts) != set(KINDS) or
+            any(type(value) is not int or value < 0 for value in counts.values())):
+        raise ValueError('invalid changes projection counts')
+    with path.open('rb') as stream:
+        reader = ProjectionReader(stream)
+        result = project(reader, row['country'])
+        if reader.sums() != [changes_hash, changes_hash]:
+            raise ValueError('changes differ from verified sidecar')
+    if result.digest != stored['sha256'] or result.counts != counts:
+        raise ValueError('changes projection differs from build')
+    return {'version': 1, 'sha256': result.digest}
+
+
+def validate_sidecars(row, report, report_bytes, directory, dump_hash, build_hash, build_record=None):
     run = row['run']
     for name in SIDECARS:
         require_match(r'[0-9a-f]{64}', run.get(RUN_FIELDS[name]), 'release run ' + RUN_FIELDS[name])
@@ -190,9 +238,12 @@ def validate_sidecars(row, report, report_bytes, directory, dump_hash, build_has
     for name, digest in digests.items():
         if run[RUN_FIELDS[name]] != digest:
             raise ValueError(name + ' differs from release.json')
-    return dict(evidence={RUN_FIELDS[name]: digests[name] for name in SIDECARS},
-                predecessor=dict(rel=previous_rel, findings_sha256=predecessor_findings, identity_sha256=predecessor_identity),
-                open=counts, changed=changed)
+    result = dict(evidence={RUN_FIELDS[name]: digests[name] for name in SIDECARS},
+                  predecessor=dict(rel=previous_rel, findings_sha256=predecessor_findings, identity_sha256=predecessor_identity),
+                  open=counts, changed=changed)
+    if row.get('schema_version') == 9:
+        result['changes_projection'] = validate_projection(row, build_record, directory / CHANGES, digests[CHANGES])
+    return result
 
 
 def require_predecessor(sidecars, manifest):

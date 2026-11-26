@@ -130,7 +130,7 @@ class AuthorizationBoundaryTest(unittest.TestCase):
         previous = json.loads((self.directory / 'previous-report.json').read_bytes())
         args = ['corpus_manifest.py', 'create', 'vn', report['rel'], str(self.directory), str(self.report_path)]
         env = {'GITHUB_REF': 'refs/heads/main', 'GITHUB_SHA': self.commit, 'GITHUB_RUN_NUMBER': '1'}
-        signed = dict(country='vn', rel=report['rel'], report={'sha256': signed_hash})
+        signed = dict(country='vn', rel=report['rel'], schema_version=6, report={'sha256': signed_hash})
         with patch.dict(os.environ, env), patch('sys.argv', args), \
                 patch('corpus_manifest.workflow', return_value='dannyota/trachuan'), \
                 patch('corpus_previous.check_remote', return_value=previous), \
@@ -143,7 +143,7 @@ class AuthorizationBoundaryTest(unittest.TestCase):
     def test_signed_manifest_creation_accepts_only_exact_verified_report(self):
         args = ['corpus_manifest.py', 'create', 'vn', self.report['rel'], str(self.directory), str(self.report_path)]
         env = {'GITHUB_REF': 'refs/heads/main', 'GITHUB_SHA': self.commit, 'GITHUB_RUN_NUMBER': '1'}
-        signed = dict(country='vn', rel=self.report['rel'], report={'sha256': self.old_hash})
+        signed = dict(country='vn', rel=self.report['rel'], schema_version=self.row['schema_version'], report={'sha256': self.old_hash})
         with patch.dict(os.environ, env), patch('sys.argv', args), patch('corpus_manifest.workflow', return_value='dannyota/trachuan'), \
                 patch('corpus_previous.check_remote', return_value=self.previous), \
                 patch('corpus_registry.existing_release', return_value=signed):

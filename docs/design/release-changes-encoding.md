@@ -32,3 +32,12 @@ rows is an error for writers and readers alike. A fixture in the repository
 holds a projection's bytes and its expected digest, and each implementation
 tests against it; it covers a quote, a backslash, a control character, non-ASCII
 text, zero, a negative integer, null and an absent field.
+
+Upload and signing in `deploy/github` compute the projection from
+`changes.jsonl` with the Python standard library, so the signing job needs no Go
+toolchain or module download. That code is a second implementation of the
+projection rules, not a copy of the Go output: it reads the same sidecar,
+applies the same schema, kind and size checks, and must reproduce both the
+encoding fixture and the projection of the change-record fixture byte for byte.
+CI runs both implementations over the same fixtures, so a rule changed in one
+and not the other fails the build.

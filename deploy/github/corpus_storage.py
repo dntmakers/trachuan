@@ -1,13 +1,13 @@
 import argparse
 import hashlib
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 
 from corpus_evidence import LIMITS, SIDECARS
 from corpus_manifest import decode, identity, sha256
-from corpus_rules import has_decision
-from manifest import positive, require_match
+from manifest import require_match
 from object_store import ObjectReader, require_free_space, require_pinned_cli, s3_endpoint
 
 
@@ -28,9 +28,11 @@ def download(country, rel, report_sha256, release_sha256, directory):
         for name, limit in limits.items():
             try:
                 objects[name] = reader.head(f'{country}/{rel}/{name}', name, limit)
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as exc:
                 if name == 'build.json' or name in SIDECARS:
-                    continue
+                    if re.search(r'\((?:404|NoSuchKey|NotFound)\)', exc.stderr or ''):
+                        continue
+                    raise ValueError('cannot read object: ' + name) from exc
                 raise
         require_free_space(objects, directory, 'corpus')
 
@@ -48,20 +50,16 @@ def download(country, rel, report_sha256, release_sha256, directory):
         row = decode(row_bytes)
         if not isinstance(row, dict) or row.get('country') != country or row.get('rel') != rel:
             raise ValueError('downloaded release identity differs from request')
-        positive(row.get('schema_version'), 'schema version')
-        if row['schema_version'] >= 8 and 'build.json' not in objects:
-            raise ValueError('schema 8 requires build.json HEAD metadata')
+        fetch('MANIFEST.sha256')
+        report = decode((directory / 'report.json').read_bytes())
+        manifest = (directory / 'MANIFEST.sha256').read_bytes()
+        if not isinstance(report, dict) or report.get('build_artifact_sha256') != hashlib.sha256(manifest).hexdigest():
+            raise ValueError('build manifest differs from report')
         if not isinstance(row.get('run'), dict):
             raise ValueError('downloaded release row has no run')
-        decided = has_decision(row['run'])
-        if decided and any(name not in objects for name in SIDECARS):
-            raise ValueError('a release with a decision requires its evidence files')
         for name in objects:
-            if name in ('report.json', 'release.json') or (name == 'build.json' and row['schema_version'] < 8):
-                continue
-            if name in SIDECARS and not decided:
-                continue
-            fetch(name)
+            if name not in ('report.json', 'release.json', 'MANIFEST.sha256'):
+                fetch(name)
 
 
 def main():
