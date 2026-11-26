@@ -12,6 +12,7 @@ import (
 
 func testWebContract(t *testing.T, coverage *contracttest.Coverage) {
 	cases := []struct{ method, path, actual, body string }{
+		{"POST", "/api/v1/changes", "/api/v1/changes", `{"country":"vn"}`},
 		{"POST", "/api/v1/search", "/api/v1/search", `{"country":"vn","query":"law"}`}, {"POST", "/api/v1/read", "/api/v1/read", `{"country":"vn","items":[{"handle":"vn:1#a"}]}`}, {"GET", "/api/v1/documents/{key}", "/api/v1/documents/vn:1", ""}, {"GET", "/api/v1/status", "/api/v1/status", ""}}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
@@ -26,6 +27,7 @@ func testWebContract(t *testing.T, coverage *contracttest.Coverage) {
 
 func testWebContract_Guards(t *testing.T, coverage *contracttest.Coverage) {
 	cases := []struct{ method, path, actual string }{
+		{"POST", "/api/v1/changes", "/api/v1/changes"},
 		{"POST", "/api/v1/search", "/api/v1/search"}, {"POST", "/api/v1/read", "/api/v1/read"}, {"GET", "/api/v1/documents/{key}", "/api/v1/documents/vn:1"}, {"GET", "/api/v1/status", "/api/v1/status"},
 	}
 	for _, tc := range cases {
@@ -55,6 +57,7 @@ func testWebContract_Guards(t *testing.T, coverage *contracttest.Coverage) {
 
 func testWebContract_Errors(t *testing.T, coverage *contracttest.Coverage) {
 	cases := []struct{ method, path, actual, body string }{
+		{"POST", "/api/v1/changes", "/api/v1/changes", `{"country":"vn"}`},
 		{"POST", "/api/v1/search", "/api/v1/search", `{"country":"vn","query":"law"}`}, {"POST", "/api/v1/read", "/api/v1/read", `{"country":"vn","items":[]}`}, {"GET", "/api/v1/documents/{key}", "/api/v1/documents/vn:1", ""}, {"GET", "/api/v1/status", "/api/v1/status", ""},
 	}
 	for _, tc := range cases {
@@ -89,6 +92,7 @@ func testWebContract_BodyAndRateLimits(t *testing.T, coverage *contracttest.Cove
 		method, path, actual, body string
 		count                      int
 	}{
+		{"POST", "/api/v1/changes", "/api/v1/changes", `{"country":"vn"}`, 120},
 		{"POST", "/api/v1/search", "/api/v1/search", `{"country":"vn","query":"law"}`, 60},
 		{"POST", "/api/v1/read", "/api/v1/read", `{"country":"vn","items":[]}`, 120},
 		{"GET", "/api/v1/documents/{key}", "/api/v1/documents/vn:1", "", 120},

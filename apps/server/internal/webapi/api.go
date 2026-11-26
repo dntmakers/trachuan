@@ -28,6 +28,9 @@ func New(cfg Config) http.Handler {
 	frameworks := newFrameworkRoutes(cfg)
 	law := newLawRoutes(cfg)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/changes" {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		if r.URL.Path == "/api/v1/frameworks" || strings.HasPrefix(r.URL.Path, "/api/v1/frameworks/") {
 			frameworks.ServeHTTP(w, r)
 			return
@@ -46,6 +49,7 @@ func newLawRoutes(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("POST /api/v1/search", a.route("search", limits.Search, a.search))
 	mux.Handle("POST /api/v1/read", a.route("read", limits.Read, a.read))
+	mux.Handle("POST /api/v1/changes", a.route("changes", limits.Read, a.changes))
 	mux.Handle("GET /api/v1/documents/{key}", a.route("documents", limits.Read, a.documents))
 	mux.Handle("GET /api/v1/status", a.route("status", limits.Read, a.status))
 	return cfg.Sessions.Middleware(cfg.Sessions.CSRF(mux))

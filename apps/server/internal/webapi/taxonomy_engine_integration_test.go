@@ -52,6 +52,10 @@ func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine 
 }
 
 func taxonomyIntegrationEngineWith(t *testing.T, recipe retrieval.Recipe, embedder retrieval.Embedder, extra ...string) *retrieval.Engine {
+	return taxonomyIntegrationEngineVersion(t, recipe, embedder, corpusdb.SchemaVersion, extra...)
+}
+
+func taxonomyIntegrationEngineVersion(t *testing.T, recipe retrieval.Recipe, embedder retrieval.Embedder, version int, extra ...string) *retrieval.Engine {
 	t.Helper()
 	ctx := context.Background()
 	q, d := embedding.QueryRecipe1(), embedding.DocumentRecipe1()
@@ -101,7 +105,7 @@ func taxonomyIntegrationEngineWith(t *testing.T, recipe retrieval.Recipe, embedd
 	threshold := 0.1
 	recipe.Abstention.Threshold = &threshold
 	recipe.Abstention.CalibrationSHA256 = hash
-	rel := retrieval.Release{Country: "vn", Rel: "20991110_1", SchemaVersion: corpusdb.SchemaVersion, RetrievalRecipe: recipe, LexicalRecipe: lexical.Recipe1(), ChunkRecipe: json.RawMessage(`{}`), EvaluationSummary: json.RawMessage(`{}`), SourceManifestHash: hash, BuildInputHash: hash, BuildRecipeHash: hash, BuiltAt: now(), LexicalStats: stats.Summary(lexical.Recipe1(), nil), DenseRecipe: retrieval.DenseRecipe{Version: 1, Model: q.Model, Dimensions: q.Dimensions, Document: d, DocumentHash: d.Hash(), Query: q, QueryHash: q.Hash()}}
+	rel := retrieval.Release{Country: "vn", Rel: "20991110_1", SchemaVersion: version, RetrievalRecipe: recipe, LexicalRecipe: lexical.Recipe1(), ChunkRecipe: json.RawMessage(`{}`), EvaluationSummary: json.RawMessage(`{}`), SourceManifestHash: hash, BuildInputHash: hash, BuildRecipeHash: hash, BuiltAt: now(), LexicalStats: stats.Summary(lexical.Recipe1(), nil), DenseRecipe: retrieval.DenseRecipe{Version: 1, Model: q.Model, Dimensions: q.Dimensions, Document: d, DocumentHash: d.Hash(), Query: q, QueryHash: q.Hash()}}
 	marshal := func(value any) string {
 		t.Helper()
 		raw, marshalErr := json.Marshal(value)
@@ -118,7 +122,6 @@ func taxonomyIntegrationEngineWith(t *testing.T, recipe retrieval.Recipe, embedd
 	return engine
 }
 
-// wireValue applies the documented omission of empty and null fields to engine output.
 func wireValue(t *testing.T, value any) any {
 	t.Helper()
 	raw, err := json.Marshal(value)

@@ -63,6 +63,10 @@ func (e *fakeEngine) Read(_ context.Context, r retrieval.ReadRequest) (retrieval
 	}
 	return retrieval.ReadResult{Release: r.Release, Items: []retrieval.ItemResult{{Complete: false, Next: "opaque"}, {Complete: true}}}, e.err
 }
+func (e *fakeEngine) Changes(_ context.Context, r retrieval.ChangesRequest) (retrieval.ChangesResult, error) {
+	e.calls.Add(1)
+	return retrieval.ChangesResult{Country: r.Country, Release: "20991111", State: "baseline", Items: []json.RawMessage{}}, e.err
+}
 func (e *fakeEngine) Status(context.Context) (retrieval.CorpusStatus, error) {
 	e.calls.Add(1)
 	return retrieval.CorpusStatus{Release: "20991111", Documents: 2}, e.err
@@ -177,7 +181,7 @@ func TestMCP_ToolsListedWithSchemas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Tools) != 7 {
+	if len(r.Tools) != 8 {
 		t.Fatalf("tools %d", len(r.Tools))
 	}
 	names := map[string]bool{}
@@ -187,7 +191,7 @@ func TestMCP_ToolsListedWithSchemas(t *testing.T) {
 			t.Fatal("missing schema")
 		}
 	}
-	for _, name := range []string{"guide", "corpus_status", "taxonomy", "search", "read", "quality_gaps", "report_issue"} {
+	for _, name := range []string{"guide", "corpus_status", "taxonomy", "search", "read", "quality_gaps", "report_issue", "changes"} {
 		if !names[name] {
 			t.Fatal("missing " + name)
 		}
@@ -355,7 +359,7 @@ func TestGuide_ContentRules(t *testing.T) {
 	r := callTool(t, h, "guide", map[string]any{"country": "vn"})
 	out := resultJSON(t, r)
 	guide, _ := out["guide"].(string)
-	for _, rule := range []string{"search", "documents", "hits", "read", "<doc>#<anchor>", "status", "warnings", "repeals", "replaces", "suspends", "amends_supplements", "in:implements", "next", "last page", "snippet is not the provision", "[…]", "direction", "outside the release", "number lookup", "complete", "Releases with restoration accept Vietnamese without diacritics", "Check restored_query if present. If the restoration is incorrect, start a new search with diacritics. If the release returns diacritics_required, retry with diacritics or a document number.", "citation", "number"} {
+	for _, rule := range []string{"search", "documents", "hits", "read", "<doc>#<anchor>", "status", "warnings", "repeals", "replaces", "suspends", "amends_supplements", "in:implements", "next", "last page", "snippet is not the provision", "[…]", "direction", "outside the release", "number lookup", "complete", "Releases with restoration accept Vietnamese without diacritics", "Check restored_query if present. If the restoration is incorrect, start a new search with diacritics. If the release returns diacritics_required, retry with diacritics or a document number.", "citation", "number", "Call changes", "same release", "Baseline", "unavailable", "corpus records", "text changes", "validity records", "cite only complete text from read"} {
 		if !strings.Contains(guide, rule) {
 			t.Fatalf("guide missing %q", rule)
 		}

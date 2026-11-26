@@ -1817,6 +1817,45 @@ paths:
         description: Used when Origin is absent.
         schema:
           type: string
+  /api/v1/changes:
+    post:
+      tags: [web]
+      parameters:
+      - {name: X-CSRF-Token, in: header, required: true, schema: {type: string}}
+      - {name: Origin, in: header, required: false, schema: {type: string}}
+      - {name: Referer, in: header, required: false, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ChangesInput'}
+      responses:
+        '200':
+          description: Success
+          headers: &changesHeaders
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ChangesResult'}
+        '400': &changesError
+          description: Request failed
+          headers: *changesHeaders
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '401': *changesError
+        '403': *changesError
+        '409': *changesError
+        '413': *changesError
+        '429':
+          description: Rate limited
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
+            Retry-After: {schema: {type: integer}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+        '503': *changesError
   /api/v1/search:
     post:
       tags: [web]
@@ -3052,6 +3091,193 @@ components:
       in: cookie
       name: __Host-pending
   schemas:
+    ChangesInput:
+      type: object
+      additionalProperties: false
+      required: [country]
+      properties:
+        country: {type: string, enum: [vn]}
+        release: {type: string, minLength: 1, maxLength: 11, pattern: '^[0-9]{8}(_[1-9][0-9]*)?$'}
+        kinds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: {type: string, enum: [document_added, document_removed, document_validity, provision_validity, provision_text, document_key]}
+        document: &changeKey {type: string, pattern: '^vn:', minLength: 4, maxLength: 512}
+        limit: {type: integer, minimum: 1, maximum: 50}
+        cursor: {type: string, minLength: 1, maxLength: 512}
+    ChangesResult:
+      type: object
+      additionalProperties: false
+      required: [country, release, state, items]
+      properties:
+        country: {type: string, enum: [vn]}
+        release: {type: string}
+        state: {type: string, enum: [available, baseline, unavailable]}
+        previous_release: {type: string, minLength: 1}
+        counts:
+          type: object
+          additionalProperties: false
+          required: [document_added, document_removed, document_validity, provision_validity, provision_text, document_key]
+          properties:
+            document_added: &changeCount {type: integer, minimum: 0}
+            document_removed: *changeCount
+            document_validity: *changeCount
+            provision_validity: *changeCount
+            provision_text: *changeCount
+            document_key: *changeCount
+        items:
+          type: array
+          items:
+            oneOf:
+            - {$ref: '#/components/schemas/ChangeDocumentAdded'}
+            - {$ref: '#/components/schemas/ChangeDocumentRemoved'}
+            - {$ref: '#/components/schemas/ChangeDocumentValidity'}
+            - {$ref: '#/components/schemas/ChangeProvisionValidity'}
+            - {$ref: '#/components/schemas/ChangeProvisionText'}
+            - {$ref: '#/components/schemas/ChangeDocumentKey'}
+            discriminator:
+              propertyName: kind
+              mapping:
+                document_added: '#/components/schemas/ChangeDocumentAdded'
+                document_removed: '#/components/schemas/ChangeDocumentRemoved'
+                document_validity: '#/components/schemas/ChangeDocumentValidity'
+                provision_validity: '#/components/schemas/ChangeProvisionValidity'
+                provision_text: '#/components/schemas/ChangeProvisionText'
+                document_key: '#/components/schemas/ChangeDocumentKey'
+        next_cursor: {type: string}
+      allOf:
+      - if:
+          required: [state]
+          properties: {state: {enum: [available]}}
+        then:
+          required: [previous_release, counts]
+      - if:
+          required: [state]
+          properties: {state: {enum: [baseline, unavailable]}}
+        then:
+          properties: {items: {maxItems: 0}}
+          not:
+            anyOf:
+            - {required: [counts]}
+            - {required: [next_cursor]}
+      - if:
+          required: [state]
+          properties: {state: {enum: [unavailable]}}
+        then:
+          not: {required: [previous_release]}
+    ChangeDocumentAdded:
+      type: object
+      additionalProperties: false
+      required: [kind, key, cause]
+      properties:
+        kind: {type: string, enum: [document_added]}
+        key: *changeKey
+        cause: &changeCause {type: string, minLength: 1, enum: [membership, coverage, source]}
+        handle: &changeHandle {type: string, minLength: 1, maxLength: 512}
+    ChangeDocumentRemoved:
+      type: object
+      additionalProperties: false
+      required: [kind, key, cause]
+      properties:
+        kind: {type: string, enum: [document_removed]}
+        key: *changeKey
+        cause: *changeCause
+        replaced_by: *changeKey
+    ChangeDocumentKey:
+      type: object
+      additionalProperties: false
+      required: [kind, key, before_key]
+      properties:
+        kind: {type: string, enum: [document_key]}
+        key: *changeKey
+        before_key: *changeKey
+        handle: *changeHandle
+    ChangeDocumentValidity:
+      type: object
+      additionalProperties: false
+      required: [kind, key]
+      properties:
+        kind: {type: string, enum: [document_validity]}
+        key: *changeKey
+        handle: *changeHandle
+        source_change: &changeSource
+          type: object
+          additionalProperties: false
+          properties:
+            before_key: *changeKey
+            text_source:
+              type: object
+              additionalProperties: false
+              required: [before, after]
+              properties:
+                before: &changeTextSource {type: string, minLength: 1, enum: [source_tree, html_transcription, pdf_text, ocr, none]}
+                after: *changeTextSource
+            text_complete: &changeBoolPair
+              type: object
+              additionalProperties: false
+              required: [before, after]
+              properties:
+                before: {type: boolean}
+                after: {type: boolean}
+            baseline: *changeBoolPair
+        status_class:
+          type: object
+          additionalProperties: false
+          required: [before, after]
+          properties:
+            before: &changeStatus {type: string, minLength: 1, enum: [in_force, partial, expired, not_yet, suspended, unknown]}
+            after: *changeStatus
+        eff_from: &changeDatePair
+          type: object
+          additionalProperties: false
+          required: [before, after]
+          properties:
+            before: &changeDate {type: [string, 'null'], format: date}
+            after: *changeDate
+        eff_to: *changeDatePair
+        is_current: *changeBoolPair
+        validity_conflict: *changeBoolPair
+    ChangeProvisionValidity:
+      type: object
+      additionalProperties: false
+      required: [kind, key, anchor, change, validity]
+      properties:
+        kind: {type: string, enum: [provision_validity]}
+        key: *changeKey
+        anchor: &changeAnchor {type: string, minLength: 1, maxLength: 512}
+        change: {type: string, minLength: 1, enum: [added, removed]}
+        handle: *changeHandle
+        source_change: *changeSource
+        validity:
+          type: object
+          additionalProperties: false
+          required: [status_class, eff_from, eff_to, method]
+          properties:
+            status_class: *changeStatus
+            eff_from: *changeDate
+            eff_to: *changeDate
+            method: {type: string, minLength: 1}
+    ChangeProvisionText:
+      type: object
+      additionalProperties: false
+      required: [kind, key, anchor, change, provenance, ambiguous]
+      properties:
+        kind: {type: string, enum: [provision_text]}
+        key: *changeKey
+        anchor: *changeAnchor
+        change: {type: string, minLength: 1, enum: [added, removed, changed]}
+        provenance: {type: boolean}
+        ambiguous: {type: boolean}
+        handle: *changeHandle
+      if:
+        anyOf:
+        - required: [change]
+          properties: {change: {enum: [removed]}}
+        - required: [ambiguous]
+          properties: {ambiguous: {enum: [true]}}
+      then:
+        not: {required: [handle]}
     PublicSampleResult:
       type: object
       additionalProperties: false

@@ -42,6 +42,10 @@ func (e *testEngine) Read(_ context.Context, r retrieval.ReadRequest) (retrieval
 	}
 	return retrieval.ReadResult{Release: r.Release, Nodes: map[string]retrieval.NodeRef{"1": {Name: "Name", Level: 1}}, Items: []retrieval.ItemResult{{Doc: "vn:1", Complete: true, Document: &retrieval.ReadDocumentEntry{DocumentEntry: retrieval.DocumentEntry{Title: "title", TextSource: "source_tree", TextComplete: true}}, Units: []retrieval.Unit{{Kind: "outline", Anchor: "a"}, {Kind: "provision", Text: "source"}}}}}, e.err
 }
+func (e *testEngine) Changes(_ context.Context, req retrieval.ChangesRequest) (retrieval.ChangesResult, error) {
+	e.calls.Add(1)
+	return retrieval.ChangesResult{Country: req.Country, Release: "20991110_1", State: "baseline", Items: []json.RawMessage{}}, e.err
+}
 func (e *testEngine) Status(context.Context) (retrieval.CorpusStatus, error) {
 	return retrieval.CorpusStatus{Documents: 9007199254740993, Provisions: 3}, e.err
 }

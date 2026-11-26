@@ -2619,6 +2619,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "X-CSRF-Token": string;
+                    Origin?: string;
+                    Referer?: string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ChangesInput"];
+                };
+            };
+            responses: {
+                /** @description Success */
+                200: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChangesResult"];
+                    };
+                };
+                /** @description Request failed */
+                400: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request failed */
+                401: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request failed */
+                403: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request failed */
+                409: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request failed */
+                413: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Rate limited */
+                429: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        "Retry-After"?: number;
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request failed */
+                503: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -4076,6 +4191,169 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChangesInput: {
+            /** @enum {string} */
+            country: "vn";
+            release?: string;
+            kinds?: ("document_added" | "document_removed" | "document_validity" | "provision_validity" | "provision_text" | "document_key")[];
+            document?: string;
+            limit?: number;
+            cursor?: string;
+        };
+        ChangesResult: {
+            /** @enum {string} */
+            country: "vn";
+            release: string;
+            /** @enum {string} */
+            state: "available" | "baseline" | "unavailable";
+            previous_release?: string;
+            counts?: {
+                document_added: number;
+                document_removed: number;
+                document_validity: number;
+                provision_validity: number;
+                provision_text: number;
+                document_key: number;
+            };
+            items: (components["schemas"]["ChangeDocumentAdded"] | components["schemas"]["ChangeDocumentRemoved"] | components["schemas"]["ChangeDocumentValidity"] | components["schemas"]["ChangeProvisionValidity"] | components["schemas"]["ChangeProvisionText"] | components["schemas"]["ChangeDocumentKey"])[];
+            next_cursor?: string;
+        } & (unknown & unknown & unknown);
+        ChangeDocumentAdded: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "document_added";
+            key: string;
+            /** @enum {string} */
+            cause: "membership" | "coverage" | "source";
+            handle?: string;
+        };
+        ChangeDocumentRemoved: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "document_removed";
+            key: string;
+            /** @enum {string} */
+            cause: "membership" | "coverage" | "source";
+            replaced_by?: string;
+        };
+        ChangeDocumentKey: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "document_key";
+            key: string;
+            before_key: string;
+            handle?: string;
+        };
+        ChangeDocumentValidity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "document_validity";
+            key: string;
+            handle?: string;
+            source_change?: {
+                before_key?: string;
+                text_source?: {
+                    /** @enum {string} */
+                    before: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
+                    /** @enum {string} */
+                    after: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
+                };
+                text_complete?: {
+                    before: boolean;
+                    after: boolean;
+                };
+                baseline?: {
+                    before: boolean;
+                    after: boolean;
+                };
+            };
+            status_class?: {
+                /** @enum {string} */
+                before: "in_force" | "partial" | "expired" | "not_yet" | "suspended" | "unknown";
+                /** @enum {string} */
+                after: "in_force" | "partial" | "expired" | "not_yet" | "suspended" | "unknown";
+            };
+            eff_from?: {
+                /** Format: date */
+                before: string | null;
+                /** Format: date */
+                after: string | null;
+            };
+            eff_to?: {
+                /** Format: date */
+                before: string | null;
+                /** Format: date */
+                after: string | null;
+            };
+            is_current?: {
+                before: boolean;
+                after: boolean;
+            };
+            validity_conflict?: {
+                before: boolean;
+                after: boolean;
+            };
+        };
+        ChangeProvisionValidity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "provision_validity";
+            key: string;
+            anchor: string;
+            /** @enum {string} */
+            change: "added" | "removed";
+            handle?: string;
+            source_change?: {
+                before_key?: string;
+                text_source?: {
+                    /** @enum {string} */
+                    before: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
+                    /** @enum {string} */
+                    after: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
+                };
+                text_complete?: {
+                    before: boolean;
+                    after: boolean;
+                };
+                baseline?: {
+                    before: boolean;
+                    after: boolean;
+                };
+            };
+            validity: {
+                /** @enum {string} */
+                status_class: "in_force" | "partial" | "expired" | "not_yet" | "suspended" | "unknown";
+                /** Format: date */
+                eff_from: string | null;
+                /** Format: date */
+                eff_to: string | null;
+                method: string;
+            };
+        };
+        ChangeProvisionText: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "provision_text";
+            key: string;
+            anchor: string;
+            /** @enum {string} */
+            change: "added" | "removed" | "changed";
+            provenance: boolean;
+            ambiguous: boolean;
+            handle?: string;
+        };
         PublicSampleResult: {
             release: string;
             /** @constant */

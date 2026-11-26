@@ -17,6 +17,9 @@ func lawToolCall[In, Out any](cfg Config, name string, run func(context.Context,
 		input = schemaFor[In]()
 	}
 	input.Properties["country"].Enum = []any{"vn"}
+	if name == "changes" {
+		configureChangesInput(input)
+	}
 	if name == "search" {
 		for _, name := range []string{"issued_from", "issued_to"} {
 			p := input.Properties[name]
@@ -66,12 +69,15 @@ func lawToolCall[In, Out any](cfg Config, name string, run func(context.Context,
 		panic("invalid tool input schema")
 	}
 	var output *jsonschema.Schema
-	if name == "taxonomy" {
+	switch name {
+	case "taxonomy":
 		output = taxonomySchema()
-	} else {
+	case "changes":
+		output = changesOutputSchema()
+	default:
 		output = schemaFor[Out]()
 	}
-	if name != "report_issue" {
+	if name != "report_issue" && name != "changes" {
 		optionalEmptyFields(output)
 	}
 	output = &jsonschema.Schema{Type: "object", AnyOf: []*jsonschema.Schema{output, schemaFor[errorResult]()}}
@@ -101,6 +107,9 @@ func lawToolCall[In, Out any](cfg Config, name string, run func(context.Context,
 		out, err := run(ctx, in)
 		if err != nil {
 			return nil, err
+		}
+		if name == "changes" {
+			return encodeChangesResult(out, outputResolved)
 		}
 		result, data, err := encodeResult(out, false)
 		if err != nil || outputResolved.Validate(data) != nil {
