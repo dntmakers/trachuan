@@ -11,11 +11,12 @@ import (
 )
 
 type Report struct {
-	SchemaVersions   []int              `json:"schema_versions"`
-	DenseQueryHash   string             `json:"dense_query_hash"`
-	RunningQuery     embedding.Report   `json:"running_query"`
-	LexicalRecipe    lexical.Recipe     `json:"lexical_recipe"`
-	RetrievalRecipes []retrieval.Recipe `json:"retrieval_recipes"`
+	SchemaVersions    []int              `json:"schema_versions"`
+	DenseQueryHash    string             `json:"dense_query_hash"`
+	RunningQuery      embedding.Report   `json:"running_query"`
+	LexicalRecipe     lexical.Recipe     `json:"lexical_recipe"`
+	RetrievalRecipes  []retrieval.Recipe `json:"retrieval_recipes"`
+	ChangesProjection *ProjectionReport  `json:"changes_projection,omitempty"`
 }
 
 func Describe(ctx context.Context, client *embedding.Client) (Report, error) {
@@ -24,5 +25,5 @@ func Describe(ctx context.Context, client *embedding.Client) (Report, error) {
 		return Report{}, fmt.Errorf("read running query recipe: %w", err)
 	}
 	return Report{corpusdb.SupportedSchemaVersions(), embedding.QueryRecipe1().Hash(), running,
-		lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3(), retrieval.Recipe4()}}, nil
+		lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3(), retrieval.Recipe4()}, nil}, nil
 }

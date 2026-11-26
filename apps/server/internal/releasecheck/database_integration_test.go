@@ -13,6 +13,7 @@ import (
 
 	"danny.vn/trachuan/internal/corpusdb"
 	"danny.vn/trachuan/internal/embedding"
+	"danny.vn/trachuan/internal/releasechanges"
 	"danny.vn/trachuan/internal/retrieval"
 	"danny.vn/trachuan/internal/retrieval/lexical"
 	"danny.vn/trachuan/internal/testpg"
@@ -111,11 +112,49 @@ func TestCheckDatabase_UsesReadOnlyRoleAndRealSearchAndRead(t *testing.T) {
 	t.Cleanup(readOnly.Close)
 	transport := &smokeTransport{}
 	client := embedding.NewClient("http://embedder", &http.Client{Transport: transport})
-	if err = checkDatabase(ctx, readOnly, name, client); err != nil {
+	previous := "20990101"
+	rel := strings.TrimPrefix(name, "corpus_vn_")
+	header := releasechanges.Header{Version: 1, Country: "vn", Release: rel, Predecessor: &previous, Baseline: true}
+	tx, err := db.Begin(ctx)
+	if err != nil {
 		t.Fatal(err)
+	}
+	written, err := corpusdb.WriteReleaseChangesStream(ctx, tx, header, func(func(releasechanges.Row) error) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	expected := &ProjectionExpected{Version: 1, SHA256: written.Digest, Release: rel, Previous: previous}
+	projection, err := checkTarget(ctx, readOnly, name, client, expected)
+	if err != nil || projection == nil || !projection.Baseline || projection.Counts["document_added"] != 0 {
+		t.Fatalf("target projection: %v", err)
 	}
 	if len(transport.calls) != 2 || transport.calls[0] != "/v1/recipe" || transport.calls[1] != "/v1/embed" {
 		t.Fatalf("smoke embedder calls: %v", transport.calls)
+	}
+	if _, err = db.Exec(ctx, `ALTER TABLE release DROP CONSTRAINT release_schema_version_check; UPDATE release SET schema_version=8`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(ctx, "REVOKE SELECT ON release_change_set, release_change FROM "+pgx.Identifier{reader.Role}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = checkTarget(ctx, readOnly, name, client, expected); err == nil || err.Error() != "projection arguments forbidden" {
+		t.Fatalf("schema 8 arguments: %v", err)
+	}
+	oldProjection, err := checkTarget(ctx, readOnly, name, client, nil)
+	if err != nil || oldProjection != nil {
+		t.Fatalf("schema 8: %v", err)
+	}
+	if _, err = db.Exec(ctx, `UPDATE release SET schema_version=9`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(ctx, "GRANT SELECT ON release_change_set, release_change TO "+pgx.Identifier{reader.Role}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = checkTarget(ctx, readOnly, name, client, nil); err == nil || err.Error() != "projection arguments required" {
+		t.Fatalf("schema 9 arguments: %v", err)
 	}
 	if _, err = readOnly.Exec(ctx, `DELETE FROM document`); err == nil {
 		t.Fatal("reader wrote to the corpus")
@@ -123,7 +162,7 @@ func TestCheckDatabase_UsesReadOnlyRoleAndRealSearchAndRead(t *testing.T) {
 	if _, err = db.Exec(ctx, `DELETE FROM chunk; DELETE FROM provision; DELETE FROM document;`); err != nil {
 		t.Fatal(err)
 	}
-	if err = checkDatabase(ctx, readOnly, name, client); err == nil {
-		t.Fatal("smoke read accepted an empty corpus")
+	if _, err = checkTarget(ctx, readOnly, name, client, expected); err == nil || err.Error() != "target smoke check failed" {
+		t.Fatalf("smoke read accepted an empty corpus: %v", err)
 	}
 }

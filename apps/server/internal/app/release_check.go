@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"time"
 
 	"danny.vn/trachuan/apps/server/internal/releasecheck"
@@ -15,7 +17,7 @@ import (
 )
 
 func runReleaseCheck(ctx context.Context, args []string, stdout io.Writer) error {
-	kind, database, err := releaseCheckArguments(args)
+	kind, database, expected, err := releaseCheckArguments(args)
 	if err != nil {
 		return err
 	}
@@ -46,7 +48,8 @@ func runReleaseCheck(ctx context.Context, args []string, stdout io.Writer) error
 		return fmt.Errorf("describe release compatibility: %w", err)
 	}
 	if database != "" {
-		if err := releasecheck.Check(ctx, os.Getenv("SERVER_CORPUS_DATABASE_URL"), database, client); err != nil {
+		report.ChangesProjection, err = releasecheck.Check(ctx, os.Getenv("SERVER_CORPUS_DATABASE_URL"), database, client, expected)
+		if err != nil {
 			return fmt.Errorf("check corpus release: %w", err)
 		}
 	}
@@ -56,29 +59,49 @@ func runReleaseCheck(ctx context.Context, args []string, stdout io.Writer) error
 	return nil
 }
 
-func releaseCheckArguments(args []string) (string, string, error) {
-	kind, database := "", ""
-	seen := map[string]bool{}
+func releaseCheckArguments(args []string) (string, string, *releasecheck.ProjectionExpected, error) {
+	values := map[string]string{}
+	invalid := func() (string, string, *releasecheck.ProjectionExpected, error) {
+		return "", "", nil, errors.New("invalid release-check arguments")
+	}
 	for len(args) > 0 {
-		if len(args) < 2 || seen[args[0]] {
-			return "", "", errors.New("invalid release-check arguments")
+		if len(args) < 2 {
+			return invalid()
 		}
-		seen[args[0]] = true
+		if _, ok := values[args[0]]; ok {
+			return invalid()
+		}
 		switch args[0] {
-		case "--kind":
-			if args[1] != "frameworks" {
-				return "", "", errors.New("invalid release-check arguments")
-			}
-			kind = args[1]
-		case "--database":
-			database = args[1]
+		case "--kind", "--database", "--projection-version", "--projection-sha256", "--projection-release", "--projection-previous":
+			values[args[0]] = args[1]
 		default:
-			return "", "", errors.New("invalid release-check arguments")
+			return invalid()
 		}
 		args = args[2:]
 	}
-	if seen["--database"] && ((kind == "" && !releasecheck.ValidDatabase(database)) || (kind == "frameworks" && !releasecheck.ValidFrameworksDatabase(database))) {
-		return "", "", errors.New("invalid release-check arguments")
+	kind, database := values["--kind"], values["--database"]
+	if _, ok := values["--kind"]; ok && kind != "frameworks" {
+		return invalid()
 	}
-	return kind, database, nil
+	if _, ok := values["--database"]; ok && ((kind == "" && !releasecheck.ValidDatabase(database)) || (kind == "frameworks" && !releasecheck.ValidFrameworksDatabase(database))) {
+		return invalid()
+	}
+	flags := []string{"--projection-version", "--projection-sha256", "--projection-release", "--projection-previous"}
+	count := 0
+	for _, flag := range flags {
+		if _, ok := values[flag]; ok {
+			count++
+		}
+	}
+	if count == 0 {
+		return kind, database, nil, nil
+	}
+	if count != len(flags) || database == "" || kind != "" {
+		return invalid()
+	}
+	version, err := strconv.Atoi(values[flags[0]])
+	if err != nil || version < 1 || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(values[flags[1]]) || !releasecheck.ValidDatabase("corpus_vn_"+values[flags[2]]) || (values[flags[3]] != "" && !releasecheck.ValidDatabase("corpus_vn_"+values[flags[3]])) {
+		return invalid()
+	}
+	return kind, database, &releasecheck.ProjectionExpected{Version: version, SHA256: values[flags[1]], Release: values[flags[2]], Previous: values[flags[3]]}, nil
 }

@@ -1,6 +1,7 @@
 import copy
 from datetime import datetime
 import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -28,7 +29,7 @@ def manifest(data, rules):
     keys = {'kind', 'version', 'repository', 'commit', 'country', 'rel', 'database',
             'sequence', 'previous', 'dump', 'report', 'build_artifact_sha256',
             'schema_version', 'extensions', 'recipes'}
-    optional = {'heading_review', 'heading_evidence', 'evidence'}
+    optional = {'heading_review', 'heading_evidence', 'evidence', 'changes_projection'}
     if not isinstance(obj, dict) or not keys <= set(obj) or set(obj) - keys - optional:
         raise ValueError('invalid corpus manifest fields')
     validate_headings(obj)
@@ -45,8 +46,18 @@ def manifest(data, rules):
         raise ValueError('corpus database mismatch')
     for field in ('sequence', 'schema_version'):
         positive(obj[field], 'corpus ' + field)
+    if obj['schema_version'] not in (4, 5, 6, 7, 8, 9):
+        raise ValueError('unsupported corpus schema version')
     if (obj['schema_version'] >= 8) != ('heading_evidence' in obj):
         raise ValueError('heading evidence does not match schema version')
+    if (obj['schema_version'] == 9) != ('changes_projection' in obj):
+        raise ValueError('changes projection does not match schema version')
+    if 'changes_projection' in obj:
+        value = obj['changes_projection']
+        if (not isinstance(value, dict) or set(value) != {'version', 'sha256'}
+                or type(value['version']) is not int or value['version'] != 1):
+            raise ValueError('invalid changes projection')
+        match('[0-9a-f]{64}', value['sha256'], 'changes projection hash')
     dump = obj['dump']
     if not isinstance(dump, dict) or set(dump) != {'object', 'sha256', 'size'}:
         raise ValueError('invalid corpus dump fields')
@@ -110,6 +121,41 @@ def compatible(obj, report):
             and recipes['dense']['query'] == report['running_query'].get('recipe')
             and recipes['lexical'] == report['lexical_recipe']
             and uncalibrated(recipes['retrieval']) in retrieval)
+
+
+def decode_report(data):
+    def unique(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError('duplicate field')
+            obj[key] = value
+        return obj
+    try:
+        return json.loads(data, object_pairs_hook=unique)
+    except (ValueError, RecursionError) as error:
+        raise ValueError('invalid release check JSON') from error
+
+
+def projection(obj, report):
+    if not isinstance(report, dict):
+        raise ValueError('invalid changes projection report')
+    if obj['schema_version'] < 9:
+        if 'changes_projection' in report:
+            raise ValueError('invalid changes projection report')
+        return None
+    value = report.get('changes_projection')
+    fields = {'version', 'sha256', 'release', 'previous', 'baseline', 'counts'}
+    kinds = {'document_added', 'document_removed', 'document_validity', 'provision_validity', 'provision_text', 'document_key'}
+    if (not isinstance(value, dict) or set(value) != fields or type(value['version']) is not int
+            or value['version'] != obj['changes_projection']['version']
+            or value['sha256'] != obj['changes_projection']['sha256'] or value['release'] != obj['rel']
+            or value['previous'] != obj['previous'] or type(value['baseline']) is not bool
+            or not isinstance(value['counts'], dict) or set(value['counts']) != kinds
+            or any(type(count) is not int or count < 0 for count in value['counts'].values())
+            or (value['baseline'] and any(value['counts'].values()))):
+        raise ValueError('invalid changes projection report')
+    return value['counts']
 
 
 def toc(text, extensions, omit=None):

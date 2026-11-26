@@ -103,7 +103,7 @@ func ReadReleaseChanges(ctx context.Context, db projectionBeginner, limits Proje
 	if headerBytes > limits.TotalBytes {
 		return ProjectionResult{}, invalidProjection("projection exceeds total limit")
 	}
-	result, err := tx.Query(ctx, `SELECT ordinal, kind, CASE WHEN ok THEN key END, CASE WHEN ok THEN key2 END, CASE WHEN ok THEN payload END, ok FROM (SELECT *, (coalesce(char_length(key),0) <= $1 AND coalesce(char_length(key2),0) <= $1 AND octet_length(payload) <= $2 AND $3::numeric + sum(octet_length(ordinal::text)::numeric + octet_length(kind) + coalesce(octet_length(key),0) + coalesce(octet_length(key2),0) + octet_length(payload) + 5) OVER (ORDER BY ordinal) <= $4) AS ok FROM release_change) bounded ORDER BY ordinal`, limits.KeyCharacters, limits.PayloadBytes, headerBytes, limits.TotalBytes)
+	result, err := tx.Query(ctx, `SELECT ordinal, CASE WHEN ok THEN kind END, CASE WHEN ok THEN key END, CASE WHEN ok THEN key2 END, CASE WHEN ok THEN payload END, ok FROM (SELECT *, (kind IN ('document_added','document_removed','document_validity','provision_validity','provision_text','document_key') AND coalesce(char_length(key),0) <= $1 AND coalesce(char_length(key2),0) <= $1 AND octet_length(payload) <= $2 AND $3::numeric + sum(octet_length(ordinal::text)::numeric + octet_length(kind) + coalesce(octet_length(key),0) + coalesce(octet_length(key2),0) + octet_length(payload) + 5) OVER (ORDER BY ordinal) <= $4) AS ok FROM release_change) bounded ORDER BY ordinal`, limits.KeyCharacters, limits.PayloadBytes, headerBytes, limits.TotalBytes)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42P01" {
@@ -114,15 +114,15 @@ func ReadReleaseChanges(ctx context.Context, db projectionBeginner, limits Proje
 	defer result.Close()
 	for result.Next() {
 		var row releasechanges.Row
-		var payload *string
+		var kind, payload *string
 		var ok bool
-		if err := result.Scan(&row.Ordinal, &row.Kind, &row.Key, &row.Key2, &payload, &ok); err != nil {
+		if err := result.Scan(&row.Ordinal, &kind, &row.Key, &row.Key2, &payload, &ok); err != nil {
 			return ProjectionResult{}, invalidProjection("read projection row: %w", err)
 		}
-		if !ok || payload == nil {
+		if !ok || kind == nil || payload == nil {
 			return ProjectionResult{}, invalidProjection("projection exceeds limits")
 		}
-		row.Payload = *payload
+		row.Kind, row.Payload = *kind, *payload
 		if err := h.Add(row); err != nil {
 			return ProjectionResult{}, invalidProjection("invalid projection row: %w", err)
 		}

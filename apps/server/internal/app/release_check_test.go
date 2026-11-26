@@ -56,6 +56,24 @@ func TestReleaseCheck_FrameworksAndLawReports(t *testing.T) {
 	}
 }
 
+func TestReleaseCheck_ProjectionArguments(t *testing.T) {
+	args := []string{"--database", "corpus_vn_20990102", "--projection-version", "1", "--projection-sha256", strings.Repeat("a", 64), "--projection-release", "20990102", "--projection-previous", "20990101"}
+	_, _, projection, err := releaseCheckArguments(args)
+	if err != nil || projection == nil || projection.Version != 1 || projection.Release != "20990102" {
+		t.Fatalf("projection arguments: %v", err)
+	}
+	baseline := append([]string(nil), args...)
+	baseline[len(baseline)-1] = ""
+	if _, _, projection, err = releaseCheckArguments(baseline); err != nil || projection == nil || projection.Previous != "" {
+		t.Fatalf("baseline arguments: %v", err)
+	}
+	for _, bad := range [][]string{args[:4], append([]string{"--kind", "frameworks"}, args...), append(args, "--projection-version", "1")} {
+		if _, _, _, err := releaseCheckArguments(bad); err == nil {
+			t.Fatal("accepted invalid projection arguments")
+		}
+	}
+}
+
 func TestReleaseCheck_RejectsKindAndDatabaseMismatch(t *testing.T) {
 	for _, args := range [][]string{
 		{"--kind", "law"}, {"--kind", "frameworks", "--kind", "frameworks"},

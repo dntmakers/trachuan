@@ -18,10 +18,8 @@ from .deploy_release_tables import PointerRefused
 from .deploy_release_target import Held, LockUnavailable, Waiting
 from .deploy_verify import match
 
-
 class ActivatorNotProvisioned(Exception):
     pass
-
 
 class Corpus:
     def __init__(self, state, store, host, rules, registry, database=None, prepare=lambda: True, clock=time.time,
@@ -155,7 +153,14 @@ class Corpus:
         self.record.clear_operation()
         self.tables.close_open()
 
-    def finish_operation(self):
+    def finish_operation(self, recheck=False):
+        if recheck and self.kind is LAW and self.manifest['schema_version'] >= 9:
+            image = self.image()
+            if not self.check(image):
+                return True
+            self.step = 'recovery'
+            self.engine.attempt(self.manifest, self.engine.steps.validate)
+            self.engine.attempt(self.manifest, self.engine.steps.smoke, image)
         self.engine.catch_up(self.manifest)
         self.engine.finish(self.manifest)
         return self.conclude()
@@ -212,7 +217,7 @@ class Corpus:
             raise Held('serving database gone')
         if self.pointer == operation['expected']:
             if recorded:
-                return self.finish_operation()
+                return self.finish_operation(recheck=True)
             self.restart()
             return None
         self.record.raise_alert('pointer_changed')
