@@ -38,6 +38,7 @@ export default defineNuxtConfig({
     '/reset': { headers: accountHeaders },
     '/link': { headers: accountHeaders },
     '/account': { headers: accountHeaders },
+    '/vn/changes': { headers: accountHeaders },
     '/vn/topics': { cache, headers: { 'Cache-Control': 'public, max-age=600' } },
     '/vn/topics/**': { cache: statusCache, headers: { 'Cache-Control': 'public, max-age=600' } },
     '/vn/documents/*/summary': { cache: summaryCache, headers: { 'Cache-Control': 'public, max-age=300' } },

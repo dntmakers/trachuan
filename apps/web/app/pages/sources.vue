@@ -4,6 +4,7 @@ import { getCoverage } from '../api/coverage'
 import { publicStatus } from '../../server/utils/public-status'
 import { messagesFor, type Language } from '../../i18n'
 import { pagesMessages } from '../../i18n/pages'
+import { changesMessages } from '../../i18n/changes'
 const language = useState<Language>('language', () => 'vi')
 const messages = computed(() => messagesFor(language.value))
 const labels = computed(() => pagesMessages(language.value))
@@ -11,4 +12,4 @@ const { data: status } = await useAsyncData('coverage-sources', () => import.met
 const origin = useRuntimeConfig().public.siteOrigin.replace(/\/$/, '')
 useStructuredData(() => status.value.status ? sourcesGraph(origin, status.value.status, language.value) : [])
 </script>
-<template><div class="container page-content"><header class="page-intro"><h1>{{ messages.sources }}</h1><p>{{ labels.sourcesIntro }}</p></header><CoverageFacts :status="status.status" show-gaps source-sentence><section class="page-section"><h2>{{ messages.sources }}</h2><div class="source-list"><div><h3><a href="https://vbpl.vn/">vbpl.vn</a></h3><p>{{ labels.vbpl }}</p></div><div><h3><a href="https://chinhphu.vn/">Cổng thông tin điện tử Chính phủ</a></h3><p>{{ labels.government }}</p></div></div></section></CoverageFacts></div></template>
+<template><div class="container page-content"><header class="page-intro"><h1>{{ messages.sources }}</h1><p>{{ labels.sourcesIntro }}</p></header><p><NuxtLink to="/vn/changes">{{ changesMessages(language).title }}</NuxtLink></p><CoverageFacts :status="status.status" show-gaps source-sentence><section class="page-section"><h2>{{ messages.sources }}</h2><div class="source-list"><div><h3><a href="https://vbpl.vn/">vbpl.vn</a></h3><p>{{ labels.vbpl }}</p></div><div><h3><a href="https://chinhphu.vn/">Cổng thông tin điện tử Chính phủ</a></h3><p>{{ labels.government }}</p></div></div></section></CoverageFacts></div></template>
