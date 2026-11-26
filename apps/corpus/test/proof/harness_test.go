@@ -66,6 +66,7 @@ type harness struct {
 	workerDone                                           chan error
 	extra                                                []string
 	rel                                                  string
+	previousReport                                       string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -146,7 +147,11 @@ func (h *harness) env(fault string) []string {
 func (h *harness) command(args ...string) {
 	h.t.Helper()
 	if len(args) > 0 && args[0] == "start" {
-		args = append(args, "--no-previous-report")
+		if h.previousReport == "" {
+			args = append(args, "--no-previous-report")
+		} else {
+			args = append(args, "--previous-report", h.previousReport)
+		}
 	}
 	cmd := exec.CommandContext(h.ctx, os.Getenv("CORPUS_PROOF_BINARY"), args...)
 	cmd.Dir, cmd.Env = h.root, h.env("")
@@ -254,7 +259,6 @@ func proveCrash(t *testing.T, point string) {
 		t.Fatalf("committed fetch items at crash = %d, want %d", committed, want)
 	}
 	h.startWorker("")
-	// A lost activity retries after its heartbeat timeout and backoff.
 	h.waitFetchProgressAfterRetry()
 	h.waitState("paused")
 	h.assertCounts(baseline)
