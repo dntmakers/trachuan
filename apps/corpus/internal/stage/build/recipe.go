@@ -53,7 +53,7 @@ type Versions struct {
 func (*Stage) Name() string { return "build" }
 
 func (s *Stage) Recipe(snapshot stage.Snapshot) string {
-	return s.recipeForRetrieval(snapshot, retrieval.Recipe3())
+	return s.recipeForRetrieval(snapshot, retrieval.Recipe4())
 }
 
 func (s *Stage) recipeForRetrieval(snapshot stage.Snapshot, policy retrieval.Recipe) string {

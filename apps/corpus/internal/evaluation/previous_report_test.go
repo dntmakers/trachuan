@@ -12,6 +12,18 @@ import (
 	"danny.vn/trachuan/internal/retrieval"
 )
 
+func TestDecodePreviousReport_RejectsInvalidRejectionFields(t *testing.T) {
+	for _, row := range []string{
+		`{"case_id":"one","reason":"diacritics_required","passed":true,"extra":true}`,
+		`{"case_id":"one","reason":"diacritics_required"}`,
+	} {
+		data := []byte(`{"version":4,"rejections":[` + row + `]}`)
+		if _, err := decodePreviousReport(data); err == nil {
+			t.Fatalf("accepted rejection %s", row)
+		}
+	}
+}
+
 func TestRun_RejectsLegacySiblingMergePreviousReport(t *testing.T) {
 	date := retrieval.Date{Year: 2026, Month: 11, Day: 9}
 	baseline, _, err := Run(context.Background(), &fakeEngine{date: date}, recordedSuite(), Options{EvaluationDate: date, Modes: []retrieval.Mode{"exact"}})
@@ -42,7 +54,7 @@ func TestRun_RejectsLegacySiblingMergePreviousReport(t *testing.T) {
 				target := root
 				for i, key := range path {
 					if i == len(path)-1 {
-						if key == "cases" && len(path) == 1 {
+						if key == "cases" && len(path) == 1 || key == "metrics" && len(path) == 3 {
 							target[key].([]any)[0].(map[string]any)["merge_siblings"] = enabled
 						} else {
 							target[key] = []any{map[string]any{"merge_siblings": enabled}}

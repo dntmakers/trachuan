@@ -26,6 +26,23 @@ func decodePreviousReport(data []byte) (Report, error) {
 	if err = json.Unmarshal(clean, &report); err != nil {
 		return Report{}, fmt.Errorf("decode previous report: %w", err)
 	}
+	if report.Version >= 2 && report.Version <= 4 {
+		if root, ok := legacy.(map[string]any); ok {
+			if rows, ok := root["rejections"].([]any); ok {
+				for _, row := range rows {
+					fields, ok := row.(map[string]any)
+					if !ok || len(fields) != 3 {
+						return Report{}, fmt.Errorf("invalid previous rejection fields")
+					}
+					for _, key := range []string{"case_id", "reason", "passed"} {
+						if _, ok := fields[key]; !ok {
+							return Report{}, fmt.Errorf("invalid previous rejection fields")
+						}
+					}
+				}
+			}
+		}
+	}
 	if report.Version >= 2 {
 		if err := validatePreviousMRR(legacy); err != nil {
 			return Report{}, err

@@ -31,7 +31,7 @@ def manifest(rel=REL, sequence=11, report='b' * 64, **fields):
 
 
 def report_for(rel=PREVIOUS, digest='b' * 64):
-    return dict(version=4, fixture_hashes={'Warnings': hashlib.sha256(b'[]\n').hexdigest()}, warning_cases=[],
+    return dict(version=5, fixture_hashes={'Warnings': hashlib.sha256(b'[]\n').hexdigest()}, warning_cases=[],
                 not_run={'warning_cases': 'not_run'},
                 previous_diff=dict(previous=dict(country='vn', rel=rel, report_sha256=digest)))
 

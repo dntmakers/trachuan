@@ -19,7 +19,7 @@ func decisionReport(t *testing.T, mutate func(map[string]any)) []byte {
 	if err = json.Unmarshal(raw, &recipeValue); err != nil {
 		t.Fatal(err)
 	}
-	report := map[string]any{"version": 2, "status": "complete", "country": "vn", "rel": "20990101_1", "retrieval_recipe": recipeValue, "recipes": map[string]string{"retrieval": recipe.Hash()}}
+	report := map[string]any{"version": 2, "scorer": "agent-eval/5", "status": "complete", "country": "vn", "rel": "20990101_1", "retrieval_recipe": recipeValue, "recipes": map[string]string{"retrieval": recipe.Hash()}}
 	if mutate != nil {
 		mutate(report)
 	}
@@ -32,7 +32,12 @@ func decisionReport(t *testing.T, mutate func(map[string]any)) []byte {
 
 func TestParseDecisionReport_AcceptsCompleteVersion2And3And4(t *testing.T) {
 	for _, version := range []int{2, 3, 4} {
-		report, err := ParseDecisionReport(decisionReport(t, func(r map[string]any) { r["version"] = version }))
+		report, err := ParseDecisionReport(decisionReport(t, func(r map[string]any) {
+			r["version"] = version
+			if version >= 3 {
+				r["scorer"] = "agent-eval/6"
+			}
+		}))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -48,8 +53,9 @@ func TestParseDecisionReport_Refuses(t *testing.T) {
 		mutate func(map[string]any)
 		want   string
 	}{
-		{"version 1", func(r map[string]any) { r["version"] = 1 }, "want version 2, 3 or 4"},
-		{"version 5", func(r map[string]any) { r["version"] = 5 }, "want version 2, 3 or 4"},
+		{"version 1", func(r map[string]any) { r["version"] = 1 }, "pairing"},
+		{"version 6", func(r map[string]any) { r["version"] = 6 }, "pairing"},
+		{"version 5 wrong recipe", func(r map[string]any) { r["version"] = 5 }, "pairing"},
 		{"version 3 recipe missing", func(r map[string]any) { r["version"] = 3; delete(r, "retrieval_recipe") }, "retrieval recipe missing"},
 		{"historical policy", func(r map[string]any) { r["historical_policy"] = "agent" }, "historical_policy"},
 		{"recipe missing", func(r map[string]any) { delete(r, "retrieval_recipe") }, "retrieval recipe missing"},

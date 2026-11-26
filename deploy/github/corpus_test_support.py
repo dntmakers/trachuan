@@ -179,13 +179,16 @@ def release_fixture_history(repository):
 
 def write_release_fixture(path, repository):
     from corpus_revision_support import (CANDIDATE_REL, CURRENT_CASES, CURRENT_RANKS, PREVIOUS_REL,
-                                         build_report, encode, link_period)
+                                         build_report, encode, link_period, set_records)
 
     row, old = write_fixture(path)
     fixture = encode(CURRENT_CASES)
     release_fixture_history(repository)
     previous = build_report(3, PREVIOUS_REL, fixture, CURRENT_RANKS)
-    report = build_report(4, CANDIDATE_REL, fixture, CURRENT_RANKS)
+    report = build_report(5, CANDIDATE_REL, fixture, CURRENT_RANKS)
+    row.update(recipe_fixture(report['retrieval_recipe'])[0])
+    for cohort in ('old_product', 'development'):
+        set_records(report, cohort, 'mrr', tolerance=0)
     link_period(report, previous)
     previous_data = json.dumps(previous).encode()
     (path / 'previous-report.json').write_bytes(previous_data)

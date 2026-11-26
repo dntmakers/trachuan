@@ -12,7 +12,7 @@ from corpus_warning import validate_authorized
 
 
 class ReleaseFixtureTest(unittest.TestCase):
-    def test_release_fixture_uses_version_four_and_synthetic_main(self):
+    def test_release_fixture_uses_version_five_and_synthetic_main(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'release').mkdir()
@@ -20,7 +20,7 @@ class ReleaseFixtureTest(unittest.TestCase):
             result = build(root / 'release', root / 'repository')
             self.assertIsNotNone(result)
             row, report = result
-            self.assertEqual(report['version'], 4)
+            self.assertEqual(report['version'], 5)
             self.assertEqual(report['warning_cases'], [])
             self.assertEqual(report['not_run']['warning_cases'], 'not_run')
             previous = json.loads((root / 'release' / 'previous-report.json').read_bytes())

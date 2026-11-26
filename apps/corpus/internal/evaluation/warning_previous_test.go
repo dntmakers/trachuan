@@ -23,6 +23,9 @@ func TestRun_VersionFourComparesPriorVersions(t *testing.T) {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			prior := baseline
 			prior.Version, prior.Country, prior.Rel = version, "vn", "20990101_1"
+			if version == 2 {
+				prior.Scorer = "agent-eval/5"
+			}
 			data, err := json.Marshal(prior)
 			if err != nil {
 				t.Fatal(err)

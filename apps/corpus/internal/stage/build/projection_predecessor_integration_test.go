@@ -30,7 +30,7 @@ func prepareProjectionPredecessor(t *testing.T, f *loadFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	report := fmt.Sprintf(`{"version":2,"status":"complete","country":"vn","rel":%q,"retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, rel, raw, recipe.Hash())
+	report := fmt.Sprintf(`{"version":2,"scorer":"agent-eval/5","status":"complete","country":"vn","rel":%q,"retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, rel, raw, recipe.Hash())
 	reportHash := hashBytes([]byte(report))
 	reportArt, err := f.artifacts.PublishContent(ctx, "previous-report", strings.Repeat("a", 64), func(dir string) error { return os.WriteFile(filepath.Join(dir, "report.json"), []byte(report), 0600) })
 	if err != nil {

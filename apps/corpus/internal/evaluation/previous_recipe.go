@@ -37,16 +37,43 @@ func parsePreviousReport(data []byte) (Report, error) {
 	if previous.Version >= 2 && len(previous.RetrievalRecipe) == 0 {
 		return Report{}, fmt.Errorf("previous version %d retrieval recipe missing", previous.Version)
 	}
+	var recipe retrieval.Recipe
 	if len(previous.RetrievalRecipe) > 0 {
-		var recipe retrieval.Recipe
 		if err = json.Unmarshal(previous.RetrievalRecipe, &recipe); err != nil {
 			return Report{}, fmt.Errorf("decode previous retrieval recipe: %w", err)
+		}
+		if !recipe.Supported() {
+			return Report{}, fmt.Errorf("unsupported previous retrieval recipe")
+		}
+		if err = validatePreviousRecipeFields(previous.RetrievalRecipe, recipe); err != nil {
+			return Report{}, err
 		}
 		if recipe.Hash() != previous.Recipes["retrieval"] {
 			return Report{}, fmt.Errorf("previous retrieval recipe hash differs from report")
 		}
 	}
+	if err = validatePreviousPairing(previous.Version, previous.Scorer, recipe.Version); err != nil {
+		return Report{}, err
+	}
 	return previous, nil
+}
+
+func validatePreviousRecipeFields(raw json.RawMessage, recipe retrieval.Recipe) error {
+	encoded, err := recipe.JSON()
+	if err != nil {
+		return fmt.Errorf("encode previous retrieval recipe: %w", err)
+	}
+	var supplied, known any
+	if err = json.Unmarshal(raw, &supplied); err != nil {
+		return fmt.Errorf("decode supplied retrieval recipe: %w", err)
+	}
+	if err = json.Unmarshal(encoded, &known); err != nil {
+		return fmt.Errorf("decode known retrieval recipe: %w", err)
+	}
+	if !reflect.DeepEqual(supplied, known) {
+		return fmt.Errorf("previous retrieval recipe has unknown or missing fields")
+	}
+	return nil
 }
 
 func ParseDecisionReport(data []byte) (Report, error) {
@@ -54,8 +81,8 @@ func ParseDecisionReport(data []byte) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if report.Version != 2 && report.Version != 3 && report.Version != 4 {
-		return Report{}, fmt.Errorf("previous report is version %d, want version 2, 3 or 4", report.Version)
+	if report.Version != 2 && report.Version != 3 && report.Version != 4 && report.Version != 5 {
+		return Report{}, fmt.Errorf("previous report is version %d, want version 2, 3, 4 or 5", report.Version)
 	}
 	if report.Status != "complete" {
 		return Report{}, fmt.Errorf("previous report status %q is not complete", report.Status)
@@ -108,22 +135,21 @@ func readPreviousRecipe(previous *Report, path string) error {
 	if err = json.Unmarshal(raw, &recipe); err != nil {
 		return fmt.Errorf("decode previous retrieval recipe: %w", err)
 	}
+	if !recipe.Supported() {
+		return fmt.Errorf("unsupported previous retrieval recipe")
+	}
+	if err = validatePreviousPairing(previous.Version, previous.Scorer, recipe.Version); err != nil {
+		return err
+	}
 	if recipe.Hash() != previous.Recipes["retrieval"] {
 		return fmt.Errorf("previous retrieval recipe hash differs from report")
 	}
-	encoded, err := recipe.JSON()
-	if err != nil {
-		return fmt.Errorf("encode previous retrieval recipe: %w", err)
+	if err = validatePreviousRecipeFields(raw, recipe); err != nil {
+		return err
 	}
-	var supplied, known, reported any
+	var supplied, reported any
 	if err = json.Unmarshal(raw, &supplied); err != nil {
 		return fmt.Errorf("decode supplied retrieval recipe: %w", err)
-	}
-	if err = json.Unmarshal(encoded, &known); err != nil {
-		return fmt.Errorf("decode known retrieval recipe: %w", err)
-	}
-	if !reflect.DeepEqual(supplied, known) {
-		return fmt.Errorf("previous retrieval recipe has unknown or missing fields")
 	}
 	if len(previous.RetrievalRecipe) > 0 {
 		if err = json.Unmarshal(previous.RetrievalRecipe, &reported); err != nil {

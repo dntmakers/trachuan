@@ -316,7 +316,7 @@ func finishProductQuality(r *Report, previous *Report, cohort string) {
 			}
 		}
 	}
-	r.QualityPass = len(r.Floors) == 2 && len(r.Rejections) == 3
+	r.QualityPass = len(r.Floors) == 2 && ((r.Version >= 5 && len(r.Rejections) == 0) || (r.Version < 5 && len(r.Rejections) == 3))
 	for _, gate := range r.Floors {
 		r.QualityPass = r.QualityPass && gate.Status == "pass"
 	}

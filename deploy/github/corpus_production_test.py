@@ -115,7 +115,7 @@ class ProductionTest(unittest.TestCase):
     def signable(self, candidate, current, existing=None, existing_error=None):
         from corpus_warning import validate_authorized
         run = dict(eval_report_sha256='e' * 64, previous_report_sha256='b' * 64)
-        candidate = candidate | {'version': 4, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]\n').hexdigest()},
+        candidate = candidate | {'version': 5, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]\n').hexdigest()},
                                  'warning_cases': [], 'not_run': {'warning_cases': 'not_run'}}
         with patch('corpus_production.production', return_value=current), \
                 patch('corpus_production.existing_release', return_value=existing, side_effect=existing_error), \
@@ -134,7 +134,7 @@ class ProductionTest(unittest.TestCase):
                 corpus_production.require_signable(new, candidate, {'eval_report_sha256': 'e' * 64}, self.path, 'dannyota/trachuan')
 
     def test_first_signing_rejects_old_fixture_and_version_three(self):
-        candidate = report() | {'version': 4, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]').hexdigest()},
+        candidate = report() | {'version': 5, 'fixture_hashes': {'Warnings': hashlib.sha256(b'[]').hexdigest()},
                                 'warning_cases': [], 'not_run': {'warning_cases': 'not_run'}}
         new = manifest(rel=REL, sequence=11) | {'commit': 'a' * 40}
         run = {'eval_report_sha256': 'e' * 64}
@@ -144,7 +144,7 @@ class ProductionTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'warning fixture differs'):
                 corpus_production.require_signable(new, candidate, run, self.path, 'dannyota/trachuan')
             candidate['version'] = 3
-            with self.assertRaisesRegex(ValueError, 'version 4'):
+            with self.assertRaisesRegex(ValueError, 'version 5'):
                 corpus_production.require_signable(new, candidate, run, self.path, 'dannyota/trachuan')
 
     def test_first_signing_requires_the_comparison(self):

@@ -13,6 +13,9 @@ func validateReportTransition(current, previous *Report) error {
 	if previous == nil {
 		return nil
 	}
+	if current.Version == 5 && previous.Version < 5 && !sameMRRCohort(current, previous, "old_product") {
+		return fmt.Errorf("old product scored membership or denominators differ")
+	}
 	prior, err := reportCaseCounts(previous)
 	if err != nil {
 		return fmt.Errorf("previous report cohorts: %w", err)

@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import corpus_upload
-from corpus_test_support import digest, save_fixture, write_fixture
+from corpus_test_support import digest, recipe_fixture, save_fixture, write_fixture
 
 
 class CorpusLLMGateUploadTest(unittest.TestCase):
@@ -17,11 +17,15 @@ class CorpusLLMGateUploadTest(unittest.TestCase):
             row, report = write_fixture(directory)
             fixture = b'[]\n'
             report['fixture_hashes']['Warnings'] = digest(fixture)
-            report.update(version=4, scorer='agent-eval/6', warning_cases=[], not_run={'warning_cases': 'not_run'},
+            report.update(version=5, scorer='agent-eval/6', warning_cases=[], not_run={'warning_cases': 'not_run'},
                           quality_pass=False, classification_gate=dict(
                 status='fail', classification_set_sha256='a' * 64, policy_sha256='b' * 64,
                 taxonomy_version='c' * 64, llm_rows=2, slices=[dict(
                     slice='seeded', status='fail', reasons=['recall below floor'])]))
+            policy = report['retrieval_recipe'] | dict(version=4, query_gate='vn-restore/1')
+            recipes, report['recipes'] = recipe_fixture(policy)
+            row.update(recipes)
+            report['retrieval_recipe'] = policy
             save_fixture(directory, row, report)
             with patch.dict(os.environ, {'OCI_S3_ENDPOINT': 'https://invalid.example'}), \
                     patch('corpus_warning.git', return_value=fixture), \

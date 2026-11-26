@@ -139,7 +139,7 @@ func TestFrozenReportRelease_VerifiesBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	report := fmt.Sprintf(`{"version":2,"status":"complete","country":"vn","rel":%q,"retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, rel, raw, recipe.Hash())
+	report := fmt.Sprintf(`{"version":2,"scorer":"agent-eval/5","status":"complete","country":"vn","rel":%q,"retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, rel, raw, recipe.Hash())
 	dir := filepath.Join(artifacts.Root, "report")
 	if mkdirErr := os.Mkdir(dir, 0700); mkdirErr != nil {
 		t.Fatal(mkdirErr)
