@@ -133,6 +133,7 @@ export const en: Catalog = {
   errors: {
     account_changed: 'Your account changed. Please review and try again.',
     invalid_request: 'The request is invalid.',
+    diacritics_required: 'Enter Vietnamese with diacritics or use a document number.',
     unauthenticated: 'Please sign in.',
     login_failed: 'Sign-in failed. Check your email and password.',
     reauth_failed: 'The password could not be verified.',

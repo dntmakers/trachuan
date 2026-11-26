@@ -130,6 +130,7 @@ export const vi = {
   errors: {
     account_changed: 'Tài khoản đã thay đổi. Bạn kiểm tra tài khoản đang dùng rồi thử lại.',
     invalid_request: 'Yêu cầu không hợp lệ.',
+    diacritics_required: 'Nhập tiếng Việt có dấu hoặc dùng số hiệu văn bản.',
     unauthenticated: 'Bạn cần đăng nhập.',
     login_failed: 'Đăng nhập thất bại. Kiểm tra lại email và mật khẩu.',
     reauth_failed: 'Không xác minh được mật khẩu.',

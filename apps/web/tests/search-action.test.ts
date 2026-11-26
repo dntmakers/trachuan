@@ -24,7 +24,7 @@ function setup(fetch: typeof globalThis.fetch, route: { query: Record<string, st
   vi.stubGlobal('onMounted', onMounted)
   vi.stubGlobal('useApi', () => api)
   setActivePinia(createPinia())
-  const wrapper = mount(Search, { global: { stubs: { NuxtLayout: { template: '<div><slot name="header" /><slot /></div>' }, SearchResults: { props: ['result'], emits: ['clearFilters'], template: `<div class="result-stub search-results"><h1 tabindex="-1">{{ result.hits?.length }}</h1><button @click="$emit('clearFilters')">Clear filters</button></div>` }, SearchNodePicker: true } } })
+  const wrapper = mount(Search, { global: { stubs: { NuxtLayout: { template: '<div><slot name="header" /><slot /></div>' }, SearchResults: { props: ['result', 'query'], emits: ['clearFilters'], template: `<div class="result-stub search-results"><h1 tabindex="-1">{{ result.hits?.length }}</h1><span class="highlight-query">{{ query }}</span><button @click="$emit('clearFilters')">Clear filters</button></div>` }, SearchNodePicker: true } } })
   return { wrapper, session }
 }
 async function submit(wrapper: ReturnType<typeof mount>) {
@@ -300,4 +300,60 @@ it('replaces disallowed search query parameters through the router', async () =>
   await flushPromises()
   expect(replace).toHaveBeenCalledWith(expect.objectContaining({ query: { node: '1' } }))
   mounted.unmount()
+})
+
+
+it('shows restored text and keeps the submitted query for paging and editing', async () => {
+  const bodies: Record<string, unknown>[] = []
+  const { wrapper } = setup(async input => {
+    bodies.push(await (input as Request).json())
+    return json({ ...page, restored_query: 'câu hỏi <b>fixture</b>' })
+  })
+  document.body.appendChild(wrapper.element)
+  await submit(wrapper)
+  expect(wrapper.text()).toContain('Searched for')
+  expect(wrapper.text()).toContain('câu hỏi <b>fixture</b>')
+  expect(wrapper.find('b').exists()).toBe(false)
+  expect(wrapper.get('.highlight-query').text()).toBe('câu hỏi <b>fixture</b>')
+  expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('fixture query')
+  await wrapper.get('textarea').setValue('different draft')
+  await more(wrapper)
+  expect(bodies[1]).toMatchObject({ query: 'fixture query', cursor: 'cursor-a' })
+  await wrapper.findAll('button').find(button => button.text() === 'Edit search')!.trigger('click')
+  expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('câu hỏi <b>fixture</b>')
+  expect(document.activeElement).toBe(wrapper.get('textarea').element)
+  await wrapper.get('form').trigger('submit')
+  await flushPromises()
+  expect(bodies[2]?.query).toBe('câu hỏi <b>fixture</b>')
+  expect(bodies[2]).not.toHaveProperty('cursor')
+  wrapper.unmount()
+})
+
+it('shows restored text on abstention and omits the notice when absent', async () => {
+  let count = 0
+  const { wrapper } = setup(async () => json({ release: page.release, abstain: true, hits: [], ...(++count === 1 ? { restored_query: 'câu hỏi' } : {}) }))
+  await submit(wrapper)
+  expect(wrapper.text()).toContain('Searched for')
+  expect(wrapper.text()).toContain('câu hỏi')
+  await submit(wrapper)
+  expect(wrapper.text()).not.toContain('Searched for')
+  expect(wrapper.get('.highlight-query').text()).toBe('fixture query')
+  wrapper.unmount()
+})
+
+
+it.each(['unavailable', 'release_expired'])('hides the restored line on a %s paging error without removing results', async code => {
+  let count = 0
+  const { wrapper } = setup(async () => ++count === 1 ? json({ ...page, restored_query: 'câu hỏi' }) : json({ error: { code } }, code === 'unavailable' ? 503 : 409))
+  await submit(wrapper)
+  expect(wrapper.text()).toContain('Searched for')
+  await more(wrapper)
+  expect(wrapper.text()).not.toContain('Searched for')
+  expect(wrapper.text()).not.toContain('Edit search')
+  expect(wrapper.get('.result-stub').text()).toContain('1')
+  if (code === 'unavailable') {
+    expect(wrapper.get('[role="alert"] button').text()).toBe('Try again')
+    expect(wrapper.findAll('button').some(button => button.text() === 'Show more results')).toBe(true)
+  }
+  wrapper.unmount()
 })

@@ -36,6 +36,12 @@ const showCorpus = ref(false)
 const facets = ref<components['schemas']['CorpusStatus'] | null>(null)
 const facetsFailed = ref(false)
 const query = ref('')
+const queryInput = ref<HTMLTextAreaElement | null>(null)
+function editRestoredQuery() {
+  if (result.value?.restored_query === undefined) return
+  query.value = result.value.restored_query
+  queryInput.value?.focus()
+}
 const asOf = ref('')
 const issuedFrom = ref('')
 const issuedTo = ref('')
@@ -186,7 +192,7 @@ async function runRequest(input: SearchInput, more: boolean) {
         <form class="search-box" @submit.prevent="search()">
           <CorpusControl v-if="showCorpus" current="law" />
           <label for="search-query" class="visually-hidden">{{ messages.searchQuery }}</label>
-          <textarea id="search-query" v-model="query" class="input" rows="1" autocomplete="off" :placeholder="messages.searchQuery" @keydown="onQueryKeydown" />
+          <textarea id="search-query" ref="queryInput" v-model="query" class="input" rows="1" autocomplete="off" :placeholder="messages.searchQuery" @keydown="onQueryKeydown" />
           <button class="btn btn-primary" type="submit" :disabled="loading">{{ messages.searchSubmit }}</button>
         </form>
         <p v-if="issuedError && !dialogOpen" role="alert">{{ labels.issuedInvalid }}</p>
@@ -211,7 +217,7 @@ async function runRequest(input: SearchInput, more: boolean) {
       <div ref="searchMain" class="search-main" aria-live="polite">
         <div v-if="loading" class="search-loading" role="status"><span class="search-spinner" aria-hidden="true" />{{ labels.loading }}</div>
         <div v-if="error" class="notice search-state" role="alert"><h1 tabindex="-1">{{ rateLimited ? labels.rate : error === 'unavailable' ? labels.unavailable : errorMessage(language, error) }}</h1><button v-if="error === 'unavailable'" type="button" class="btn btn-secondary" @click="retrySearch">{{ shellMessages(language).retry }}</button><span v-if="retryAfter">{{ messages.searchRetry }} {{ retryAfter }} {{ messages.searchSeconds }}</span></div>
-        <div v-if="result" :class="{ 'search-results-pending': loading && !loadingMore }"><SearchResults :result="result" :query="submitted?.query" :filters="activeFilters" @clear-filters="clearFilters" /></div>
+        <div v-if="result" :class="{ 'search-results-pending': loading && !loadingMore }"><p v-if="!error && result.restored_query !== undefined">{{ labels.searchedFor }}: {{ result.restored_query }} <button type="button" class="btn btn-secondary" @click="editRestoredQuery">{{ labels.editSearch }}</button></p><SearchResults :result="result" :query="result.restored_query ?? submitted?.query" :filters="activeFilters" @clear-filters="clearFilters" /></div>
         <div v-else-if="!loading && !error" class="notice search-state search-idle"><h1>{{ messages.searchTitle }}</h1><p><template v-for="(part, index) in labels.idle.split(/(\d+\/\d{4}\/[\p{Lu}-]+)/u)" :key="index"><span v-if="index % 2" class="nowrap">{{ part }}</span><template v-else>{{ part }}</template></template></p><p>{{ labels.examples }}</p><button v-for="suggestion in homeSuggestions" :key="suggestion" type="button" class="chip" @click="fillExample(suggestion)">{{ suggestion }}</button></div>
         <button v-if="result?.next_cursor" type="button" class="btn btn-secondary search-more" :disabled="loading" @click="search(true)">{{ labels.more }}</button>
       </div>
