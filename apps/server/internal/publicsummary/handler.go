@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"danny.vn/trachuan/apps/server/internal/apierror"
+	"danny.vn/trachuan/internal/retrieval"
 )
 
 type Handler struct {
@@ -47,7 +45,7 @@ func (h *Handler) Available(ctx context.Context, release string) (bool, error) {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.PathValue("key")
-	if r.URL.RawQuery != "" || (key != "" && !validKey(key)) {
+	if r.URL.RawQuery != "" || (key != "" && !retrieval.ValidDocumentKey(key)) {
 		apierror.Write(w, 400, "invalid_request")
 		return
 	}
@@ -106,18 +104,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d, must-revalidate", seconds))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(raw)
-}
-
-func validKey(key string) bool {
-	if !strings.HasPrefix(key, "vn:") || len(key) <= 3 || !utf8.ValidString(key) || strings.ContainsAny(key, "#/?\\") {
-		return false
-	}
-	for _, r := range key {
-		if unicode.IsSpace(r) || unicode.IsControl(r) {
-			return false
-		}
-	}
-	return true
 }
 
 func writeFailure(w http.ResponseWriter, err error) {
