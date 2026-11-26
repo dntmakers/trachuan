@@ -16,7 +16,6 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
-	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
 	"danny.vn/trachuan/apps/corpus/internal/store"
 	"danny.vn/trachuan/apps/corpus/internal/testactivity"
 	"danny.vn/trachuan/internal/testpg"
@@ -212,15 +211,8 @@ func TestBuild_ChangedCorrectionsFileIsInventoryChanged(t *testing.T) {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			f := recoverySetup(t)
 			ctx := context.Background()
-			if version == 1 {
-				f.run.Snapshot.SourceList = []byte(`{"country":"vn","vbpl":{"selection_version":1},"status_codes":{}}`)
-				entries := []membership.Entry{{DocumentKey: "vn:vbpl:1", Source: "vbpl", SourceID: "1", Class: "primary", Disposition: "active"}}
-				if err := membership.PublishPhase(ctx, store.New(f.env.DB), f.run.ID, membership.Final, entries); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := f.env.DB.Exec(ctx, `INSERT INTO run_item(run_id,stage,item_key,state,batch) VALUES($1,'relate','vn:vbpl:1','gap',0)`, f.run.ID); err != nil {
-					t.Fatal(err)
-				}
+			if version == 0 {
+				f.run.Snapshot.SourceList = []byte(`{"country":"vn","status_codes":{}}`)
 			}
 			path := filepath.Join(t.TempDir(), "corrections.yaml")
 			if err := os.WriteFile(path, []byte("[]\n"), 0600); err != nil {
@@ -247,6 +239,12 @@ func TestBuild_ChangedCorrectionsFileIsInventoryChanged(t *testing.T) {
 			temp := "corpus_tmp_" + f.run.Country + "_" + items[0].InputHash[:24]
 			t.Cleanup(func() { testpg.DropCorpusDatabase(t, f.admin, temp, f.run.Country+"/"+f.run.Rel) })
 			unchanged, err := st.Process(ctx, f.env, f.run, items[0])
+			if version == 0 {
+				if err == nil || !strings.Contains(err.Error(), "frozen membership") || unchanged.Artifact != nil {
+					t.Fatalf("legacy inventory accepted: output=%+v error=%v", unchanged, err)
+				}
+				return
+			}
 			if err != nil || unchanged.Artifact == nil {
 				testactivity.Log(t, f.admin, temp)
 				t.Fatalf("comment-only change failed build: %v", err)

@@ -140,6 +140,7 @@ func processTemporaryRelease(t *testing.T, classified bool) {
 	}
 	defer pool.Close()
 	f.run.Snapshot.SourceList = []byte(`{"country":"vn","status_codes":{}}`)
+	freezeFixtureMembership(t, f)
 	inv := f.inventory(t)
 	suite := evaluation.Suite{Legacy: []evaluation.Case{{ID: "one", Question: "ngân hàng", ExpectAbstain: true}, {ID: "two", Question: "abc", ExpectAbstain: true}, {ID: "three", Question: "def", ExpectAbstain: true}, {ID: "four", Question: "ghi", ExpectAbstain: true}}, Rejections: []string{"two", "three", "four"}, Hashes: evaluation.FixtureHashes{Legacy: "legacy"}, Map: evaluation.IdentityMap{Version: 1, LegacySHA256: "legacy", IdentityInventoryHash: inv.IdentityHash()}}
 	pinTestSuite(t, &suite)
@@ -181,10 +182,7 @@ func processTemporaryRelease(t *testing.T, classified bool) {
 	}
 	st := New(cfg)
 	env := stage.Env{DB: pool, Artifacts: f.artifacts}
-	items, err := st.Plan(ctx, env, f.run)
-	if err != nil {
-		t.Fatal(err)
-	}
+	items := planLockedFixture(t, f, st, env)
 	temp := "corpus_tmp_vn_" + items[0].InputHash[:24]
 	admin, err := pgx.Connect(ctx, builder.URL)
 	if err != nil {
@@ -216,8 +214,8 @@ func processTemporaryRelease(t *testing.T, classified bool) {
 		if pinErr != nil {
 			t.Fatal(pinErr)
 		}
-		if want := st.inputHash(f.run.Country, f.run.Rel, inv, correction); record.BuildInputHash != want {
-			t.Fatalf("no-set build input = %s, want legacy %s", record.BuildInputHash, want)
+		if want := st.frozenInputHash(f.run, inv, correction); record.BuildInputHash != want {
+			t.Fatalf("no-set build input = %s, want %s", record.BuildInputHash, want)
 		}
 		if record.ClassificationSetSHA256 != "" || record.ClassificationPolicySHA256 != "" || record.Taxonomy.ClassificationStats != nil {
 			t.Fatal("no-set build records a classification layer")

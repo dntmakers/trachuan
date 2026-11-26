@@ -138,7 +138,7 @@ func TestStart_RetryRebuildsDependents(t *testing.T) {
 	d.RecipesFor = func(stage.Snapshot) map[string]string {
 		return map[string]string{"discover": "one", "expand": "two", "fetch": "three", "build": "four"}
 	}
-	snap := stage.Snapshot{SourceList: []byte(`{}`), Stages: d.Stages, Recipes: d.RecipesFor(stage.Snapshot{}), PreviousReport: &stage.PreviousReport{SHA256: stage.NoPreviousReport}}
+	snap := stage.Snapshot{SourceList: []byte(`{}`), Stages: d.Stages, Recipes: d.RecipesFor(stage.Snapshot{}), PreviousReport: &stage.PreviousReport{SHA256: stage.NoPreviousReport}, LockedPredecessor: &stage.LockedPredecessor{ReportSHA256: "none", Release: "none", IdentitySHA256: "none"}}
 	next := "build"
 	insertLifecycleRun(t, d, "paused", time.Now(), snap, &next)
 	ctx := context.Background()
@@ -167,6 +167,10 @@ func TestStart_RetryRebuildsDependents(t *testing.T) {
 	err := d.DB.QueryRow(ctx, `SELECT (SELECT count(*) FROM run_item),(SELECT count(*) FROM gap),(SELECT count(*) FROM run_document),(SELECT count(*) FROM run_membership_evidence),(SELECT count(*) FROM run_seed_observation),(SELECT count(*) FROM artifact), seeds_hash,expanded_hash,final_hash,fetch_close_input_hash FROM run_scope`).Scan(&items, &gaps, &docs, &evidence, &observations, &artifacts, &seeds, &expanded, &final, &hash)
 	if err != nil || items != 2 || gaps != 0 || docs != 1 || evidence != 1 || observations != 0 || artifacts != 1 || seeds == nil || expanded != nil || final != nil || hash != nil {
 		t.Fatalf("items=%d gaps=%d docs=%d evidence=%d observations=%d artifacts=%d seeds=%v expanded=%v final=%v hash=%v err=%v", items, gaps, docs, evidence, observations, artifacts, seeds, expanded, final, hash, err)
+	}
+	var lock []byte
+	if err = d.DB.QueryRow(ctx, `SELECT snapshot->'locked_predecessor' FROM run`).Scan(&lock); err != nil || !strings.Contains(string(lock), `"identity_sha256": "none"`) {
+		t.Fatalf("lock=%s err=%v", lock, err)
 	}
 	var recipes []byte
 	if err = d.DB.QueryRow(ctx, `SELECT snapshot->'Recipes' FROM run`).Scan(&recipes); err != nil {

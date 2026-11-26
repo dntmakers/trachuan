@@ -106,7 +106,11 @@ func inventoryInputHash(country, rel string, inv Inventory, identityMap string, 
 	return buildHash(country, rel, inv, identityMap, provenanceInputHash(inv), c)
 }
 func buildHash(country, rel string, inv Inventory, identityMap, provenance string, c correctionInput, versions ...string) string {
-	args := []string{country, rel, inv.SourceManifestHash(), strconv.Itoa(corpusdb.SchemaVersion), identityMap}
+	return buildHashForSchema(country, rel, inv, identityMap, provenance, c, corpusdb.SchemaVersion, versions...)
+}
+
+func buildHashForSchema(country, rel string, inv Inventory, identityMap, provenance string, c correctionInput, schemaVersion int, versions ...string) string {
+	args := []string{country, rel, inv.SourceManifestHash(), strconv.Itoa(schemaVersion), identityMap}
 	if inv.Version == 2 {
 		version := ""
 		if len(versions) > 0 {

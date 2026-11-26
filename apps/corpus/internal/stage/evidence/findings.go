@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"danny.vn/trachuan/apps/corpus/internal/detector"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 )
 
 const (
@@ -21,55 +22,11 @@ const (
 	noneValue     = "none"
 )
 
-type Bindings struct {
-	Rel                       string `json:"rel"`
-	DumpSHA256                string `json:"dump_sha256"`
-	BuildArtifactSHA256       string `json:"build_artifact_sha256"`
-	ReportSHA256              string `json:"report_sha256"`
-	DetectorRegistrySHA256    string `json:"detector_registry_sha256"`
-	PredecessorRel            string `json:"predecessor_rel"`
-	PredecessorFindingsSHA256 string `json:"predecessor_findings_sha256"`
-}
-
-type DetectorCounts struct {
-	Complete      bool              `json:"complete"`
-	Severity      detector.Severity `json:"severity"`
-	Observed      int               `json:"observed"`
-	NotObservable int               `json:"not_observable"`
-	Excluded      int               `json:"excluded"`
-}
-
-type Finding struct {
-	Key           string            `json:"key"`
-	Detector      string            `json:"detector"`
-	Subject       Subject           `json:"subject"`
-	Discriminator string            `json:"discriminator"`
-	Fingerprint   string            `json:"fingerprint"`
-	Semantics     int               `json:"semantics"`
-	Severity      detector.Severity `json:"severity"`
-	FirstRel      string            `json:"first_rel"`
-	Status        string            `json:"status"`
-	Carried       bool              `json:"carried"`
-}
-
-type ReviewDecision struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Fingerprint string `json:"fingerprint"`
-	Semantics   int    `json:"semantics"`
-	FirstRel    string `json:"first_rel"`
-}
-
-type File struct {
-	Schema    int                       `json:"schema"`
-	Bindings  Bindings                  `json:"bindings"`
-	Detectors map[string]DetectorCounts `json:"detectors"`
-	Findings  []Finding                 `json:"findings"`
-	New       []string                  `json:"new"`
-	Gone      []string                  `json:"gone"`
-	Carried   []string                  `json:"carried"`
-	Unmatched []ReviewDecision          `json:"unmatched"`
-}
+type Bindings = releasechange.FindingsBindings
+type DetectorCounts = releasechange.DetectorCounts
+type Finding = releasechange.Finding
+type ReviewDecision = releasechange.ReviewDecision
+type File releasechange.FindingsFile
 
 func (f File) encode() ([]byte, error) {
 	data, err := json.MarshalIndent(f, "", "  ")
@@ -165,7 +122,7 @@ func firedFinding(spec detector.Detector, f Fired, rel string) (Finding, error) 
 	if err != nil {
 		return Finding{}, err
 	}
-	if err = f.Subject.validate(); err != nil {
+	if err = f.Subject.Validate(); err != nil {
 		return Finding{}, err
 	}
 	key, err := findingKey(id, f)

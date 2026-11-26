@@ -52,6 +52,7 @@ type Querier interface {
 	GetOCRCheck(ctx context.Context, arg GetOCRCheckParams) (OcrCheck, error)
 	GetOCRText(ctx context.Context, arg GetOCRTextParams) (OcrText, error)
 	GetPinnedArtifact(ctx context.Context, arg GetPinnedArtifactParams) (GetPinnedArtifactRow, error)
+	GetPlannedItemInputHash(ctx context.Context, arg GetPlannedItemInputHashParams) (*string, error)
 	GetRun(ctx context.Context, arg GetRunParams) (Run, error)
 	GetRunAcquisition(ctx context.Context, arg GetRunAcquisitionParams) (GetRunAcquisitionRow, error)
 	GetRunForUpdate(ctx context.Context, arg GetRunForUpdateParams) (Run, error)
@@ -141,6 +142,7 @@ type Querier interface {
 	SetFetchedFileTime(ctx context.Context, arg SetFetchedFileTimeParams) (int64, error)
 	SetMembershipPredecessor(ctx context.Context, arg SetMembershipPredecessorParams) (int64, error)
 	SetRunMessage(ctx context.Context, arg SetRunMessageParams) error
+	SetRunPredecessorLock(ctx context.Context, arg SetRunPredecessorLockParams) error
 	SetRunState(ctx context.Context, arg SetRunStateParams) error
 	StartRun(ctx context.Context, arg StartRunParams) error
 	SumOCRCheckUsage(ctx context.Context, checkerID string) ([]json.RawMessage, error)

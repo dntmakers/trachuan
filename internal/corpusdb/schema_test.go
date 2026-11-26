@@ -66,11 +66,19 @@ func TestApplyTables_DefersANNIndex(t *testing.T) {
 	}
 }
 
-func TestSchema_Version8Constraints(t *testing.T) {
-	if SchemaVersion != 8 {
-		t.Fatalf("schema version = %d, want 8", SchemaVersion)
+func TestSchema_ReleaseChangeIndexesAndHeaderBounds(t *testing.T) {
+	for _, part := range []string{"octet_length(country) <= 2", "octet_length(release) <= 11", "octet_length(predecessor) <= 11", "CREATE INDEX ON release_change (kind, ordinal)"} {
+		if !strings.Contains(schema, part) {
+			t.Errorf("schema missing %q", part)
+		}
 	}
-	for _, part := range []string{"document_summary", "validity_decision", "validity_conflict", "derived_from_text", "manual_correction", "schema_version = 8", "'pdf_text'", "'inherited'", "ordinal integer NOT NULL CHECK (ordinal >= 1)", "provision_count integer NOT NULL CHECK (provision_count >= 0)", "document_count integer NOT NULL CHECK (document_count >= 0)", "UNIQUE NULLS NOT DISTINCT (parent_id,ordinal)", "text_source text NOT NULL", "text_complete boolean NOT NULL", "locator text", "text_source <> 'none' OR NOT text_complete"} {
+}
+
+func TestSchema_Version9Constraints(t *testing.T) {
+	if SchemaVersion != 9 {
+		t.Fatalf("schema version = %d, want 9", SchemaVersion)
+	}
+	for _, part := range []string{"document_summary", "validity_decision", "validity_conflict", "derived_from_text", "manual_correction", "schema_version = 9", "'pdf_text'", "'inherited'", "ordinal integer NOT NULL CHECK (ordinal >= 1)", "provision_count integer NOT NULL CHECK (provision_count >= 0)", "document_count integer NOT NULL CHECK (document_count >= 0)", "UNIQUE NULLS NOT DISTINCT (parent_id,ordinal)", "text_source text NOT NULL", "text_complete boolean NOT NULL", "locator text", "text_source <> 'none' OR NOT text_complete"} {
 		if !strings.Contains(schema, part) {
 			t.Errorf("schema missing %q", part)
 		}

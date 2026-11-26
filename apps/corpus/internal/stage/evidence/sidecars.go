@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -64,41 +63,6 @@ func readHeader(path string, out any) error {
 		return refuse("%s header: %v", filepath.Base(path), err)
 	}
 	return nil
-}
-
-func manifestDigest(dir, name string) (string, bool, error) {
-	data, err := os.ReadFile(filepath.Join(dir, manifestFile))
-	if err != nil {
-		return "", false, fmt.Errorf("read evidence manifest: %w", err)
-	}
-	for line := range strings.SplitSeq(string(data), "\n") {
-		if len(line) > 66 && line[64:66] == "  " && line[66:] == name {
-			return line[:64], true, nil
-		}
-	}
-	return "", false, nil
-}
-
-func predecessorIdentity(dir, rel, reportSHA256 string) (string, string, error) {
-	sum, ok, err := manifestDigest(dir, identityFile)
-	if err != nil {
-		return "", "", err
-	}
-	if !ok {
-		return "", "", refuse("predecessor %s evidence has no identity.jsonl", rel)
-	}
-	path := filepath.Join(dir, identityFile)
-	var header identityHeader
-	if err = readHeader(path, &header); err != nil {
-		return "", "", err
-	}
-	if header.Schema != summarySchema {
-		return "", "", refuse("predecessor %s identity schema %d is not %d", rel, header.Schema, summarySchema)
-	}
-	if header.Bindings.Rel != rel || header.Bindings.ReportSHA256 != hashPrefix+reportSHA256 {
-		return "", "", refuse("predecessor %s identity does not bind the frozen previous report", rel)
-	}
-	return path, sum, nil
 }
 
 func checkSidecars(dir, rel string, inputs frozenInputs) error {

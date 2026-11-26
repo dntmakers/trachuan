@@ -279,7 +279,7 @@ func TestGapSnapshot_IgnoresOrderAndEvidenceRows(t *testing.T) {
 
 func TestRecipe_CoversRegistryDetectorsAndSerialization(t *testing.T) {
 	plain := New(Config{}).Recipe(stage.Snapshot{})
-	if want := stage.RecipeHash(stage.EvidenceStage, "1", detector.LegacyHash(), "[]", "findings.json/2,identity.jsonl/1,changes.jsonl/1"); plain != want {
+	if want := stage.RecipeHash(stage.EvidenceStage, "2", detector.LegacyHash(), "[]", "findings.json/2,identity.jsonl/1,changes.jsonl/1"); plain != want {
 		t.Fatalf("recipe = %s, want %s", plain, want)
 	}
 	if New(Config{Detectors: []Detector{fakeDetector{id: "x"}}}).Recipe(stage.Snapshot{}) == plain {
@@ -515,6 +515,17 @@ func TestProcess_ReportMustMatchRunAndDecision(t *testing.T) {
 				t.Fatalf("err = %v", err)
 			}
 		})
+	}
+}
+
+func TestPlan_RejectsSchema9WithoutLock(t *testing.T) {
+	f := newFixture(t, noneDecision())
+	f.build = f.publish("build", strings.Repeat("2", 64), map[string]string{"build.json": `{"schema_version":9}`})
+	f.report["build_artifact_sha256"] = f.build.SHA256
+	f.sync()
+	_, _, err := f.process()
+	if err == nil || !strings.Contains(err.Error(), "locked predecessor") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

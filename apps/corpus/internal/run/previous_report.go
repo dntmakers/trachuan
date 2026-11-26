@@ -59,6 +59,12 @@ func decide(ctx context.Context, in decisionInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if lock := in.Snapshot.LockedPredecessor; lock != nil {
+		if current == nil || current.SHA256 != lock.ReportSHA256 || chosen.sha256 != lock.ReportSHA256 {
+			return "", errors.New("run has a locked previous report decision")
+		}
+		return "", nil
+	}
 	if current != nil && current.SHA256 == chosen.sha256 {
 		return "", nil
 	}

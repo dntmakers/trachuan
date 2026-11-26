@@ -9,14 +9,10 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
-	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 )
 
 func membersFrom(inv build.Inventory, identityInventoryHash string) (members, error) {
-	if inv.Version != 2 {
-		return members{}, refuse("identity summary needs the run's frozen membership inventory")
-	}
-	return releasechange.NewMembers(inv.Membership.Entries, inv.IdentityHash(), identityInventoryHash)
+	return build.ProjectionMembers(inv, identityInventoryHash)
 }
 
 func (s *Stage) loadMembers(ctx context.Context, env stage.Env, run stage.Run, buildDir string) (members, error) {

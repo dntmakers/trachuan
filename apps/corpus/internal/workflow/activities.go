@@ -8,6 +8,7 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/detector"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"danny.vn/trachuan/apps/corpus/internal/store"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/temporal"
@@ -41,6 +42,14 @@ func activityError(err error) error {
 	}
 	if errors.Is(err, stage.ErrNoDecision) {
 		return temporal.NewNonRetryableApplicationError(err.Error(), "no_previous_report_decision", err)
+	}
+	var refusal *releasechange.InputError
+	if errors.As(err, &refusal) {
+		return temporal.NewNonRetryableApplicationError(refusal.Error(), "invalid_predecessor", err)
+	}
+	var replacement *stage.BuildReplacementError
+	if errors.As(err, &replacement) {
+		return temporal.NewNonRetryableApplicationError(replacement.Error(), "invalid_build_replacement", err)
 	}
 	var recipe *stage.RecipeError
 	if errors.As(err, &recipe) {

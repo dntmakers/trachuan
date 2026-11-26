@@ -17,8 +17,8 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/detector"
 	"danny.vn/trachuan/apps/corpus/internal/evaluation"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"danny.vn/trachuan/apps/corpus/internal/store"
-	"github.com/jackc/pgx/v5"
 )
 
 func refuse(format string, args ...any) error {
@@ -217,6 +217,25 @@ func (s *Stage) resolveInputs(ctx context.Context, env stage.Env, run stage.Run,
 		return frozenInputs{}, err
 	}
 	buildDir := env.Artifacts.Abs(build.Path)
+	buildData, err := os.ReadFile(filepath.Join(buildDir, "build.json"))
+	if err != nil {
+		return frozenInputs{}, refuse("read build record: %v", err)
+	}
+	var buildRecord struct {
+		SchemaVersion int `json:"schema_version"`
+	}
+	if err = json.Unmarshal(buildData, &buildRecord); err != nil {
+		return frozenInputs{}, refuse("decode build record: %v", err)
+	}
+	if buildRecord.SchemaVersion >= 9 {
+		lock := run.Snapshot.LockedPredecessor
+		if lock == nil || lock.ReportSHA256 != decision.SHA256 {
+			return frozenInputs{}, refuse("schema 9 build has no matching locked predecessor")
+		}
+		if (compared == nil && lock.Release != noneValue) || (compared != nil && compared.Rel != lock.Release) {
+			return frozenInputs{}, refuse("selected report differs from locked predecessor release")
+		}
+	}
 	knowledge, err := readKnowledge(buildDir, build.SHA256)
 	if err != nil {
 		return frozenInputs{}, err
@@ -225,52 +244,35 @@ func (s *Stage) resolveInputs(ctx context.Context, env stage.Env, run stage.Run,
 	if err != nil {
 		return frozenInputs{}, err
 	}
+	if buildRecord.SchemaVersion >= 9 && previous.identitySHA256 != run.Snapshot.LockedPredecessor.IdentitySHA256 {
+		return frozenInputs{}, refuse("predecessor identity differs from locked decision")
+	}
 	return frozenInputs{build: build, registryHash: evidenceRegistryHash(run.Snapshot), buildDir: buildDir, reportPath: reportPath, reportSHA256: bareSHA256(data), dumpSHA256: report.DumpSHA256, gapSnapshot: gaps, knowledge: knowledge, predecessor: previous}, nil
 }
 
 func resolvePredecessor(ctx context.Context, env stage.Env, q store.Querier, run stage.Run, decision stage.PreviousReport, compared *evaluation.ComparedRelease) (predecessor, error) {
-	if decision.None() {
-		if compared != nil {
+	rel := ""
+	if compared != nil {
+		if decision.None() {
 			return predecessor{}, refuse("selected report names %s, previous report decision is none", compared.Rel)
 		}
-		return predecessor{rel: noneValue, findingsSHA256: noneValue, identitySHA256: noneValue}, nil
-	}
-	if compared == nil || compared.ReportSHA256 != decision.SHA256 || compared.Country != run.Country {
+		if compared.ReportSHA256 != decision.SHA256 || compared.Country != run.Country {
+			return predecessor{}, refuse("selected report does not match the previous report decision %s", decision.SHA256)
+		}
+		rel = compared.Rel
+	} else if !decision.None() {
 		return predecessor{}, refuse("selected report does not match the previous report decision %s", decision.SHA256)
 	}
-	row, err := q.GetRun(ctx, store.GetRunParams{Country: run.Country, Rel: compared.Rel})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return predecessor{}, refuse("predecessor %s/%s has no run", run.Country, compared.Rel)
-	}
-	if err != nil {
-		return predecessor{}, fmt.Errorf("read predecessor run: %w", err)
-	}
-	var snapshot stage.Snapshot
-	if err = json.Unmarshal(row.Snapshot, &snapshot); err != nil {
-		return predecessor{}, refuse("decode predecessor snapshot: %v", err)
-	}
-	if stage.PredatesDecision(run.Country, compared.Rel, snapshot) {
-		return predecessor{rel: compared.Rel, findingsSHA256: noneValue, identitySHA256: noneValue}, nil
-	}
-	if snapshot.PreviousReport == nil {
-		return predecessor{}, refuse("predecessor %s has no previous report decision", compared.Rel)
-	}
-	if row.State != "evaluated" && row.State != "released" {
-		return predecessor{}, refuse("predecessor %s is %s, not evaluated", compared.Rel, row.State)
-	}
-	file, sum, dir, err := readRunEvidence(ctx, q, env.Artifacts, row)
+	resolved, err := releasechange.ResolvePredecessor(ctx, q, env.Artifacts, run, decision, rel)
 	if err != nil {
 		return predecessor{}, err
 	}
-	bound, hasPrefix := strings.CutPrefix(file.Bindings.ReportSHA256, hashPrefix)
-	if !hasPrefix || bound != decision.SHA256 || file.Bindings.Rel != compared.Rel {
-		return predecessor{}, refuse("predecessor %s evidence does not bind the frozen previous report", compared.Rel)
+	result := predecessor{rel: resolved.Release, findingsSHA256: resolved.FindingsSHA256, identitySHA256: resolved.IdentitySHA256, identityPath: resolved.IdentityPath}
+	if resolved.Findings != nil {
+		file := File(*resolved.Findings)
+		result.file = &file
 	}
-	path, identity, err := predecessorIdentity(dir, compared.Rel, decision.SHA256)
-	if err != nil {
-		return predecessor{}, err
-	}
-	return predecessor{rel: compared.Rel, findingsSHA256: sum, file: &file, identitySHA256: identity, identityPath: path}, nil
+	return result, nil
 }
 
 func readRunEvidence(ctx context.Context, q store.Querier, artifacts artifact.Store, row store.Run) (File, string, string, error) {
@@ -296,14 +298,11 @@ func readArtifactFindings(dir, manifestSHA256 string) (File, string, error) {
 	if err != nil {
 		return File{}, "", refuse("read findings: %v", err)
 	}
-	var file File
-	if err = json.Unmarshal(data, &file); err != nil {
-		return File{}, "", refuse("decode findings: %v", err)
+	file, err := releasechange.DecodeFindings(data)
+	if err != nil {
+		return File{}, "", err
 	}
-	if file.Schema != schemaVersion {
-		return File{}, "", refuse("findings schema %d is not %d", file.Schema, schemaVersion)
-	}
-	return file, bareSHA256(data), nil
+	return File(file), bareSHA256(data), nil
 }
 
 func LoadFindings(ctx context.Context, q store.Querier, artifacts artifact.Store, country, rel string) (File, error) {

@@ -86,8 +86,8 @@ func TestDetectorInputsRecipeAndLegacyBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantV1 := stage.RecipeHash(stage.EvidenceStage, "1", detector.Hash(), string(specs), serialization, "tree-transcription-divergence/1:5*min<3*max")
-	wantLegacy := stage.RecipeHash(stage.EvidenceStage, "1", detector.LegacyHash(), "[]", serialization)
+	wantV1 := stage.RecipeHash(stage.EvidenceStage, "2", detector.Hash(), string(specs), serialization, "tree-transcription-divergence/1:5*min<3*max")
+	wantLegacy := stage.RecipeHash(stage.EvidenceStage, "2", detector.LegacyHash(), "[]", serialization)
 	if v1 != wantV1 || legacy != wantLegacy {
 		t.Fatalf("v1=%s want=%s legacy=%s want=%s", v1, wantV1, legacy, wantLegacy)
 	}

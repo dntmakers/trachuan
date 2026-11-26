@@ -308,7 +308,7 @@ func TestRecipe_NamesTheThreeFileSerializations(t *testing.T) {
 	if serialization != "findings.json/2,identity.jsonl/1,changes.jsonl/1" {
 		t.Fatalf("serialization %q", serialization)
 	}
-	if New(Config{}).Recipe(stage.Snapshot{}) != stage.RecipeHash(stage.EvidenceStage, "1", detector.LegacyHash(), "[]", serialization) {
+	if New(Config{}).Recipe(stage.Snapshot{}) != stage.RecipeHash(stage.EvidenceStage, "2", detector.LegacyHash(), "[]", serialization) {
 		t.Fatal("recipe does not cover the serialization")
 	}
 }

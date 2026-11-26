@@ -6,6 +6,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"danny.vn/trachuan/internal/corpusdb"
 )
 
 func TestDatabaseMetrics_OnlyRecordedSummaryOmissions(t *testing.T) {
@@ -18,7 +20,7 @@ func TestDatabaseMetrics_OnlyRecordedSummaryOmissions(t *testing.T) {
 	}
 	ctx := context.Background()
 	hash := strings.Repeat("a", 64)
-	if _, err = f.corpus.Exec(ctx, `INSERT INTO release VALUES (true,'vn','20990101_1',8,'','{}','{}','{}','{}','{}',$1,$1,$1,'{}',now())`, hash); err != nil {
+	if _, err = f.corpus.Exec(ctx, `INSERT INTO release VALUES (true,'vn','20990101_1',$2,'','{}','{}','{}','{}','{}',$1,$1,$1,'{}',now())`, hash, corpusdb.SchemaVersion); err != nil {
 		t.Fatal(err)
 	}
 	type gap struct {

@@ -51,7 +51,7 @@ func TestUnmatchedOperativeClaim_FiresWhenNoRelationRow(t *testing.T) {
 	if f.Subject.Type != "claim" || f.Subject.Fields[0] != "vn:src" || f.Subject.Fields[1] != "dieu-1" || f.Subject.Fields[2] != "0" || f.Severity != "review" || f.Discriminator != "" {
 		t.Fatalf("finding %+v", f)
 	}
-	if err := f.Subject.validate(); err != nil {
+	if err := f.Subject.Validate(); err != nil {
 		t.Fatal(err)
 	}
 }

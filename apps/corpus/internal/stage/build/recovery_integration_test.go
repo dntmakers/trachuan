@@ -48,6 +48,7 @@ func recoverySetupWith(t *testing.T, configure func(*Config), prepare ...func(*l
 	for _, setup := range prepare {
 		setup(f)
 	}
+	freezeFixtureMembership(t, f)
 	inv := f.inventory(t)
 	suite := evaluation.Suite{Legacy: []evaluation.Case{{ID: "one", Question: "ngân hàng", ExpectAbstain: true}, {ID: "two", Question: "abc", ExpectAbstain: true}, {ID: "three", Question: "def", ExpectAbstain: true}, {ID: "four", Question: "ghi", ExpectAbstain: true}}, Rejections: []string{"two", "three", "four"}, Hashes: evaluation.FixtureHashes{Legacy: "legacy"}, Map: evaluation.IdentityMap{Version: 1, LegacySHA256: "legacy", IdentityInventoryHash: inv.IdentityHash()}}
 	pinTestSuite(t, &suite)
@@ -59,10 +60,7 @@ func recoverySetupWith(t *testing.T, configure func(*Config), prepare ...func(*l
 	configure(&cfg)
 	st := New(cfg)
 	env := stage.Env{DB: pool, Artifacts: f.artifacts}
-	items, err := st.Plan(ctx, env, f.run)
-	if err != nil {
-		t.Fatal(err)
-	}
+	items := planLockedFixture(t, f, st, env)
 	admin, err := pgx.Connect(ctx, builder.URL)
 	if err != nil {
 		t.Fatal(err)

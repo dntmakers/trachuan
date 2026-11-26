@@ -15,14 +15,23 @@ import (
 	"danny.vn/trachuan/internal/corpusdb"
 )
 
+type ProjectionDigest struct {
+	Version int    `json:"version"`
+	SHA256  string `json:"sha256"`
+}
+
 type BuildRecord struct {
 	Version                    int              `json:"version"`
 	Country                    string           `json:"country"`
 	Rel                        string           `json:"rel"`
 	DatabaseName               string           `json:"database_name"`
 	SchemaVersion              int              `json:"schema_version"`
+	ChangesProjection          ProjectionDigest `json:"changes_projection"`
+	ChangesCounts              map[string]int   `json:"changes_counts"`
 	BuildInputHash             string           `json:"build_input_hash"`
 	BuildRecipeHash            string           `json:"build_recipe_hash"`
+	PredecessorRelease         string           `json:"predecessor_release"`
+	PredecessorIdentitySHA256  string           `json:"predecessor_identity_sha256"`
 	ClassificationSetSHA256    string           `json:"classification_set_sha256,omitempty"`
 	ClassificationPolicySHA256 string           `json:"classification_policy_sha256,omitempty"`
 	SourceManifestHash         string           `json:"source_manifest_hash"`
@@ -115,13 +124,26 @@ func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Ru
 	if err != nil {
 		return record, "", err
 	}
-	recipeHash, err := New(cfg).recordRecipeHash(run.Snapshot, record.RetrievalRecipe)
+	if record.SchemaVersion != 8 && record.SchemaVersion != corpusdb.SchemaVersion {
+		return record, "", fmt.Errorf("unsupported build schema %d", record.SchemaVersion)
+	}
+	recipeHash, err := New(cfg).recordRecipeHash(run.Snapshot, record.RetrievalRecipe, record.SchemaVersion)
 	if err != nil {
 		return record, "", err
 	}
-	inputHash := recordInputHash(run.Country, run.Rel, inventory, record.IdentityMapSHA256, record.ProvenanceSHA256, record.CorrectionsSHA256, *record.DevelopmentCasesSHA256, record.TaxonomyVersion, record.HeadingExclusionsSHA256)
+	inputHash := recordInputHashForSchema(run.Country, run.Rel, inventory, record.IdentityMapSHA256, record.ProvenanceSHA256, record.CorrectionsSHA256, *record.DevelopmentCasesSHA256, record.SchemaVersion, record.TaxonomyVersion, record.HeadingExclusionsSHA256)
 	inputHash = withClassificationSet(withReports(withKnowledge(inputHash, knowledgeHash), reportsHash), run.Snapshot.ClassificationSetSHA256)
-	if record.Version != 1 || record.Country != run.Country || record.Rel != run.Rel || record.DatabaseName != final || record.SchemaVersion != corpusdb.SchemaVersion || inventory.Country != run.Country || inventory.SourceListHash != run.Snapshot.SourceListHash || record.BuildInputHash != art.InputHash || record.BuildInputHash != inputHash || *record.DevelopmentCasesSHA256 != cfg.Suite.Hashes.Development || record.BuildRecipeHash != recipeHash || record.SourceManifestHash != inventory.SourceManifestHash() || record.IdentityInventoryHash != inventory.IdentityHash() || record.Dump.Format != "custom" || record.PostgresVersion != cfg.Versions.PostgreSQLMajor || record.PGVectorVersion != cfg.Versions.PGVector || record.LtreeVersion != cfg.Versions.Ltree || record.PgDumpVersion != cfg.Versions.PgDump || record.WorkerVersion != run.Snapshot.WorkerVersion || record.BuiltAt.IsZero() {
+	if record.SchemaVersion >= 9 {
+		lock := run.Snapshot.LockedPredecessor
+		if lock == nil || lock.Release != record.PredecessorRelease || lock.IdentitySHA256 != record.PredecessorIdentitySHA256 || (run.Snapshot.PreviousReport != nil && lock.ReportSHA256 != run.Snapshot.PreviousReport.SHA256) {
+			return record, "", fmt.Errorf("build predecessor differs from locked decision")
+		}
+		if err = validateProjectionRecord(record, run); err != nil {
+			return record, "", err
+		}
+		inputHash = predecessorInputHash(inputHash, *lock)
+	}
+	if record.Version != 1 || record.Country != run.Country || record.Rel != run.Rel || record.DatabaseName != final || inventory.Country != run.Country || inventory.SourceListHash != run.Snapshot.SourceListHash || record.BuildInputHash != art.InputHash || record.BuildInputHash != inputHash || *record.DevelopmentCasesSHA256 != cfg.Suite.Hashes.Development || record.BuildRecipeHash != recipeHash || record.SourceManifestHash != inventory.SourceManifestHash() || record.IdentityInventoryHash != inventory.IdentityHash() || record.Dump.Format != "custom" || record.PostgresVersion != cfg.Versions.PostgreSQLMajor || record.PGVectorVersion != cfg.Versions.PGVector || record.LtreeVersion != cfg.Versions.Ltree || record.PgDumpVersion != cfg.Versions.PgDump || record.WorkerVersion != run.Snapshot.WorkerVersion || record.BuiltAt.IsZero() {
 		return record, "", fmt.Errorf("build artifact identity mismatch")
 	}
 	if record.Taxonomy == nil || record.Taxonomy.Nodes < 0 || record.Taxonomy.Served < 0 || record.Taxonomy.Seeds < 0 || record.Taxonomy.Overrides < 0 || record.Taxonomy.Excluded < 0 || record.Taxonomy.MissingArticles < 0 || record.Taxonomy.MissingOverrideTargets < 0 || record.Taxonomy.Inherited < 0 || record.Taxonomy.UnmatchedConsolidated < 0 || (record.Taxonomy.Inherited > 0 && record.Taxonomy.Inheritance.Status != "pass") || (record.Taxonomy.Inheritance.Status != "" && !validInheritanceGate(record.Taxonomy.Inheritance)) {
@@ -187,9 +209,13 @@ func verifyCalibration(recipeJSON, calibration []byte) error {
 }
 
 func recordInputHash(country, rel string, inv Inventory, identityMap, provenanceHash, correctionsHash, developmentHash string, versions ...string) string {
+	return recordInputHashForSchema(country, rel, inv, identityMap, provenanceHash, correctionsHash, developmentHash, corpusdb.SchemaVersion, versions...)
+}
+
+func recordInputHashForSchema(country, rel string, inv Inventory, identityMap, provenanceHash, correctionsHash, developmentHash string, schemaVersion int, versions ...string) string {
 	exclusions := hashBytes([]byte("[]"))
 	if len(versions) > 1 {
 		exclusions = versions[1]
 	}
-	return withHeadingExclusions(withDevelopmentHash(buildHash(country, rel, inv, identityMap, provenanceHash, correctionInput{hash: correctionsHash, nonempty: correctionsHash != ""}, versions...), developmentHash), exclusions)
+	return withHeadingExclusions(withDevelopmentHash(buildHashForSchema(country, rel, inv, identityMap, provenanceHash, correctionInput{hash: correctionsHash, nonempty: correctionsHash != ""}, schemaVersion, versions...), developmentHash), exclusions)
 }

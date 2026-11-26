@@ -9,7 +9,12 @@ import (
 )
 
 func (s *Stage) frozenInputHash(run stage.Run, inv Inventory, correction correctionInput) string {
-	return withClassificationSet(s.inputHash(run.Country, run.Rel, inv, correction), run.Snapshot.ClassificationSetSHA256)
+	base := withClassificationSet(s.inputHash(run.Country, run.Rel, inv, correction), run.Snapshot.ClassificationSetSHA256)
+	lock := stage.LockedPredecessor{Release: stage.NoPreviousReport, IdentitySHA256: stage.NoPreviousReport}
+	if run.Snapshot.LockedPredecessor != nil {
+		lock = *run.Snapshot.LockedPredecessor
+	}
+	return predecessorInputHash(base, lock)
 }
 
 func withClassificationSet(input, selection string) string {

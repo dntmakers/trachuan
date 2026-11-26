@@ -302,6 +302,21 @@ func (q *Queries) ResetFailedItems(ctx context.Context, arg ResetFailedItemsPara
 	return err
 }
 
+const setRunPredecessorLock = `-- name: SetRunPredecessorLock :exec
+UPDATE run SET snapshot = jsonb_set(snapshot, '{locked_predecessor}', $1::jsonb), updated_at = now()
+WHERE id = $2
+`
+
+type SetRunPredecessorLockParams struct {
+	LockedPredecessor json.RawMessage
+	ID                int64
+}
+
+func (q *Queries) SetRunPredecessorLock(ctx context.Context, arg SetRunPredecessorLockParams) error {
+	_, err := q.db.Exec(ctx, setRunPredecessorLock, arg.LockedPredecessor, arg.ID)
+	return err
+}
+
 const setRunState = `-- name: SetRunState :exec
 UPDATE run SET state = $2, message = $3, updated_at = now() WHERE id = $1
 `

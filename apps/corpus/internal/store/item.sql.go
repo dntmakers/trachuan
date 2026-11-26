@@ -31,6 +31,23 @@ func (q *Queries) GetExtractInput(ctx context.Context, arg GetExtractInputParams
 	return i, err
 }
 
+const getPlannedItemInputHash = `-- name: GetPlannedItemInputHash :one
+SELECT input_hash FROM run_item WHERE run_id = $1 AND stage = $2 AND item_key = $3 FOR UPDATE
+`
+
+type GetPlannedItemInputHashParams struct {
+	RunID   int64
+	Stage   string
+	ItemKey string
+}
+
+func (q *Queries) GetPlannedItemInputHash(ctx context.Context, arg GetPlannedItemInputHashParams) (*string, error) {
+	row := q.db.QueryRow(ctx, getPlannedItemInputHash, arg.RunID, arg.Stage, arg.ItemKey)
+	var input_hash *string
+	err := row.Scan(&input_hash)
+	return input_hash, err
+}
+
 const insertPlannedItem = `-- name: InsertPlannedItem :exec
 INSERT INTO run_item (run_id, stage, item_key, input_hash, recipe_hash, state, batch, message)
 VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
