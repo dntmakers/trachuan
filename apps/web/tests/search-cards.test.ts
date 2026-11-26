@@ -171,3 +171,12 @@ it('shows the source host only for an https source', async () => {
   await wrapper.setProps({ result: { ...result, documents: { 'vn:vbpl:1': { ...doc, source_url: 'http://example.invalid/path' } } } })
   expect(wrapper.find('.result-source').exists()).toBe(false)
 })
+
+
+it.each([['en', 'Enter Vietnamese with diacritics or use a document number.'], ['vi', 'Nhập tiếng Việt có dấu hoặc dùng số hiệu văn bản.']])('shows the diacritics-required abstention in %s', (language, expected) => {
+  vi.stubGlobal('useState', () => ref(language))
+  const wrapper = mount(SearchResults, { props: { result: { abstain: true, reason: 'diacritics_required', hits: [] } } })
+  expect(wrapper.text()).toContain(expected)
+  expect(wrapper.text()).not.toContain(language === 'en' ? 'No matching clause yet.' : 'Chưa thấy khoản nào khớp.')
+  wrapper.unmount()
+})

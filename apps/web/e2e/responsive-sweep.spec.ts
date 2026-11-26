@@ -120,6 +120,7 @@ const states = [
   { name: '/link reset', path: '/link', kind: 'reset' },
   { name: '/link add_password', path: '/link', kind: 'add_password' },
   { name: '/vn/search hits', path: '/vn/search', kind: 'search' },
+  { name: '/vn/search restored', path: '/vn/search', kind: 'search-restored' },
   { name: '/vn/documents/vn:vbpl:1', path: '/vn/documents/vn:vbpl:1', kind: 'reader' },
   { name: '/vn/documents/vn:vbpl:1 files', path: '/vn/documents/vn:vbpl:1', kind: 'reader-files' },
   ...['set', 'unset', 'long email', 'setup', 'recovery', 'remove', 'change password', 'add notice', 'token dialog', 'token value', 'delete dialog'].map(name => ({ name: `/account ${name}`, path: name, kind: 'account' })),
@@ -138,9 +139,9 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
         if (state.path === '/' || state.path === '/sources') await expect(page.locator('.coverage-stats dd')).toHaveCount(4)
         else await expect(page.locator('main').getByText('Fixture topic').first()).toBeVisible()
       } else if (state.kind === 'account') await accountState(page, state.path, language)
-      else if (state.kind === 'search' || state.kind === 'reader' || state.kind === 'reader-files') {
+      else if (state.kind === 'search' || state.kind === 'search-restored' || state.kind === 'reader' || state.kind === 'reader-files') {
         await page.route('**/api/v1/me', route => route.fulfill({ json: account }))
-        await page.route('**/api/v1/search', route => route.fulfill({ json: { release: '20990101', abstain: false, hits: [{ citation: 'Điều 1', complete: true, text: 'Nội dung giả lập.' }] } }))
+        await page.route('**/api/v1/search', route => route.fulfill({ json: { release: '20990101', abstain: false, ...(state.kind === 'search-restored' ? { restored_query: 'Nội dung giả lập ' + 'a'.repeat(100) } : {}), hits: [{ citation: 'Điều 1', complete: true, text: 'Nội dung giả lập.' }] } }))
         await page.route('**/api/v1/read', route => route.fulfill({ json: { release: '20990101', items: [{ complete: true, units: [{ kind: 'timeline', event: { kind: 'repeals', actor: { key: 'vn:vbpl:2', number: '123/2099/ND-CP', issued: '2099-01-01', in_release: true }, target: { scope: 'unresolved_provision', named: 'dieu-123-khoan-4' } } }] }] } }))
         await page.route('**/api/v1/documents/*', route => route.fulfill({ json: { release: '20990101', fetch_sha256: fileHash, files: state.kind === 'reader-files' ? files : [], files_omitted: state.kind === 'reader-files' ? 3 : 0, item: { complete: true, document: { number: '1/2099', title: 'Test law', status: { class: 'in_force', current: true }, text_source: 'none', text_complete: false }, units: [{ kind: 'provision', anchor: 'dieu-1', label: 'Điều 1', text: 'Text' }] } } }))
         await page.goto('/')
@@ -149,7 +150,7 @@ for (const width of [320, 390, 768, 1280]) for (const language of ['vi', 'en']) 
         await expect(page.getByRole('link', { name: /^(account|tài khoản)$/i })).toBeVisible()
         if (await menu.isVisible()) await menu.click()
         await navigate(page, state.path)
-        if (state.kind === 'search') {
+        if (state.kind === 'search' || state.kind === 'search-restored') {
           await page.locator('#search-query').fill('Nội dung giả lập')
           await page.locator('.search-box').evaluate(form => (form as HTMLFormElement).requestSubmit())
           await expect(page.locator('.result-card .law-text')).toBeVisible()
