@@ -24,5 +24,5 @@ func Describe(ctx context.Context, client *embedding.Client) (Report, error) {
 		return Report{}, fmt.Errorf("read running query recipe: %w", err)
 	}
 	return Report{corpusdb.SupportedSchemaVersions(), embedding.QueryRecipe1().Hash(), running,
-		lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3()}}, nil
+		lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3(), retrieval.Recipe4()}}, nil
 }

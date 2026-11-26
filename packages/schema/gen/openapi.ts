@@ -4497,6 +4497,7 @@ export interface components {
             abstain: boolean;
             reason?: string;
             message?: string;
+            restored_query?: string;
             documents?: {
                 [key: string]: components["schemas"]["Document"];
             };

@@ -33,7 +33,7 @@ func TestDescribe_LawEncodingUnchanged(t *testing.T) {
 		RunningQuery     embedding.Report   `json:"running_query"`
 		LexicalRecipe    lexical.Recipe     `json:"lexical_recipe"`
 		RetrievalRecipes []retrieval.Recipe `json:"retrieval_recipes"`
-	}{corpusdb.SupportedSchemaVersions(), embedding.QueryRecipe1().Hash(), running, lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3()}})
+	}{corpusdb.SupportedSchemaVersions(), embedding.QueryRecipe1().Hash(), running, lexical.Recipe1(), []retrieval.Recipe{retrieval.Recipe2(), retrieval.Recipe3(), retrieval.Recipe4()}})
 	if err != nil || string(got) != string(want) {
 		t.Fatal("law report bytes changed")
 	}
@@ -56,7 +56,7 @@ func TestDescribe_ReportsPinnedAndRunningRecipesSeparately(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.DenseQueryHash != embedding.QueryRecipe1().Hash() || got.RunningQuery.Recipe != recipe || got.LexicalRecipe != lexical.Recipe1() || len(got.RetrievalRecipes) != 2 || !slices.Equal(got.SchemaVersions, []int{4, 5, 6, 7, 8}) {
+		if got.DenseQueryHash != embedding.QueryRecipe1().Hash() || got.RunningQuery.Recipe != recipe || got.LexicalRecipe != lexical.Recipe1() || len(got.RetrievalRecipes) != 3 || !slices.Equal(got.SchemaVersions, []int{4, 5, 6, 7, 8}) {
 			t.Fatalf("unexpected description: %+v", got)
 		}
 	}

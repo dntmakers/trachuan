@@ -3852,6 +3852,7 @@ components:
         abstain: *id007
         reason: *id001
         message: *id001
+        restored_query: *id001
         documents:
           type: object
           additionalProperties:

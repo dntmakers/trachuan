@@ -98,6 +98,8 @@ func validObject(b []byte) bool {
 	return json.Unmarshal(b, &v) == nil && v != nil
 }
 
+func (e *Engine) QueryGate() string { return e.release.RetrievalRecipe.QueryGate }
+
 func (e *Engine) Release() Release {
 	r := e.release
 	r.ChunkRecipe = append(json.RawMessage(nil), r.ChunkRecipe...)

@@ -41,7 +41,7 @@ func (e *Engine) Present(ctx context.Context, resp Response, d Detail) (SearchRe
 }
 
 func present(resp Response, docs map[string]DocumentEntry, d Detail) SearchResult {
-	result := SearchResult{OutsideFilterCount: resp.OutsideFilterCount, NextCursor: resp.NextCursor, Nodes: map[string]NodeRef{}, Release: resp.Release, Abstain: resp.Abstain, Reason: resp.Reason, Message: resp.Message, Gaps: resp.Gaps, Documents: make(map[string]DocumentEntry)}
+	result := SearchResult{OutsideFilterCount: resp.OutsideFilterCount, NextCursor: resp.NextCursor, Nodes: map[string]NodeRef{}, Release: resp.Release, Abstain: resp.Abstain, Reason: resp.Reason, Message: resp.Message, RestoredQuery: resp.RestoredQuery, Gaps: resp.Gaps, Documents: make(map[string]DocumentEntry)}
 	for code, ref := range resp.Nodes {
 		result.Nodes[code] = ref
 	}

@@ -77,7 +77,7 @@ func prefetchCase(ctx context.Context, engine Engine, input cohortInput, rejects
 		return result
 	}
 	result.legacy = result.product
-	if input.legacy && !result.product.Validation.Accepted {
+	if input.legacy && (!result.product.Validation.Accepted || result.product.QueryChanged) {
 		result.legacy, result.legacyErr = engine.PrepareLegacy(ctx, request)
 		if result.legacyErr != nil {
 			return result

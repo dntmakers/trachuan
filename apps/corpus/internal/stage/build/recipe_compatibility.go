@@ -17,7 +17,7 @@ func (s *Stage) recordRecipeHash(snapshot stage.Snapshot, raw json.RawMessage) (
 	if err := json.Unmarshal(raw, &recipe); err != nil {
 		return "", fmt.Errorf("decode retrieval recipe: %w", err)
 	}
-	if !recipe.Supported() {
+	if !recipe.Supported() || (recipe.Version != 2 && recipe.Version != 3) {
 		return "", fmt.Errorf("unsupported retrieval recipe")
 	}
 	if recipe.Version == 2 {

@@ -42,9 +42,12 @@ type Request struct {
 }
 
 type Prepared struct {
-	Request    Request
-	Validation Validation
-	Vector     *embedding.Vector
+	Request        Request
+	Validation     Validation
+	Vector         *embedding.Vector
+	EffectiveQuery string
+	QueryChanged   bool
+	collectionDate string
 }
 
 type Options struct {

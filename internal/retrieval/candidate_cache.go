@@ -66,7 +66,11 @@ func (e *Engine) candidates(ctx context.Context, tx pgx.Tx, p Prepared, vec stri
 	}
 	var key [32]byte
 	if cache != nil {
-		key = e.candidateKey(p.Request, depths, date.Format(time.DateOnly))
+		req := p.Request
+		if p.EffectiveQuery != "" {
+			req.Query = p.EffectiveQuery
+		}
+		key = e.candidateKey(req, depths, date.Format(time.DateOnly))
 		if err := ctx.Err(); err != nil {
 			return [2]ArmGroup{}, nil, err
 		}

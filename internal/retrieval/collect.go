@@ -29,11 +29,18 @@ func (e *Engine) collectWithCandidates(ctx context.Context, p Prepared, depths D
 	if e.db == nil || p.Vector == nil || len(p.Vector.Values) != e.queryRecipe.Dimensions || p.Vector.RecipeHash != e.queryRecipe.Hash() || depths.Dense < 1 || depths.Dense > 200 || depths.Lexical < 1 || depths.Lexical > 100 {
 		return Arms{}, errors.New("invalid prepared request or depths")
 	}
-	sparse, err := lexical.Query(p.Request.Query, e.release.LexicalRecipe)
+	query := p.EffectiveQuery
+	if query == "" {
+		query = p.Request.Query
+	}
+	sparse, err := lexical.Query(query, e.release.LexicalRecipe)
 	if err != nil {
 		return Arms{}, errors.New("encode lexical query failed")
 	}
-	date := e.searchDate(p.Request)
+	date := p.collectionDate
+	if date == "" {
+		date = e.searchDate(p.Request)
+	}
 	ctx, cancel := context.WithTimeout(ctx, e.deadline())
 	defer cancel()
 	tx, err := e.db.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})

@@ -355,7 +355,7 @@ func TestGuide_ContentRules(t *testing.T) {
 	r := callTool(t, h, "guide", map[string]any{"country": "vn"})
 	out := resultJSON(t, r)
 	guide, _ := out["guide"].(string)
-	for _, rule := range []string{"search", "documents", "hits", "read", "<doc>#<anchor>", "status", "warnings", "repeals", "replaces", "suspends", "amends_supplements", "in:implements", "next", "last page", "snippet is not the provision", "[…]", "direction", "outside the release", "number lookup", "complete", "Vietnamese with diacritics", "citation", "number"} {
+	for _, rule := range []string{"search", "documents", "hits", "read", "<doc>#<anchor>", "status", "warnings", "repeals", "replaces", "suspends", "amends_supplements", "in:implements", "next", "last page", "snippet is not the provision", "[…]", "direction", "outside the release", "number lookup", "complete", "Releases with restoration accept Vietnamese without diacritics", "Check restored_query if present. If the restoration is incorrect, start a new search with diacritics. If the release returns diacritics_required, retry with diacritics or a document number.", "citation", "number"} {
 		if !strings.Contains(guide, rule) {
 			t.Fatalf("guide missing %q", rule)
 		}

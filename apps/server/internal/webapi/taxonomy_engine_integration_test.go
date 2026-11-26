@@ -48,6 +48,10 @@ func (taxonomyEmbedder) Embed(context.Context, string) (embedding.Vector, error)
 }
 
 func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine {
+	return taxonomyIntegrationEngineWith(t, retrieval.Recipe2(), taxonomyEmbedder{}, extra...)
+}
+
+func taxonomyIntegrationEngineWith(t *testing.T, recipe retrieval.Recipe, embedder retrieval.Embedder, extra ...string) *retrieval.Engine {
 	t.Helper()
 	ctx := context.Background()
 	q, d := embedding.QueryRecipe1(), embedding.DocumentRecipe1()
@@ -61,8 +65,8 @@ func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine 
 	}
 	exec := func(query string, args ...any) {
 		t.Helper()
-		if _, err := db.Exec(ctx, query, args...); err != nil {
-			t.Fatal(err)
+		if _, execErr := db.Exec(ctx, query, args...); execErr != nil {
+			t.Fatal(execErr)
 		}
 	}
 	hash := strings.Repeat("a", 64)
@@ -76,9 +80,9 @@ func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine 
 		key := fmt.Sprintf("vn:%d", id)
 		exec(`INSERT INTO document(id,country,key,number,number_norm,title,doc_type,issuer,class,source,validity_conflict,eff_from,raw_issue_date,raw_eff_from,raw_eff_to,status_code,status_name,status_class,status_basis,is_current,is_consolidated,content_state,fetch_sha256,text_source,text_complete) VALUES($1,'vn',$2,'n','n','title','law','issuer','primary','vbpl',false,'2099-01-01','','','','','','in_force','source_status',true,false,'indexed',$3,'source_tree',true)`, id, key, hash)
 		exec(`INSERT INTO provision(id,document_id,node_id,kind,label,heading,ordinal,preorder,path,text,anchor) VALUES($1,$1,'p','dieu','Điều','',1,1,'p',$2,'p')`, id, content)
-		sparse, err := lexical.Document(content, stats, lexical.Recipe1())
-		if err != nil {
-			t.Fatal(err)
+		sparse, encodeErr := lexical.Document(content, stats, lexical.Recipe1())
+		if encodeErr != nil {
+			t.Fatal(encodeErr)
 		}
 		var terms []string
 		for _, term := range sparse {
@@ -94,7 +98,6 @@ func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine 
 		exec(statement)
 	}
 	now := func() time.Time { return time.Date(2099, 11, 10, 0, 0, 0, 0, time.UTC) }
-	recipe := retrieval.Recipe2()
 	threshold := 0.1
 	recipe.Abstention.Threshold = &threshold
 	recipe.Abstention.CalibrationSHA256 = hash
@@ -108,7 +111,7 @@ func taxonomyIntegrationEngine(t *testing.T, extra ...string) *retrieval.Engine 
 		return string(raw)
 	}
 	exec(`INSERT INTO release VALUES (true,'vn',$1,$2,'v1',$3::jsonb,'{}',$4::jsonb,$5::jsonb,$6::jsonb,$7,$7,$7,'{}',$8)`, rel.Rel, rel.SchemaVersion, marshal(rel.DenseRecipe), marshal(rel.LexicalRecipe), marshal(rel.RetrievalRecipe), marshal(rel.LexicalStats), hash, rel.BuiltAt)
-	engine, err := retrieval.Open(ctx, db, taxonomyEmbedder{}, retrieval.Options{Now: now, Profile: "evaluation"})
+	engine, err := retrieval.Open(ctx, db, embedder, retrieval.Options{Now: now, Profile: "evaluation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,8 +177,8 @@ func TestTaxonomyAndFilteredSearch_EngineResultsIntegration(t *testing.T) {
 	compare := func(label string, raw []byte, want any) {
 		t.Helper()
 		var got any
-		if err := json.Unmarshal(raw, &got); err != nil {
-			t.Fatal(err)
+		if decodeErr := json.Unmarshal(raw, &got); decodeErr != nil {
+			t.Fatal(decodeErr)
 		}
 		if !reflect.DeepEqual(got, wireValue(t, want)) {
 			t.Fatalf("%s differs from engine: %s", label, raw)

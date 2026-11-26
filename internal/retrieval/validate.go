@@ -9,14 +9,25 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// Validation contains the input gate and document-number routing result.
+type queryRoute string
+
+const (
+	routeNumber      queryRoute = "number"
+	routeMarked      queryRoute = "marked"
+	routeRestore     queryRoute = "restore"
+	routeUnsupported queryRoute = "unsupported"
+)
+
 type Validation struct {
+	Route      queryRoute
 	Accepted   bool
 	Routed     bool
 	References []string
 	Reason     string
 	Message    string
 }
+
+func (v Validation) RestorationRoute() bool { return v.Route == routeRestore }
 
 // ValidateQuery applies the deterministic query gate.
 func ValidateQuery(q string) (Validation, error) {
@@ -47,14 +58,34 @@ func ValidateQuery(q string) (Validation, error) {
 			}
 		}
 	}
-	if v.Routed || marked {
+	if v.Routed {
+		v.Route = routeNumber
 		v.Accepted = true
 		return v, nil
 	}
+	if marked {
+		v.Route = routeMarked
+		v.Accepted = true
+		return v, nil
+	}
+	v.Route = routeRestore
 	v.Reason = "diacritics_required"
 	if !latin {
+		v.Route = routeUnsupported
 		v.Reason = "unsupported_query"
 	}
 	v.Message = "Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản."
 	return v, nil
+}
+
+func resolveValidation(v Validation, recipe Recipe, legacy bool) Validation {
+	if v.Route == routeRestore && (recipe.Version == 4 || legacy) {
+		v.Accepted = true
+		v.Reason = ""
+		v.Message = ""
+	}
+	if v.Route == routeUnsupported && recipe.Version == 4 {
+		v.Message = "Vui lòng nhập câu hỏi tiếng Việt hoặc số hiệu văn bản."
+	}
+	return v
 }

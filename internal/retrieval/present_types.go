@@ -44,6 +44,7 @@ type SearchResult struct {
 	Abstain            bool                     `json:"abstain"`
 	Reason             string                   `json:"reason,omitempty"`
 	Message            string                   `json:"message,omitempty"`
+	RestoredQuery      string                   `json:"restored_query,omitempty"`
 	Documents          map[string]DocumentEntry `json:"documents,omitempty"`
 	Hits               []PresentedHit           `json:"hits,omitempty"`
 	NonCurrent         []PresentedHit           `json:"non_current,omitempty"`
