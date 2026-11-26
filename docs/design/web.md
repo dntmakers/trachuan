@@ -64,6 +64,14 @@ first page, and paging sends the submitted bounds unchanged. These date inputs
 stay in the form and POST body, not the URL. The existing
 [filter order and outside count](retrieval.md#filter-contract) apply.
 
+When the response has `restored_query`, show its value above the hits as plain
+text with `Đã tìm theo` / `Searched for`, including on an abstention. Use the
+same text to mark matching words on result cards. Keep what the user typed in
+the form. Offer `Sửa câu tìm kiếm` / `Edit search` to put the restored text in
+the input and focus it. Submission after editing starts a new first page.
+Continue the current results with the original submitted query and cursor. Keep
+both query forms in page memory and POST bodies.
+
 The reader's technical panel shows [source files](mcp-read.md#source-files) with
 the name linked only when the API supplied an allowed URL, role when not `main`,
 size, fetch date when known, and the first 12 hex digits of the file hash with a

@@ -39,10 +39,10 @@ new run requires exactly one of:
 
 - `--previous-report <report.json>`: the uploaded report of the production
   release ([corpus release](corpus-release.md)). Start decodes it, requires
-  report version 2, 3 or
-  [4](evaluation-warning-cases.md#report-and-release-gate) with its retrieval
-  recipe, status complete, this run's country and a `rel` below this run's, and
-  copies the bytes into the artifact store.
+  report version 2, 3, [4](evaluation-warning-cases.md#report-and-release-gate)
+  or [5](evaluation-fixtures.md#retiring-the-rejection-checks) with its
+  retrieval recipe, status complete, this run's country and a `rel` below this
+  run's, and copies the bytes into the artifact store.
 - `--no-previous-report`: the run is compared with nothing and cannot publish.
 
 Neither or both refuses the start, so a forgotten flag cannot look like a
@@ -70,6 +70,11 @@ last stage: only its completion makes the run `evaluated`, `--until eval` pauses
 the run, and `corpus release-row` reports `complete` only with its item done.
 
 ### Upload and signing
+
+When recipe 4 is enabled for new builds, deploy the report version 5 validators
+before uploading or first signing a new release. Require report version 5 for
+both paths after that cutover. Validate previous and re-signed reports by their
+own version and keep their signed hashes.
 
 `corpus release-row` adds `eval_report_sha256`, `previous_report_sha256` (64
 hexadecimal characters, or `none`) and, from the run's verified evidence

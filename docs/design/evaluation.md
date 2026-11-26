@@ -49,9 +49,9 @@ plus arm controls, and writes the same report/cache as the stage. Exit 0 means
 the diagnostic run completed, including measured floor failures. Exit 1 means
 invalid inputs, infrastructure failure or incomplete scoring. Optional
 `--require-floors` exits 2 for failed or unavailable old-product or development
-floors or a failed rejection check (development floors that are `not_run`
-because the file is empty do not count), for future automation; it cannot turn
-an incomplete run into a passing report.
+floors (development floors that are `not_run` because the file is empty do not
+count). Through version 4, a failed rejection check also exits 2. The flag
+cannot turn an incomplete run into a passing report.
 
 The stage compares with the previous report the run froze at start, and its
 report is the one a release uploads
@@ -61,16 +61,16 @@ diagnostic.
 Stage key is `<cc>/<rel>`, one item after a done build. Input hash combines
 verified build artifact hash, fixture and mapping hashes, previous report hash
 or empty string, frozen date, and mode list in fixed order. Recipe hash covers
-scorer version (now `agent-eval/6`), legacy matcher version, product matcher
-version, metric definitions, rejection IDs/message, cache schema/depths,
-quantile rule, and floors. It reads but never changes the dump or singleton
-release row. Artifact files: `report.json`, `cases.jsonl`, `arms.jsonl`,
-`queries.f32`, `query-index.json`, `MANIFEST.sha256`. `Rows` is a no-op;
-`Resolve` exposes the report status and regenerates evaluation gaps: one
-`eval_floor_failed` per failed or unavailable old-product floor (detail
-`<mode>:<metric>`) or development floor (detail `development:<mode>:<metric>`)
-and one `eval_rejection_failed` per failed rejection check (detail the case ID).
-The owner may accept them; release stays blocked by `release_eligible`. No
+scorer version, legacy matcher version, product matcher version, metric and gate
+definitions, cache schema/depths, quantile rule and floors. It reads but never
+changes the dump or singleton release row. Artifact files: `report.json`,
+`cases.jsonl`, `arms.jsonl`, `queries.f32`, `query-index.json`,
+`MANIFEST.sha256`. `Rows` is a no-op; `Resolve` exposes the report status and
+regenerates evaluation gaps: one `eval_floor_failed` per failed or unavailable
+old-product floor (detail `<mode>:<metric>`) or development floor (detail
+`development:<mode>:<metric>`) and one `eval_rejection_failed` per failed
+historical rejection check (through report version 4, detail the case ID). The
+owner may accept them; release stays blocked by `release_eligible`. No
 production queries enter these artifacts.
 
 ## Fixtures and identity adjudication
@@ -96,23 +96,18 @@ article hit therefore earns legacy credit for its complete member clauses
 (`agent-eval/4`). Report direct-only scores alongside legacy relation credit.
 Guard fixtures against empty expected numbers.
 
-Legacy evaluation bypasses only the product diacritics rejection through
-`Engine.PrepareLegacy(ctx,request)` followed by `Engine.Collect`; it still
-enforces size/token and SQL safety limits, and does not restore accents or add
-Qwen instructions. The method is a trusted evaluation API, never exposed by the
-server. All other candidate and shaping choices follow the release recipe. Call
-the result `legacy_matcher_on_product_recipe`, not a reproduction of banhmi's
-engine. Compare descriptively with the accepted numbers and the
+Legacy evaluation uses the typed query through the trusted
+`Engine.PrepareLegacy(ctx,request)` followed by `Engine.Collect`. It bypasses
+the old diacritics rejection and skips restoration, while enforcing size,
+model-token and SQL safety limits. The server never exposes this path. All other
+candidate and shaping choices follow the release recipe. Call the result
+`legacy_matcher_on_product_recipe`, not a reproduction of banhmi's engine.
+Compare descriptively with the accepted numbers and the
 [local exact baseline](../research/retrieval-hybrid-results-2026-11.md),
 labeling corpus, model and policy differences; no legacy floor or parity claim.
 
-Old product uses 84 positive cases with 93 citations and 5 negatives. The
-remaining three cases are rejection checks: `edge-no-diacritics-infosec`,
-`edge-no-diacritics-payment`, `edge-no-diacritics-mangluoi`. All must return
-`diacritics_required` and the exact
-[message](retrieval-recipe.md#validation-and-routing), no hits and no embed
-request. Exclude them from recall, MRR, precision and abstention denominators;
-report 3/3 separately as a hard gate.
+[Old product membership](evaluation-fixtures.md#retiring-the-rejection-checks)
+excludes the three unaccented legacy cases from every product denominator.
 
 Product matching is exact country/key/anchor membership in the adjudicated
 alternatives. A document-level expectation accepts any returned provision of
@@ -146,18 +141,19 @@ under identical eligibility and response processing; only hybrid gates apply.
   group precision separately. Legacy only trims a trailing non-current run,
   unless all hits are non-current, in which case all count. Zero denominator is
   null/N/A, never 1. Independently adjudicated legal validity is not claimed.
-- Abstention accuracy: correct abstain flag / all non-rejection cases. Treat
-  abstention as the positive class: TP negative case abstained; FN negative
-  answered; FP positive case abstained; TN positive answered. Also report
-  negative recall TP/(TP+FN), positive answer rate TN/(TN+FP) and balanced
-  accuracy, the mean of those two rates, which is the abstention target. No hits
-  means abstain; an infrastructure error means evaluation incomplete, not
-  abstention. Low-confidence responses keep their hits, so the flag is a signal
-  agents read, not a loss of evidence; recall and MRR score the hits regardless.
-  Balanced accuracy is a target record (`targets`, like recall@20 and MRR@8,
-  target 0.85, per cohort, with both rates and the confusion counts); it never
-  enters `floors`, `quality_pass`, `--require-floors` exit codes or
-  `eval_floor_failed` gaps, and `non_regression` compares it between releases.
+- Abstention accuracy: correct abstain flag divided by the scored case count.
+  Treat abstention as the positive class: TP negative case abstained; FN
+  negative answered; FP positive case abstained; TN positive answered. Also
+  report negative recall TP/(TP+FN), positive answer rate TN/(TN+FP) and
+  balanced accuracy, the mean of those two rates, which is the abstention
+  target. No hits means abstain; an infrastructure error means evaluation
+  incomplete, not abstention. Low-confidence responses keep their hits, so the
+  flag is a signal agents read, not a loss of evidence; recall and MRR score the
+  hits regardless. Balanced accuracy is a target record (`targets`, like
+  recall@20 and MRR@8, target 0.85, per cohort, with both rates and the
+  confusion counts); it never enters `floors`, `quality_pass`,
+  `--require-floors` exit codes or `eval_floor_failed` gaps, and
+  `non_regression` compares it between releases.
 - Evidence characters: sum Unicode code points actually returned in hit text and
   relation evidence, across both groups. Count repeated bytes again if sent
   twice; omit keys, scores, titles, context prefixes and structural JSON.
@@ -200,18 +196,19 @@ is `out_of_scope` when the release serves no nodes
 override is set. `quality_pass` means both hybrid modes meet all old-product
 floors, and development floors once development cases exist, the filter gate
 when the release serves nodes, every taxonomy classification floor that applies
-to the release passes (a failed or unavailable applicable row fails), and all
-three rejection checks pass; legacy has no gate. `release_eligible` is always
-false in this baseline, including when `quality_pass` is true. Measured failures
-leave the stage done and the run on its way to `evaluated`, with
-`quality_pass:false` and `release_eligible:false`. Per-case `mapping_incomplete`
-is a reported diagnostic, not a run failure. Malformed fixture/map files,
-incomplete case execution or infrastructure failure fail the stage. CLI and
-status must distinguish completed evaluation from passed quality gates.
+to the release passes (a failed or unavailable applicable row fails). The report
+version's other gates also apply. Legacy parity has no gate. `release_eligible`
+is always false in this baseline, including when `quality_pass` is true.
+Measured failures leave the stage done and the run on its way to `evaluated`,
+with `quality_pass:false` and `release_eligible:false`. Per-case
+`mapping_incomplete` is a reported diagnostic, not a run failure. Malformed
+fixture/map files, incomplete case execution or infrastructure failure fail the
+stage. CLI and status must distinguish completed evaluation from passed quality
+gates.
 
-Version 4 also requires the
-[reviewed warning gate](evaluation-warning-cases.md#report-and-release-gate) to
-pass for `quality_pass:true`.
+Report versions 4 and 5 require the
+[reviewed warning gate](evaluation-warning-cases.md#report-and-release-gate).
+Versions 2 through 4 require the historical rejection checks.
 
 ## Cache and report format
 
@@ -245,10 +242,11 @@ eligible for caching. No questions in logs or report copies. Cache key includes
 dump, fixtures, map, query vectors, all recipes, date, tie rules and software
 versions; mismatches invalidate reuse.
 
-`report.json` fields: `version:4`, `status`, `quality_pass`, `release_eligible`,
-`country`, `rel`, `build_artifact_sha256`, `dump_sha256`, `fixture_hashes`,
-`identity_map_sha256`, `recipes`, `evaluation_date`, `request_as_of`,
-`database_instance_kind`, `software`, `calibration`,
+`report.json` fields: `version:5` with retrieval recipe 4 and scorer
+`agent-eval/6`, `status`, `quality_pass`, `release_eligible`, `country`, `rel`,
+`build_artifact_sha256`, `dump_sha256`, `fixture_hashes`, `identity_map_sha256`,
+`recipes`, `evaluation_date`, `request_as_of`, `database_instance_kind`,
+`software`, `calibration`,
 `cohorts:{legacy,old_product,development,development_period}`, `floors`,
 `rejections`, `coverage`, `ann_loss`, `timings_ms`, `evidence_characters`,
 `cache_manifest`, `previous_diff` (with `previous:{country,rel,report_sha256}`

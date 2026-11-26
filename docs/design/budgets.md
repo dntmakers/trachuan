@@ -231,6 +231,8 @@ physical table and indexes separately against the host disk budget.
 | Warnings per hit or read unit                                                             | 10, omissions counted                                                                                      |
 | Document-reference parser                                                                 | At most 8 references, 128 runes per reference                                                              |
 | Serving database statement deadline                                                       | 2 s; no unbounded exact fallback                                                                           |
+| Diacritic restoration candidates; text                                                    | At most 20 chunks; first 4,096 code points per chunk (16 KiB UTF-8 per chunk, 320 KiB total text)          |
+| Diacritic restoration options; phase deadline                                             | At most 8 forms per token including the typed form; 2 s serving or 60 s evaluation, capped by the caller   |
 | Evaluation exact arm cache depth                                                          | Dense 200; lexical 100                                                                                     |
 | Provisional calibration threshold sentinels                                               | -1 (all finite cosines pass); 2 (all abstain)                                                              |
 
