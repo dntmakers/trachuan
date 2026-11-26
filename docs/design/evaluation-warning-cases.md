@@ -183,26 +183,27 @@ its build/dump bindings and the verified previous report
 [corpus_upload.py](../../deploy/github/corpus_upload.py#L98-L105),
 [corpus_previous.py](../../deploy/github/corpus_previous.py#L15-L42)).
 
-1. After rollout, upload and first signing of a new release require version 4
-   and `fixture_hashes.Warnings` equal to the SHA-256 of the fixture at the
-   trusted release-authorizing `main` commit. Upload uses local `main`, updated
-   before upload; signing uses the workflow's `main` commit. Do not accept an
-   older fixture from history. A run evaluated at version 3 needs a new run.
+1. Upload and first signing require the current report version
+   ([selected report](release-evidence.md#selected-report)) and
+   `fixture_hashes.Warnings` equal to the SHA-256 of the fixture at the trusted
+   release-authorizing `main` commit. Upload uses local `main`, updated before
+   upload. Signing uses the workflow's `main` commit. A run evaluated under an
+   earlier report version needs a new run for first signing.
 2. Re-signing keeps the report hash from the verified signed release manifest
    and applies the report version's validation rules
    ([corpus_production.py](../../deploy/github/corpus_production.py#L76-L93),
    [corpus_publish.py](../../deploy/github/corpus_publish.py#L23-L39)). Only on
-   this path, resolve version 4's fixture by its digest in first-parent `main`
+   this path, resolve the warning fixture by its digest in first-parent `main`
    history, using the path-specific reader
    ([corpus_fixture_history.py](../../deploy/github/corpus_fixture_history.py#L42-L74)).
-3. For version 4, decode the closed warning schema separately. Require closed
-   record shapes, exact case membership and order, the prescribed surface matrix
-   and the `not_run` rule. Compare each match with the pinned fixture. A search
-   `carrier` must be a provision handle in the target document; the validator
-   does not check its place in the tree. A read `carrier` must be T's handle.
-   Recompute the candidate gate and refuse a missing or failing gate even if
-   `quality_pass` is true. Keep the existing partition, revisions and gates for
-   versions 3 and 4.
+3. For versions 4 and 5, decode the closed warning schema separately. Require
+   closed record shapes, exact case membership and order, the prescribed surface
+   matrix and the `not_run` rule. Compare each match with the pinned fixture. A
+   search `carrier` must be a provision handle in the target document; the
+   validator does not check its place in the tree. A read `carrier` must be T's
+   handle. Recompute the candidate gate and refuse a missing or failing gate
+   even if `quality_pass` is true. Apply fixture and other gate rules by report
+   version ([evaluation fixtures](evaluation-fixtures.md#revisions)).
 
 Signing trusts the evaluator's observations, as it already trusts the reported
 case ranks and observations behind other metrics

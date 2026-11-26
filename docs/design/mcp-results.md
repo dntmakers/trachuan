@@ -38,7 +38,13 @@ Input adds `detail`: `compact` (default) or `full`. The default `limit` depends
 on `detail`.
 
 Top level: `release`, `abstain`, `reason`, `message`, `documents`, `hits`,
-`non_current`, `gaps`, `outside_filter_count`, `next_cursor`, `nodes`.
+`non_current`, `gaps`, `outside_filter_count`, `next_cursor`, `nodes`,
+`restored_query`. When retrieval changes the query, `restored_query` holds the
+exact effective text searched. This optional string appears in compact and full
+results, including abstentions with a changed query, and in both MCP result
+copies and `POST /api/v1/search`. The OpenAPI schema exposes the same optional
+string. When search uses the original bytes, the field is omitted.
+
 `documents` is an object keyed by document key and holds every document that a
 hit in `hits` or `non_current` names, once; `nodes` is an object keyed by node
 code with `name` and `level` for every code a hit or document entry names.
@@ -179,6 +185,15 @@ today first and returns few others in `non_current`
 ([retrieval validity](retrieval-validity.md#validity-and-evidence)), and that
 `abstain:true` is advisory, keeps its hits and judges only `hits`, not
 `non_current`.
+
+`guide` tells callers that releases with restoration accept Vietnamese without
+diacritics. The English guidance is
+`Check restored_query if present. If the restoration is incorrect, start a new search with diacritics. If the release returns diacritics_required, retry with diacritics or a document number.`
+
+With recipe 4, update the opening `Use Vietnamese with diacritics` in
+[guide.go](../../apps/server/internal/mcpapi/guide.go#L10) and the corresponding
+`TestGuide_ContentRules` assertion in
+[server_test.go](../../apps/server/internal/mcpapi/server_test.go#L358).
 
 ## Evaluation
 

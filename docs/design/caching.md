@@ -11,10 +11,10 @@ the rules.
 
 - Memory only, inside the `server` process. Nothing is written to disk, a
   database, logs, metrics labels or backups, and a restart empties every cache.
-- Keys are SHA-256 digests of a canonical byte string, never the text itself. A
-  cache never holds query text; values hold only vectors, responses the server
-  would return anyway, or [search candidates](#search-candidates) (chunk ids,
-  ranks, scores and fallback flags).
+- Keys are SHA-256 digests of a canonical byte string, never the text itself.
+  Values hold only vectors, responses the server would return anyway, or
+  [search candidates](#search-candidates) (chunk IDs, ranks, scores and fallback
+  flags). Keep original and restored queries out of cache values.
 - Every key that depends on corpus content includes the release, so activating a
   release makes older entries unreachable; the server also drops them at once
   when the active database changes. Query vectors depend only on the query
@@ -61,10 +61,17 @@ through the same query. Maximum age 24 hours.
 
 The server caches the serialized `search` result (the `structuredContent` JSON)
 under `sha256(release, civil date in Vietnam, canonical request JSON)`, where
-the canonical request is the validated tool input with defaults filled in and
-keys sorted. The civil date is part of the key because default validity
-filtering depends on the current date. A hit skips embedding, both retrieval
-arms and presentation. Maximum age 1 hour.
+the canonical request retains the caller's exact query, fills in defaults, and
+sorts keys. The civil date is part of the key because default validity filtering
+depends on the current date. A hit skips embedding, both retrieval arms and
+presentation. Maximum age 1 hour.
+
+Requests on the [restoration route](unaccented-queries.md) bypass response cache
+reads and writes, even if the route finds no replacement. Decide cache
+eligibility from the original query and the resolved release's recipe before
+looking up a response. Check that any response with `restored_query` skips
+storage. The vector and candidate caches can still use digests of the effective
+query under their usual rules.
 
 ## Read items
 
@@ -94,9 +101,10 @@ The candidate phase of a search collection is cached: for the current and the
 non-current group, the ordered raw ANN, dense and lexical candidate lists (chunk
 id, rank, cosine or score) and whether the exact fallback ran. Hydration,
 validity, presentation and paging always run as on a miss, so a hit returns
-exactly the bytes a miss returns. The search response cache still answers
-identical repeats first; this cache serves the same question with a different
-filter, detail level, limit or cursor page, none of which change collection.
+exactly the bytes a miss returns. The response cache answers eligible identical
+requests first. The candidate cache also serves restoration repeats and the same
+question with a different filter, detail level, limit or cursor page. None of
+those changes affect collection.
 
 The key is the SHA-256 of the canonical JSON of: the query recipe hash, the
 retrieval recipe hash, the lexical recipe hash, the exact query text the
@@ -106,8 +114,11 @@ or none, the dense mode (`ann` or `exact`) and both depths. The candidate phase
 reads the date and whether `as_of` is given; the date already equals `as_of`
 when it is given, and the key carries `as_of` itself so that no change in that
 derivation can serve a wrong entry. The release is bound by the release-scoped
-handle, as for the other corpus caches. Validation references, the query vector
-and the sparse query are functions of the text and recipes, so they are covered.
+handle, as for the other corpus caches. `Prepare` resolves the effective query
+before this lookup. On the restoration route the sparse vector uses that same
+text and the validated references are empty. When a document number is routed,
+the exact text still carries the references. Candidate entries hold no
+restoration data and a hit still runs the restoration prepass when needed.
 Filters, nodes, documents, `in_force_only`, detail, limit, arm mode and cursor
 position are not in the key: collection does not read them (`in_force_only` only
 selects which collected group is shaped). Only serving collections are cached;

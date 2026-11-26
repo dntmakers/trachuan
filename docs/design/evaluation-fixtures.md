@@ -10,12 +10,13 @@ questions, expectations, alternate numbers, notes and flags. The fixture is
 public authored evaluation data, not captured user questions. Copy no matcher
 implementation. `fixtures.json` records its source path, source commit if
 available, byte hash, authoring origin and case count. `old-product.json`
-references the legacy fixture hash and the three rejection IDs, rather than
-duplicating questions or rewriting expectations. `development.json` holds the
-development cases in the legacy case format plus a required `tags` list;
-`fixtures.json` records its hash, authoring origin and case count, an empty
-array is valid, and case IDs are unique across legacy and development. Its
-identity entries live in `identity-map.json` beside the old product entries.
+references the legacy fixture hash and the three IDs excluded from product
+scoring, rather than duplicating questions or rewriting expectations.
+`development.json` holds the development cases in the legacy case format plus a
+required `tags` list; `fixtures.json` records its hash, authoring origin and
+case count, an empty array is valid, and case IDs are unique across legacy and
+development. Its identity entries live in `identity-map.json` beside the old
+product entries.
 
 Legacy case format is the existing JSON array:
 `{id,question, expected_citations:[{doc_number,article?,clause?,point?,relation_ok?, alt_doc_numbers?}],expect_abstain?,expect_fail?,notes?}`.
@@ -144,20 +145,20 @@ rename is a removal: a revision that removes a case is refused.
   holds exactly the legacy fixture's cases less the old product fixture's
   `rejection_ids`, both taken from the same history by the report's `Legacy` and
   `OldProduct` hashes. In each of these cohorts every case has a `hybrid` row in
-  both modes at limits 8 and 20, with `expected` equal to its citation count,
-  and `rejections` names exactly the rejection IDs. Each rejection record holds
-  only `case_id`, `reason` and `passed`, with `passed` true and `reason`
-  `diacritics_required`, the only refusal the evaluator counts as passed. Each
-  `old_product` and `development` floor is the evaluator's
-  `current_law_precision` record at limit 8, `hybrid`, for `exact` and `ann`,
-  equal to the cohort metric, its value equal to its numerator over its
-  denominator and at least the validators' own floor of 0.99, with status `pass`
-  (for empty `development`, status `not_run`, zero counts, null value, and no
-  matching cohort metric); the top-level `floors` equal the `old_product`
-  floors, and `rejection_count` is 3 in `old_product` and 0 elsewhere. Precision
-  itself is taken as stated, since recomputing it needs the validity of every
-  returned document, which the report does not carry. The previous report's
-  `old_product` cohort, `rejections` and floors are checked the same way. An old
+  both modes at limits 8 and 20, with `expected` equal to its citation count. In
+  versions 3 and 4, `rejections` names exactly the rejection IDs. Each record
+  holds only `case_id`, `reason` and `passed`, with `passed` true and `reason`
+  `diacritics_required`. For version 5 apply the rule below. Each `old_product`
+  and `development` floor is the evaluator's `current_law_precision` record at
+  limit 8, `hybrid`, for `exact` and `ann`, equal to the cohort metric, its
+  value equal to its numerator over its denominator and at least the validators'
+  own floor of 0.99, with status `pass` (for empty `development`, status
+  `not_run`, zero counts, null value, and no matching cohort metric); the
+  top-level `floors` equal the `old_product` floors. Through version 4,
+  `rejection_count` is 3 in `old_product` and 0 elsewhere. Precision itself is
+  taken as stated, since recomputing it needs the validity of every returned
+  document, which the report does not carry. Check the previous report's
+  `old_product` cohort, `rejections` and floors by its own version. An old
   product fixture whose `legacy_sha256` is not the legacy fixture's hash is
   refused. The `legacy` cohort is not checked, since no gate reads it.
 - Version 2 candidates also need three distinct rejection IDs with the same
@@ -169,3 +170,34 @@ that revises it, and a case moved into `development_period` leaves the gate for
 good, which takes an ADR 0010 History line naming it. The tolerance already used
 is carried as a difference measured over the previous membership. The guard is
 the Git review of the fixture change, and `revised` lists every such case.
+
+## Retiring the rejection checks
+
+Old product has 84 positive cases with 93 citations and 5 negatives. The
+historical `rejection_ids` in `old-product.json` name
+`edge-no-diacritics-infosec`, `edge-no-diacritics-payment` and
+`edge-no-diacritics-mangluoi`. Keep the fixture bytes and hash. The IDs stay in
+legacy parity and outside all product metrics and calibration. Report version 5
+stops running them as rejection checks. Fixed-input
+[contract tests](unaccented-queries.md#contract-tests) cover the route. An
+optional `corpus eval` diagnostic note can count which of the three were tried,
+changed, returned hits or abstained. The signed report and release checks do not
+read it.
+
+Version 5 requires retrieval recipe 4. Its `rejections` array is empty,
+`rejection_count` is zero in every cohort, and old product's `case_count` counts
+only its 89 scored cases. The
+[release validators](release-evidence.md#upload-and-signing) recompute this
+membership and check `rejections` and every `rejection_count`. An older signed
+report keeps its own shape and rejection checks.
+
+For non-regression across the cutover, the evaluator and both validators first
+validate each report under its own version. Then compare old product by scored
+membership. In this comparison only, subtract the verified older
+`rejection_count` from its `case_count` and ignore its verified rejection rows.
+Require the same fixture hashes, scored case IDs and fixed denominators for
+recall and MRR. Check current-law precision against the floor using each
+report's own returned primary hit count. Existing development revision rules
+apply. Recall@20 and MRR@8 keep the strict recipe-change comparison. The MRR@8
+watermark starts at the previous score under the
+[tolerance rule](evaluation-mrr-tolerance.md#rule).

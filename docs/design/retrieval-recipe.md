@@ -3,9 +3,9 @@
 Proposed root package `internal/retrieval`, imported by `apps/corpus` and the
 future `apps/server`. It returns provisions from one pinned corpus database. No
 API transport, authentication, taxonomy, implicit document scoping, abbreviation
-expansion, accent restoration or model selection lives here.
-[Retrieval](retrieval.md) owns the product interface; this note owns the
-unfiltered engine. [Budgets](budgets.md#retrieval) owns numeric parameters.
+expansion or model selection lives here. [Retrieval](retrieval.md) owns the
+product interface. This note owns the unfiltered engine.
+[Budgets](budgets.md#retrieval) owns numeric parameters.
 
 ## Go boundary
 
@@ -57,52 +57,64 @@ Types and required fields:
 | `Validity`    | `StatusClass string`, `StatusBasis string` (the document's `status_basis`), `Current bool`, `AsOf *Date`, `EffectiveFrom,EffectiveTo *Date`, `Basis string` (`source_status` or `document_dates`)                                                                                                                                                                                                                                              |
 | `Relation`    | Source/target keys and numbers, nullable anchors, kind, raw label, evidence, evidence SHA-256, completeness flag, method, resolved flags                                                                                                                                                                                                                                                                                                       |
 | `Gap`         | `Kind,DocumentKey,Anchor,Message string`                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `Response`    | `Release string`, `Hits,NonCurrent []Hit`, `Abstain bool`, `Reason,Message string`, `Gaps []Gap`, `Diagnostics Diagnostics`                                                                                                                                                                                                                                                                                                                    |
+| `Response`    | `Release string`, `Hits,NonCurrent []Hit`, `Abstain bool`, `Reason,Message,RestoredQuery string`, `Gaps []Gap`, `Diagnostics Diagnostics`                                                                                                                                                                                                                                                                                                      |
 | `Diagnostics` | Arm counts, eligible count, raw ANN count, fallback flag, per-operation milliseconds, query recipe hash; no query text                                                                                                                                                                                                                                                                                                                         |
-| `Arms`        | Release/recipe hashes, route, depths, validation outcome, ordered dense/lexical `[]Candidate`, hydrated grouping/evidence metadata, exact member cosines, validity groups, diagnostics                                                                                                                                                                                                                                                         |
+| `Arms`        | Release/recipe hashes, route, depths, validation outcome, optional restored query text, ordered dense/lexical `[]Candidate`, hydrated grouping/evidence metadata, exact member cosines, validity groups, diagnostics                                                                                                                                                                                                                           |
 | `Candidate`   | Chunk id/ordinal, owning identity, group identity, rank, cosine, BM25 score, fragments and grouping metadata                                                                                                                                                                                                                                                                                                                                   |
 
 `Recipe` is the versioned JSON below; `Release` mirrors the schema's release
 metadata. `Embedder` uses the protocol types of root package
 `internal/embedding`: `Recipe(ctx) (embedding.Recipe, error)` and
 `Embed(ctx, text) (embedding.Vector, error)`; `DenseRuntime` and `Vector` above
-name those types. `Prepare` validates and embeds once and returns
-`Prepared{Request, Validation, Vector}`; `PrepareLegacy` skips only the
-diacritics gate for trusted evaluation. Callers may reuse one `Prepared` across
-limits, modes and arm controls and may export its vector. `Collect` runs arm SQL
-and bounded hydration for a `Prepared`, never embedding again. `Rank` fuses,
-groups and caps without a threshold and returns the ordered groups with
-`FirstBestCosine`; build calibration uses it on a draft engine. `Shape` is
-`Rank` plus abstention and evidence over a sufficient cache. If the requested
-shaping needs uncached members or deeper pools, fail with `cache_insufficient`,
-never silently approximate. Dense-only and lexical-only diagnostics still embed
-once to compute the same abstention statistic. Cache collection hydrates the
-whole requested arm union as [eval](evaluation.md#cache-and-report-format)
-specifies; the smaller fusion hydration window applies only during `Shape`.
-`Search` collects recipe depths then shapes with `Request.Arms`; `Collect`
-always caches both arms so controls reuse the same candidates. Single-arm
-shaping removes the other arm before fusion and hydration, not after ranking.
+name those types. `Prepare` validates and embeds once and returns `Prepared`
+with the original request, validation, effective query text and vector. Recipe 4
+may restore diacritics before embedding under
+[search without diacritics](unaccented-queries.md). `PrepareLegacy` uses the
+typed bytes for trusted evaluation under the
+[legacy contract](evaluation.md#scoring-contracts). Callers may reuse one
+`Prepared` across limits, modes and arm controls and may export its vector.
+`Collect` runs arm SQL and bounded hydration for a `Prepared`, never embedding
+again. `Rank` fuses, groups and caps without a threshold and returns the ordered
+groups with `FirstBestCosine`; build calibration uses it on a draft engine.
+`Shape` is `Rank` plus abstention and evidence over a sufficient cache. If the
+requested shaping needs uncached members or deeper pools, fail with
+`cache_insufficient`, never silently approximate. Dense-only and lexical-only
+diagnostics still embed once to compute the same abstention statistic. Cache
+collection hydrates the whole requested arm union as
+[eval](evaluation.md#cache-and-report-format) specifies; the smaller fusion
+hydration window applies only during `Shape`. `Search` collects recipe depths
+then shapes with `Request.Arms`; `Collect` always caches both arms so controls
+reuse the same candidates. Single-arm shaping removes the other arm before
+fusion and hydration, not after ranking.
 
 ## Validation and routing
 
 Validate UTF-8, nonempty trimmed input, Unicode rune count, NUL absence and
 request options before database work. Limit zero selects the recipe default;
-negative or above-maximum limits fail. Preserve accepted query bytes for the
-dense model; validation and pattern recognition use a separate NFC view. The
-service counts actual model tokens before inference. Unknown mode, invalid date
-or limit outside budgets returns typed `invalid_request`; token overflow returns
-`query_too_long`. Do not truncate queries.
+negative or above-maximum limits fail. Use a separate NFC view for validation
+and reference recognition. The dense model receives the original bytes except on
+a changed restoration. The service counts actual model tokens before inference.
+Unknown mode, invalid date or limit outside budgets returns typed
+`invalid_request`; token overflow returns `query_too_long`. Do not truncate
+queries.
 
 A Vietnamese mark is `đ`/`Đ`, or a Latin vowel in NFC whose NFD decomposition
 contains Vietnamese breve, circumflex, horn, acute, grave, hook, tilde or dot
-below. This is a deterministic input gate, not a language detector. Queries with
-no such mark and no valid document reference return an empty response,
-`abstain:true`, reason `diacritics_required`, message
-`Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.` Check first for
-no Latin letters and no valid reference: that returns the same empty abstaining
-shape with reason `unsupported_query`. Foreign text that passes the mark gate is
-left to the evidence threshold; do not claim reliable semantic language
-recognition from a character test.
+below. Parse document references and detect marks in the original query. Any
+valid reference selects the existing number route. A marked query uses its
+original bytes. Recipe 4 sends the remaining queries with at least one Latin
+letter to [restoration](unaccented-queries.md). With neither a reference nor a
+Latin letter, return an empty `abstain:true` response with `unsupported_query`
+and `Vui lòng nhập câu hỏi tiếng Việt hoặc số hiệu văn bản.` The English web
+message is `Enter a Vietnamese question or a document number.` This character
+check cannot establish the language or subject. Accepted text passes through
+normal evidence abstention.
+
+Recipes 2 and 3 still reject the restoration route as `diacritics_required` and
+keep the original message for both rejection reasons,
+`Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản.` The MCP and
+`/api/v1` adapters may check input syntax before resolving a release. The
+resolved recipe decides the route and the public abstention reason.
 
 Recognize a bounded document token at start/end or boundaries that are not
 Unicode letters/digits. Grammar: 1 to 4 ASCII digits, `/`, optional four-digit

@@ -23,8 +23,8 @@ which returns `FirstBestCosine` without a threshold; it never calls `Search`.
 Hash only the pre-calibration retrieval policy in `calibration.json`, never the
 finalized recipe that will contain that file's hash. Use finite float64 cosine
 values clamped to [-1,1]; if a rounded midpoint equals the lower score, use the
-upper score, since equality passes. Exclude the three rejection checks from
-fitting.
+upper score, since equality passes. Use the gated old product membership in
+[evaluation](evaluation-fixtures.md#retiring-the-rejection-checks).
 
 Record threshold, exact float values, fixture/mapping/recipe hashes, date and
 all candidate TP/FP/TN/FN counts in `calibration.json`. Hash that file into

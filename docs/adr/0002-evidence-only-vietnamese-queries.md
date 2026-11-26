@@ -11,8 +11,10 @@ of Vietnamese legal terms is unreliable.
 ## Decision
 
 Our servers run only the query embedder. The user's own agent reasons over
-verbatim evidence. Queries must be Vietnamese with diacritics or a document
-number; legal text is never translated. Questions are never stored.
+verbatim evidence. Search accepts Vietnamese with or without diacritics and
+recognizes document numbers. Retrieval may restore diacritics from the release's
+own text under the [retrieval recipe](../design/retrieval-recipe.md). Legal text
+is never translated. Questions are never stored.
 
 ## Consequences
 
@@ -35,3 +37,7 @@ features.
   closed values, dates, document numbers checked against the corpus), never free
   text or URLs; only a capped covert channel through the choice of values
   remains ([error reports](../design/error-reports.md)).
+- 2026-11-25 The owner approved queries typed without diacritics. Retrieval
+  recipe 4 restores them from release text before embedding. The study and
+  trade-offs are in
+  [search without diacritics](../design/unaccented-queries.md).

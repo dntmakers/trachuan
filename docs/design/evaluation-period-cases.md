@@ -76,8 +76,8 @@ own cohort, `development_period`, with its own case records.
 - **Later gating:** after two releases with a period cohort, ADR 0010's History
   records whether and how it is gated, from how validity fixes moved it.
 
-The `development` cohort keeps every other rule: current-law precision and the
-rejection checks are hard gates, recall@20 does not fall, and MRR@8 follows the
+The `development` cohort keeps its other gates. Current-law precision has a
+floor, recall@20 does not fall, and MRR@8 follows the
 [MRR@8 tolerance](evaluation-mrr-tolerance.md). The research override
 `historical_policy` has no case left to act on in the gated records and is
 removed.

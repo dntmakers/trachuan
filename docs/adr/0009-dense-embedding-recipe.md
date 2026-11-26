@@ -20,14 +20,17 @@ Release 1 uses this dense recipe; the release manifest records every field.
 | Architecture       | XLM-RoBERTa encoder fine-tuned from BGE-M3, 568M parameters                        |
 | Dimensions         | 1,024, `vector(1024)`                                                              |
 | Pooling            | CLS token, then L2 normalization; similarity is cosine                             |
-| Query input        | the question as written, no instruction prefix, at most 256 tokens                 |
+| Query input        | raw text selected by retrieval, no instruction prefix, at most 256 tokens          |
 | Document input     | `strip(context_prefix) + "\n" + strip(content)`, no prefix, at most 2,048 tokens   |
 | Document embedding | batch on the MacBook GPU (PyTorch MPS, FP16); about 20 minutes for 98,506 chunks   |
 | Query serving      | ONNX Runtime CPU, dynamic INT8 per-channel from the repository's `onnx/model.onnx` |
 | Tokenizer          | the model repository's tokenizer at the same revision                              |
 
-Queries longer than 256 tokens are rejected before embedding; the model was
-trained with 256-token queries.
+Retrieval chooses the input under the
+[retrieval recipe](../design/retrieval-recipe.md). The
+[query embedder](../design/embedder.md#http-contract) receives those bytes
+verbatim. It rejects inputs above 256 model tokens before embedding. The model
+was trained with 256-token queries.
 
 ## Consequences
 
@@ -121,3 +124,6 @@ local studies, not that documentation, establish this model's trade-offs.
 - 2026-11-10: aligned Consequences and Alternatives with the accepted INT8
   query/FP16 document pair and A1 measurements; removed obsolete FP32 budget,
   Graviton latency and pending-INT8 language. The decision is unchanged.
+- 2026-11-26 Retrieval recipe 4 may restore query diacritics before embedding.
+  Retrieval chooses the input text. The query embedder uses those bytes verbatim
+  under its existing 256-token limit.

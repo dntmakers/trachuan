@@ -5,12 +5,11 @@ token) and `/mcp` for agents (bearer token). Same functions, rules and limits.
 
 ## Query validation
 
-Accept Vietnamese text with diacritics or a document-number pattern such as
-`50/2024/TT-NHNN`. The exact character gate, bounded number grammar and
-rejection message are in the
-[retrieval recipe](retrieval-recipe.md#validation-and-routing). A character gate
-does not establish the language or subject of a question; evidence-based
-abstention handles unsupported accepted text. Never translate.
+Accept Vietnamese with or without diacritics and recognize document numbers such
+as `50/2024/TT-NHNN`. The release's
+[retrieval recipe](retrieval-recipe.md#validation-and-routing) decides
+validation and routing. Evidence-based abstention handles accepted queries
+outside the corpus. Legal text stays in its original language.
 
 ## Ranking
 
@@ -70,16 +69,19 @@ hits; the filtered first page takes as many hits from each group as today's
 first page does and fills any slots left by the same rule, so every inside hit
 of today's first page stays on it; every hit carries `in_filter: true|false`;
 and `outside_filter_count` counts outside hits over both groups. Every page
-carries the first page's `abstain`, `reason` and `message`; filters and paging
-never change them. `next_cursor` continues while either sequence has hits left,
-so every hit the unfiltered search would return stays reachable exactly once.
-The cursor is opaque and holds the release, the first page's `limit`, the number
-of hits taken so far from each sequence, the resolved `as_of` date and a SHA-256
-digest of the request without `cursor` and `limit`, never query text. Both
-issue-date bounds participate in the digest: adding, removing or changing one
-requires a new first page. Later pages use the cursor's date and rebuild the
-sequences from it, and a cursor whose digest or release does not match is
-`invalid_request` or `release_expired`.
+carries the first page's `abstain`, `reason`, `message` and `restored_query`
+when present. Filters and paging never change them. `next_cursor` continues
+while either sequence has hits left, so every hit the unfiltered search would
+return stays reachable exactly once. The cursor is opaque and holds the release,
+the first page's `limit`, the number of hits taken so far from each sequence,
+the pinned retrieval date and a SHA-256 digest of the request without `cursor`
+and `limit`. The question appears only in the digest, which binds its exact
+original bytes. Whether the caller supplied `as_of` comes from the original
+request and participates in the digest separately from the pinned date. An
+edited query starts a fresh search. Both issue-date bounds participate in the
+digest: adding, removing or changing one requires a new first page. Later pages
+use the cursor's date and rebuild the sequences from it, and a cursor whose
+digest or release does not match is `invalid_request` or `release_expired`.
 
 The [taxonomy recall gate](evaluation.md#metrics) stays unchanged. Issue dates
 add no evaluation cohort or release gate. Instead, contract tests for MCP and
@@ -103,7 +105,7 @@ error, never silently different text.
 | `guide`         | `country`                                                                                                                                                              | Usage, Vietnamese rule, citation format, the reading flow in [search results](mcp-results.md#guide), suggested flow `taxonomy` then `search` with `nodes` then `read`, `in_force_only:false` for a past period, `abstain` advisory                                                                                                                                                                                                                                                                |
 | `corpus_status` | `country`                                                                                                                                                              | Release, counts of documents, provisions, served nodes and gaps, newest source date, document types and issuers with counts                                                                                                                                                                                                                                                                                                                                                                       |
 | `taxonomy`      | `country`, `node` code or empty, `depth`, optional `q`                                                                                                                 | Served subtree in sibling order with `code`, `name`, `description`, `level`, `origin`, provision and document counts, to `depth` levels below `node` (roots when empty); `q` instead returns served nodes in `node`'s subtree (all when empty) whose name or description contains it, case and diacritics folded, as a flat list in tree order. Either way at most 500 nodes: the subtree fills breadth first in sibling order, the `q` list in tree order, and `truncated` marks that more exist |
-| `search`        | `country`, `query`, `nodes[]`, `as_of`, `in_force_only`, `doc_types[]`, `issuers[]`, `documents[]`, `issued_from`, `issued_to`, `detail`, `limit`, `cursor`, `release` | `documents` once per document with metadata, status and relation counts (related pointers in full results); ranked hits with handle, citation path, verbatim snippet and `complete`, nodes, warnings, `in_filter`; `detail:"full"` returns recipe text, fragments, score and relations instead of the snippet; plus `outside_filter_count`, `gaps[]`, `abstain`, `release`, `next_cursor` ([search results](mcp-results.md))                                                                      |
+| `search`        | `country`, `query`, `nodes[]`, `as_of`, `in_force_only`, `doc_types[]`, `issuers[]`, `documents[]`, `issued_from`, `issued_to`, `detail`, `limit`, `cursor`, `release` | `documents` once per document with metadata, status and relation counts (related pointers in full results); ranked hits with handle, citation path, verbatim snippet and `complete`, nodes, warnings, `in_filter`; `detail:"full"` returns recipe text, fragments, score and relations instead of the snippet; plus `outside_filter_count`, `gaps[]`, `abstain`, `restored_query`, `release`, `next_cursor` ([search results](mcp-results.md))                                                    |
 | `read`          | `country`, `items[]` of `handle`, number, `from`/`to` range, `relations`, `timeline`, or `next` token; `release`                                                       | Per item: a document's metadata, source files and outline, a provision's verbatim text with ancestor lead-ins and warnings, its relation list, or a document timeline; a per-call cap with fixed parts and opaque `next` tokens ([batch reading](mcp-read.md))                                                                                                                                                                                                                                    |
 | `quality_gaps`  | `country`, `kind`, `node`, `cursor`                                                                                                                                    | Paged gap list                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 

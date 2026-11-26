@@ -13,21 +13,20 @@ independent review corrected it before these decisions.
 The main consumers are AI agents over MCP. An agent reads every hit it receives,
 pays for each hit in context tokens, writes Vietnamese with diacritics, and
 cites what it is given. banhmi's 92 golden cases already guided the model
-choice, and three of them send unaccented queries that ADR 0002 rejects.
+choice, and three of them send unaccented queries.
 
 ## Decision
 
 1. Three cohorts. **Legacy parity**: banhmi's 92 cases with their expectations
    and matcher rules unchanged, applied to each hit and to each complete
    fragment it carries, compared only with banhmi's accepted numbers; no floor
-   applies. **Old product**: the same 92 cases under product scoring; the three
-   unaccented cases become rejection checks that must all return the ADR 0002
-   diacritics message and sit outside the recall, MRR and abstention
-   denominators; the other 89 keep their expectations. **Development**: the new
-   cases below; cases about a past period are reported in their own cohort and
-   not gated ([period cases](../design/evaluation-period-cases.md)). The targets
-   and gates in [testing](../../instructions/testing.md) apply to the old
-   product and development cohorts, each on its own.
+   applies. **Old product** uses product scoring on the other 89 legacy cases.
+   The three unaccented cases sit outside this cohort and every release gate.
+   **Development** includes the new cases below; cases about a past period are
+   reported in their own cohort and not gated
+   ([period cases](../design/evaluation-period-cases.md)). The targets and gates
+   in [testing](../../instructions/testing.md) apply to the old product and
+   development cohorts, each on its own.
 2. Product scoring matches exact document and provision identities, with
    alternates adjudicated from official text; no substring credit. Product
    current-law precision counts every returned primary hit.
@@ -45,10 +44,14 @@ choice, and three of them send unaccented queries that ADR 0002 rejects.
    and development cohorts, the net count of matched expected citations within
    20 hits rises on at least one cohort (same fixtures and scoring modes before
    and after), and recall@20 and MRR@8 fall on neither cohort; otherwise the
-   current recipe stays. Recall@20 counts because 20 compact hits are what an
-   agent receives by default
-   ([ADR 0013](0013-compact-search-and-batch-read.md)). Current-law precision
-   and the rejection checks are hard gates; abstention is a target (balanced
+   current recipe stays. The move from recipe 3 to 4 may ship without a net
+   citation gain when restoration is the only policy change. This requires the
+   same dense, chunk and lexical recipes and the same retrieval policy apart
+   from the version and query gate. The release's own calibration results may
+   differ under the same calibration policy. Existing gates and non-regression
+   rules still apply. Recall@20 counts because 20 compact hits are what an agent
+   receives by default ([ADR 0013](0013-compact-search-and-batch-read.md)).
+   Current-law precision is a hard gate. Abstention is a target (balanced
    accuracy of the low-confidence flag, both rates reported per cohort), because
    the flag keeps the hits and an agent reads it as a signal. Recall and MRR
    have targets that every report states, but a target is not a gate: a release
@@ -88,12 +91,11 @@ cases in all, with low statistical power stated in every report. No result
 proves a recipe better on unseen questions; the guards are that changes target
 named failure classes and must not fall on the old product cohort, which the
 model choice already used. Case authoring stays small enough to repeat as the
-corpus grows. The three unaccented legacy cases count as rejection checks in the
-old product cohort and as written in legacy parity. The index plan takes its
-chunk, lexical and retrieval recipes from the experiments this protocol scores.
-Gates and targets change only with a History line. These metrics measure
-retrieval and response size, not the quality of an agent's final answer or its
-real token spend.
+corpus grows. The three unaccented legacy cases are scored as written in legacy
+parity. The index plan takes its chunk, lexical and retrieval recipes from the
+experiments this protocol scores. Gates and targets change only with a History
+line. These metrics measure retrieval and response size, not the quality of an
+agent's final answer or its real token spend.
 
 Abstention as a target, not a gate, is an accepted trade-off: an agent may
 refuse a flagged response that held the answer, or trust unflagged weak
@@ -259,3 +261,10 @@ accuracy on either cohort.
   of the warning fixture must show its reviewed `provision_effect` warning on
   the target provision through search and read, with no previous comparison;
   `quality_pass` holds the result and the signing validators recompute it.
+- 2026-11-25 The owner removed the three unaccented rejection checks from the
+  release gate when approving search without diacritics. Raw folded queries all
+  abstained in the [study](../research/unaccented-queries-2026-11.md), while the
+  restoration route recovered most of the accented recall. Callers can correct
+  the restored text. Fixed-input contract tests cover the route. The 89 existing
+  old product cases keep their expectations. Item 4 allows the restoration-only
+  recipe change at equal recall and MRR.
