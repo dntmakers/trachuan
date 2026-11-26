@@ -1,3 +1,4 @@
+import json
 import re
 
 from . import deploy_corpus_sql as sql
@@ -6,7 +7,7 @@ from . import deploy_release_target as target
 from . import deploy_smoke_container
 from .deploy_corpus_kind import LAW
 from .deploy_corpus_lock import AdvisoryLock
-from .deploy_corpus_verify import toc
+from .deploy_corpus_verify import decode_report, projection, toc
 from .deploy_host import activator_arguments, activator_client
 from .deploy_io import CommandError, decode, interrupted, JSON_LIMIT
 from .deploy_release_tables import Tables
@@ -271,12 +272,17 @@ class Database:
             command += ['--secret', 'server_corpus_database_url,type=env,target=SERVER_CORPUS_DATABASE_URL']
         return deploy_smoke_container.run(self.host, [*command, image, *args], timeout=150, **options)
 
-    def describe(self, image, database=None, **options):
+    def describe(self, image, database=None, manifest=None, **options):
         args = ['release-check', *self.kind.check]
         if database is not None:
             self.sql.database(database)
             args += ['--database', database]
-        return decode(self.server(image, *args, secret=database is not None, stdout_limit=JSON_LIMIT, **options), 'release check')
+        if manifest is not None and manifest['schema_version'] >= 9:
+            value = manifest['changes_projection']
+            args += ['--projection-version', str(value['version']), '--projection-sha256', value['sha256'],
+                     '--projection-release', manifest['rel'], '--projection-previous', manifest['previous']]
+        data = self.server(image, *args, secret=database is not None, stdout_limit=JSON_LIMIT, **options)
+        return decode_report(data) if self.kind is LAW else decode(data, 'release check')
 
     def smoke(self, row, image):
         self.target(row['database_name'])
@@ -284,5 +290,8 @@ class Database:
         self.check_catalog(row, True)
         self.on_target(row, sql.PREWARM)
         self.verify_target(row)
-        self.describe(image, row['database_name'])
+        report = self.describe(image, row['database_name'], manifest=row['manifest'])
+        counts = projection(row['manifest'], report)
+        if counts is not None:
+            self.host.note('release-changes', json.dumps(counts, sort_keys=True, separators=(',', ':')))
         self.verify_target(row)

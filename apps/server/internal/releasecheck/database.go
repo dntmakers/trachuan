@@ -30,20 +30,38 @@ func databaseConfig(template, name string) (*pgxpool.Config, error) {
 	return cfg, nil
 }
 
-func Check(ctx context.Context, template, name string, client *embedding.Client) error {
+func Check(ctx context.Context, template, name string, client *embedding.Client, expected *ProjectionExpected) (*ProjectionReport, error) {
 	cfg, err := databaseConfig(template, name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	db, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
-		return errors.New("create corpus reader pool failed")
+		return nil, errors.New("create corpus reader pool failed")
 	}
 	defer db.Close()
 	if err = db.Ping(ctx); err != nil {
-		return errors.New("connect to corpus as corpus_reader failed")
+		return nil, errors.New("connect to corpus as corpus_reader failed")
 	}
-	return checkDatabase(ctx, db, name, client)
+	return checkTarget(ctx, db, name, client, expected)
+}
+
+func checkTarget(ctx context.Context, db *pgxpool.Pool, name string, client *embedding.Client, expected *ProjectionExpected) (*ProjectionReport, error) {
+	r, err := retrieval.ReadRelease(ctx, db)
+	if err != nil {
+		return nil, errors.New("load target release failed")
+	}
+	if r.SchemaVersion >= 9 && expected != nil && expected.Release != r.Rel {
+		return nil, errors.New("projection release mismatch")
+	}
+	projection, err := checkProjection(ctx, db, r.SchemaVersion, expected)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkDatabase(ctx, db, name, client); err != nil {
+		return nil, errors.New("target smoke check failed")
+	}
+	return projection, nil
 }
 
 func checkDatabase(ctx context.Context, db *pgxpool.Pool, name string, client *embedding.Client) error {
