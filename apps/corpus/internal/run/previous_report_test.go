@@ -28,7 +28,7 @@ func previousReportFile(t *testing.T, mutate func(map[string]any)) (string, stri
 	if err = json.Unmarshal(raw, &value); err != nil {
 		t.Fatal(err)
 	}
-	report := map[string]any{"version": 2, "status": "complete", "country": "vn", "rel": "20990101_1", "retrieval_recipe": value, "recipes": map[string]string{"retrieval": recipe.Hash()}}
+	report := map[string]any{"version": 2, "scorer": "agent-eval/5", "status": "complete", "country": "vn", "rel": "20990101_1", "retrieval_recipe": value, "recipes": map[string]string{"retrieval": recipe.Hash()}}
 	if mutate != nil {
 		mutate(report)
 	}
@@ -100,7 +100,12 @@ func TestDecide_FreezesReportBytesInStore(t *testing.T) {
 
 func TestDecide_AcceptsVersion2And3And4(t *testing.T) {
 	for _, version := range []int{2, 3, 4} {
-		path, sum := previousReportFile(t, func(r map[string]any) { r["version"] = version })
+		path, sum := previousReportFile(t, func(r map[string]any) {
+			r["version"] = version
+			if version >= 3 {
+				r["scorer"] = "agent-eval/6"
+			}
+		})
 		snapshot := stage.Snapshot{}
 		if _, err := decide(context.Background(), decideInput(t, ReportChoice{Path: path}, false, &snapshot)); err != nil {
 			t.Fatalf("version %d: %v", version, err)
@@ -117,8 +122,8 @@ func TestDecide_RefusesUnusableReport(t *testing.T) {
 		mutate func(map[string]any)
 		want   string
 	}{
-		{"version", func(r map[string]any) { r["version"] = 1 }, "want version 2, 3 or 4"},
-		{"later version", func(r map[string]any) { r["version"] = 5 }, "want version 2, 3 or 4"},
+		{"version", func(r map[string]any) { r["version"] = 1 }, "pairing"},
+		{"later version", func(r map[string]any) { r["version"] = 6 }, "pairing"},
 		{"status", func(r map[string]any) { r["status"] = "incomplete" }, "not complete"},
 		{"recipe", func(r map[string]any) { delete(r, "retrieval_recipe") }, "retrieval recipe"},
 		{"country", func(r map[string]any) { r["country"] = "us" }, "country"},

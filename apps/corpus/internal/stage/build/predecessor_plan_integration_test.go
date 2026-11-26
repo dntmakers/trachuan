@@ -209,7 +209,7 @@ func TestBuildPlan_RejectsChangedReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	report := fmt.Sprintf(`{"version":2,"status":"complete","country":"vn","rel":"20261118_1","retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, raw, recipe.Hash())
+	report := fmt.Sprintf(`{"version":2,"scorer":"agent-eval/5","status":"complete","country":"vn","rel":"20261118_1","retrieval_recipe":%s,"recipes":{"retrieval":%q}}`, raw, recipe.Hash())
 	art, err := f.artifacts.PublishContent(ctx, "previous-report", strings.Repeat("a", 64), func(dir string) error { return os.WriteFile(filepath.Join(dir, "report.json"), []byte(report), 0600) })
 	if err != nil {
 		t.Fatal(err)

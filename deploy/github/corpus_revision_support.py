@@ -6,7 +6,7 @@ from corpus_test_support import digest, fixture_repository, git, recipe_fixture
 
 PREVIOUS_REL, CANDIDATE_REL = '20990101_1', '20990102_1'
 MODES = ('exact', 'ann')
-SCORERS = {2: 'agent-eval/5', 3: 'agent-eval/6', 4: 'agent-eval/6'}
+SCORERS = {2: 'agent-eval/5', 3: 'agent-eval/6', 4: 'agent-eval/6', 5: 'agent-eval/6'}
 LEGACY_PATH = 'apps/corpus/internal/evaluation/testdata/vn/legacy.json'
 OLD_PRODUCT_PATH = 'apps/corpus/internal/evaluation/testdata/vn/old-product.json'
 
@@ -88,13 +88,16 @@ def period_records(report):
 
 def build_report(version, rel, fixture, ranks, cohorts=None, old_ranks=None):
     row, hashes = recipe_fixture()
+    if version == 5:
+        policy = row['retrieval_recipe'] | dict(version=4, query_gate='vn-restore/1')
+        row, hashes = recipe_fixture(policy)
     report = dict(version=version, scorer=SCORERS[version], country='vn', rel=rel,
                   retrieval_recipe=row['retrieval_recipe'], recipes=hashes, status='complete', quality_pass=True,
                   release_eligible=False,
                   previous_diff={'previous': dict(country='vn', rel=PREVIOUS_REL, report_sha256='a' * 64)},
                   fixture_hashes=dict(Legacy=digest(LEGACY_FIXTURE), OldProduct=digest(OLD_PRODUCT_FIXTURE),
                                       Development=digest(fixture)),
-                  rejections=[dict(case_id=f'r{i}', reason='diacritics_required', passed=True) for i in range(3)],
+                  rejections=[] if version == 5 else [dict(case_id=f'r{i}', reason='diacritics_required', passed=True) for i in range(3)],
                   not_run={}, cases=[])
     for case_id, case_ranks in (OLD_RANKS | (old_ranks or {})).items():
         report['cases'] += case_rows(case_id, 'old_product', *case_ranks)
@@ -105,7 +108,7 @@ def build_report(version, rel, fixture, ranks, cohorts=None, old_ranks=None):
     report['cohorts'] = {'legacy': dict(case_count=0, rejection_count=0, metrics=[])}
     for name in names[1:]:
         rows = [row for row in report['cases'] if row['cohort'] == name and row['mode'] == 'exact' and row['limit'] == 8]
-        rejections = 3 if name == 'old_product' else 0
+        rejections = 3 if name == 'old_product' and version < 5 else 0
         report['cohorts'][name] = dict(case_count=len(rows) + rejections, rejection_count=rejections,
                                        positive_count=sum(row['expected'] > 0 for row in rows),
                                        negative_count=sum(row['expected'] == 0 for row in rows),
@@ -208,6 +211,35 @@ def refuses(report, previous, row, history):
     except ValueError:
         return True
     return False
+
+
+def validate_go_report_five(directory):
+    from corpus_fixture_history import FixtureHistory
+    from corpus_manifest import decode, validate_report
+    from corpus_previous import bind_previous_recipe
+    directory = Path(directory)
+    fixture, legacy, old_product = ((directory / name).read_bytes()
+                                    for name in ('fixture.json', 'legacy.json', 'old-product.json'))
+    history = FixtureHistory(add_old_product(fixture_repository(directory / 'repository', [fixture]), legacy, old_product))
+    row = decode((directory / 'release.json').read_bytes())
+    current = decode((directory / 'current' / 'report.json').read_bytes())
+    previous = decode((directory / 'previous' / 'report.json').read_bytes())
+    if current['version'] != 5 or previous['version'] not in (4, 5):
+        raise AssertionError('expected a version 4 or 5 predecessor and a version 5 candidate')
+    signed = {'recipes': {'retrieval': copy.deepcopy(previous['retrieval_recipe'])}}
+    previous = bind_previous_recipe(previous, signed)
+    validate_report(current, 'vn', current['rel'], previous_report=previous, release_row=row, history=history)
+    invalid_paths = sorted(directory.glob('invalid-*/report.json'))
+    if not invalid_paths:
+        raise AssertionError('missing invalid previous reports')
+    for path in invalid_paths:
+        invalid = decode(path.read_bytes())
+        try:
+            invalid = bind_previous_recipe(invalid, signed)
+        except ValueError:
+            continue
+        if not refuses(current, invalid, row, history):
+            raise AssertionError(f'Python accepted invalid previous report {path.parent.name}')
 
 
 def validate_go_reports(directory):

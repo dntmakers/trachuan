@@ -83,6 +83,10 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 	if recipe.Version != 2 {
 		r.RetrievalRecipeVersion = recipe.Version
 	}
+	if recipe.Version == 4 {
+		r.Version = 5
+		r.Rejections = []Rejection{}
+	}
 	r.CapOverride = o.CapOverride
 	r.ArticleCapOverride = o.ArticleCapOverride
 	r.ValidityOverrides = o.ValidityOverrides
@@ -137,7 +141,7 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 		if input.legacy && (!legacy.Validation.Accepted || legacy.Vector == nil) {
 			return Report{}, Cache{}, fmt.Errorf("legacy case %s rejected", c.ID)
 		}
-		if input.legacy && rejects[c.ID] {
+		if input.legacy && rejects[c.ID] && r.Version < 5 {
 			v := product.Validation
 			r.Rejections = append(r.Rejections, Rejection{c.ID, v.Reason, !v.Accepted && product.Vector == nil && v.Reason == "diacritics_required" && v.Message == "Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản."})
 		} else if !product.Validation.Accepted || product.Vector == nil {
@@ -145,6 +149,9 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 		}
 		for _, cohort := range input.cohorts {
 			stats := r.Cohorts[cohort]
+			if cohort == "old_product" && rejects[c.ID] && r.Version >= 5 {
+				continue
+			}
 			stats.CaseCount++
 			if cohort == "old_product" && rejects[c.ID] {
 				stats.RejectionCount++
@@ -378,21 +385,4 @@ func run(ctx context.Context, engine Engine, suite Suite, o Options, limit int) 
 	}
 	r.CacheManifest = map[string]any{"arm_rows": len(cache.Arms), "query_rows": len(cache.Vectors), "query_index_entries": len(cache.Index), "cache_key": cacheKey(cache, o, suite.EvalHashes())}
 	return r, cache, nil
-}
-func annMeasure(id, cohort string, exact, raw, effective []retrieval.Candidate, fallback bool, depth int) ANNMeasure {
-	exact = exact[:min(len(exact), depth)]
-	return ANNMeasure{id, cohort, len(exact), overlap(exact, raw), overlap(exact, effective), fallback}
-}
-func overlap(exact, other []retrieval.Candidate) int {
-	ids := map[int64]bool{}
-	for _, c := range exact {
-		ids[c.ChunkID] = true
-	}
-	n := 0
-	for _, c := range other {
-		if ids[c.ChunkID] {
-			n++
-		}
-	}
-	return n
 }

@@ -55,10 +55,10 @@ class WarningFixtureTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate(bad, [CASE], 'vn')
 
-    def test_new_release_pins_fixture_at_main_and_requires_version_four(self):
+    def test_new_release_pins_fixture_at_main_and_requires_version_five(self):
         current = json.dumps([CASE]).encode()
         old_hash = hashlib.sha256(b'[]').hexdigest()
-        report = dict(version=4, fixture_hashes={'Warnings': old_hash}, warning_cases=[],
+        report = dict(version=5, fixture_hashes={'Warnings': old_hash}, warning_cases=[],
                       not_run={'warning_cases': 'not_run'})
         validate = getattr(corpus_warning, 'validate_authorized', lambda *args, **kwargs: None)
         with patch('corpus_warning.git', create=True, return_value=current):

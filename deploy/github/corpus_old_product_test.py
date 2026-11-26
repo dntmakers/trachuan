@@ -253,6 +253,7 @@ class FixtureDecodeTest(unittest.TestCase):
         cases = legacy_cases(legacy)
         rejected = rejection_ids((REPOSITORY / OLD_PRODUCT).read_bytes(), digest(legacy), cases)
         self.assertEqual(len(set(rejected) & {case['id'] for case in cases}), 3)
+        self.assertEqual(len(cases) - len(rejected), 89)
 
 
 if __name__ == '__main__':

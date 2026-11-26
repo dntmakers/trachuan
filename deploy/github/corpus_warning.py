@@ -127,8 +127,8 @@ def validate_authorized(report, country, *, commit=None, verified_report_hash=No
     version = report.get('version')
     if verified_report_hash is not None and type(version) is int and version in (1, 2, 3):
         return
-    if type(version) is not int or version != 4:
-        raise ValueError('new release requires report version 4')
+    if type(version) is not int or version not in (4, 5) or (commit is not None and version != 5):
+        raise ValueError('new release requires report version 5')
     hashes = report.get('fixture_hashes')
     digest = hashes.get('Warnings') if isinstance(hashes, dict) else None
     if not isinstance(digest, str) or not re.fullmatch('[0-9a-f]{64}', digest):

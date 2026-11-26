@@ -113,6 +113,12 @@ func cohortCases(r *Report, cohort string) (map[mrrCaseKey]CaseResult, bool) {
 
 func sameMRRCohort(a, b *Report, cohort string) bool {
 	ac, bc := a.Cohorts[cohort], b.Cohorts[cohort]
+	crossCutover := (a.Version == 5 && b.Version < 5) || (b.Version == 5 && a.Version < 5)
+	if crossCutover && cohort == "old_product" {
+		ac.CaseCount -= ac.RejectionCount
+		bc.CaseCount -= bc.RejectionCount
+		ac.RejectionCount, bc.RejectionCount = 0, 0
+	}
 	if ac.CaseCount != bc.CaseCount || ac.PositiveCount != bc.PositiveCount || ac.NegativeCount != bc.NegativeCount || ac.RejectionCount != bc.RejectionCount || ac.ExpectedCitations != bc.ExpectedCitations {
 		return false
 	}
@@ -139,6 +145,9 @@ func sameMRRCohort(a, b *Report, cohort string) bool {
 	denoms := func(metrics []Metric) map[metricIdentity]int {
 		out := map[metricIdentity]int{}
 		for _, m := range metrics {
+			if crossCutover && m.Name != "recall" && m.Name != "mrr" {
+				continue
+			}
 			out[metricIdentity{m.Mode, m.Arms, m.Limit, m.Name}] = m.Denominator
 		}
 		return out
@@ -152,6 +161,9 @@ func sameMRRCohort(a, b *Report, cohort string) bool {
 			out[v.CaseID] = true
 		}
 		return out
+	}
+	if crossCutover {
+		return true
 	}
 	return reflect.DeepEqual(rejections(a), rejections(b))
 }

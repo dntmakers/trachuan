@@ -519,7 +519,7 @@ func TestQuality_TargetsGatesAndRegression(t *testing.T) {
 	}
 }
 
-func TestRun_PreviousReportAffectsQuality(t *testing.T) {
+func TestRun_RejectsInconsistentPreviousMetric(t *testing.T) {
 	date := retrieval.Date{Year: 2026, Month: time.November, Day: 9}
 	opts := Options{EvaluationDate: date}
 	engine := &recordedEngine{fakeEngine: fakeEngine{date: date}}
@@ -542,12 +542,9 @@ func TestRun_PreviousReportAffectsQuality(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts.PreviousReport = path
-	r, _, err := Run(context.Background(), engine, recordedSuite(), opts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r.QualityPass || r.NonRegression[0].Status != "fail" || *r.NonRegression[0].PreviousValue != 1.1 {
-		t.Fatalf("regression %+v quality %v", r.NonRegression, r.QualityPass)
+	_, _, err = Run(context.Background(), engine, recordedSuite(), opts)
+	if err == nil {
+		t.Fatal("accepted inconsistent previous recall")
 	}
 }
 
@@ -843,7 +840,7 @@ func TestPreviousDiff_OldAbstentionPolicyIncompatible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prior.Scorer = "agent-eval/1"
+	prior.Version, prior.Scorer = 1, "agent-eval/1"
 	data, err := json.Marshal(prior)
 	if err != nil {
 		t.Fatal(err)
@@ -902,7 +899,7 @@ func TestPreviousDiff_ScorerVersionIncompatible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prior.Scorer = "agent-eval/2"
+	prior.Version, prior.Scorer = 1, "agent-eval/2"
 	data, err := json.Marshal(prior)
 	if err != nil {
 		t.Fatal(err)

@@ -72,7 +72,11 @@ func prefetchCase(ctx context.Context, engine Engine, input cohortInput, rejects
 	force := input.inForce()
 	request := retrieval.Request{Query: c.Question, Limit: 8, Mode: "exact", Arms: "hybrid", InForceOnly: &force}
 	result := casePrefetch{collects: map[string]map[retrieval.Mode]caseCollect{}}
-	result.product, result.prepareErr = engine.Prepare(ctx, request)
+	if recipe.Version >= 4 && input.legacy && rejects[c.ID] {
+		result.product, result.prepareErr = engine.PrepareLegacy(ctx, request)
+	} else {
+		result.product, result.prepareErr = engine.Prepare(ctx, request)
+	}
 	if result.prepareErr != nil {
 		return result
 	}

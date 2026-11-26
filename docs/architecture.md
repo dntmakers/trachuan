@@ -72,7 +72,9 @@ routes. The admin CLI triages and exports reports.
 
 ## Shared retrieval (`internal/retrieval`)
 
-The engine serves recipe 3 over one corpus release database: `Search` ranks and
+The engine serves retrieval recipes 2, 3 and 4 over one corpus release database
+(new builds write recipe 4, which restores diacritics before search;
+[search without diacritics](design/unaccented-queries.md)): `Search` ranks and
 shapes evidence, `Present` turns a response into compact or full results with
 document entries and relation pointers, and `Read` reads handles in batches with
 fixed parts and `next` tokens ([search results](design/mcp-results.md)).

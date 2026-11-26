@@ -86,7 +86,8 @@ def check_floors(report):
     cohorts = report['cohorts']
     for name, cohort in cohorts.items():
         count = cohort.get('rejection_count') if isinstance(cohort, dict) else None
-        if name in REJECTION_COUNTS and (type(count) is not int or count != REJECTION_COUNTS[name]):
+        expected = 0 if report['version'] == 5 else REJECTION_COUNTS.get(name)
+        if expected is not None and (type(count) is not int or count != expected):
             raise ValueError(f'{name} rejection_count differs from the evaluator')
     old_product = cohorts['old_product']
     check_cohort_floors(old_product, 'pass')

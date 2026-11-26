@@ -77,7 +77,10 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 		record["changes_projection"] = ProjectionDigest{Version: 1, SHA256: h.Sum()}
 		record["changes_counts"] = h.Counts()
 	}
-	policy := retrieval.Recipe3()
+	policy := retrieval.Recipe4()
+	if opts.legacySchema {
+		policy = retrieval.Recipe3()
+	}
 	if opts.recipe2 {
 		policy = retrieval.Recipe2()
 	}

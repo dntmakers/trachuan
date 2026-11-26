@@ -91,8 +91,12 @@ def old_product_partition(report, root):
     cases = legacy_cases(FixtureHistory(root, LEGACY).fixture(legacy_hash))
     rejected = rejection_ids(FixtureHistory(root, OLD_PRODUCT).fixture(old_hash), legacy_hash, cases)
     rows = report['rejections']
-    if sorted(row['case_id'] for row in rows) != sorted(rejected):
-        raise ValueError('report rejections differ from the old product fixture rejection_ids')
-    check_rejection_records(rows)
+    if report['version'] == 5:
+        if rows != []:
+            raise ValueError('version 5 rejections must be empty')
+    else:
+        if sorted(row['case_id'] for row in rows) != sorted(rejected):
+            raise ValueError('report rejections differ from the old product fixture rejection_ids')
+        check_rejection_records(rows)
     counts = {case['id']: len(case.get('expected_citations') or ()) for case in cases}
     return {case_id for case_id in counts if case_id not in rejected}, counts

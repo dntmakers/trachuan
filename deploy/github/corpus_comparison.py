@@ -5,7 +5,7 @@ from corpus_watermark import carried_high_water
 
 
 TOLERANCE = .005
-SCORERS = {1: ('agent-eval/1', 'agent-eval/2', 'agent-eval/3', 'agent-eval/4'), 2: ('agent-eval/5',), 3: ('agent-eval/6',), 4: ('agent-eval/6',)}
+SCORERS = {1: ('agent-eval/1', 'agent-eval/2', 'agent-eval/3', 'agent-eval/4'), 2: ('agent-eval/5',), 3: ('agent-eval/6',), 4: ('agent-eval/6',), 5: ('agent-eval/6',)}
 REVISION_FIELDS = ('revision', 'numerator', 'denominator', 'previous_numerator', 'previous_denominator')
 FIXTURES = {'old_product': ('Legacy', 'OldProduct'), 'development': ('Development',)}
 
@@ -17,6 +17,12 @@ def versions(report):
         raise ValueError('invalid scorer version')
     if report['version'] >= 2 and (not isinstance(report.get('retrieval_recipe'), dict) or not isinstance(report['retrieval_recipe'].get('abstention'), dict)):
         raise ValueError(f"version {report['version']} requires the full retrieval recipe")
+    if report['version'] >= 2:
+        recipe_version = report['retrieval_recipe'].get('version')
+        if type(recipe_version) is not int or recipe_version not in (2, 3, 4) or (report['version'] == 5) != (recipe_version == 4):
+            raise ValueError('report version and retrieval recipe version differ')
+        if recipe_version == 4 and report['retrieval_recipe'].get('query_gate') != 'vn-restore/1':
+            raise ValueError('retrieval recipe 4 requires vn-restore/1')
 
 
 def finite_values(value):
@@ -114,17 +120,29 @@ def same_inputs(a, b, cohort, current, previous):
         if not a.get('fixture_hashes', {}).get(key) or a['fixture_hashes'][key] != b.get('fixture_hashes', {}).get(key):
             return False
     ac, bc = a['cohorts'][cohort], b['cohorts'][cohort]
+    cutover = {a['version'] >= 5, b['version'] >= 5} == {True, False}
     for key in ('case_count', 'positive_count', 'negative_count', 'rejection_count', 'expected_citations'):
-        if type(ac.get(key)) is not int or ac[key] != bc.get(key):
+        if type(ac.get(key)) is not int or type(bc.get(key)) is not int:
             return False
+        if cutover and cohort == 'old_product' and key in ('case_count', 'rejection_count'):
+            continue
+        if ac[key] != bc[key]:
+            return False
+    if cutover and cohort == 'old_product' and ac['case_count'] - ac['rejection_count'] != bc['case_count'] - bc['rejection_count']:
+        return False
     if not current or current.keys() != previous.keys():
         return False
     if any(row['expected'] != previous[key]['expected'] for key, row in current.items()):
         return False
     fields = ('mode', 'arms', 'limit', 'name')
     am, bm = indexed(ac.get('metrics'), fields), indexed(bc.get('metrics'), fields)
+    if cutover:
+        am = {key: value for key, value in am.items() if key[3] in ('recall', 'mrr')}
+        bm = {key: value for key, value in bm.items() if key[3] in ('recall', 'mrr')}
     if am.keys() != bm.keys() or any(row.get('denominator') != bm[key].get('denominator') for key, row in am.items()):
         return False
+    if cutover:
+        return True
     ar, br = indexed(a.get('rejections'), ('case_id',)), indexed(b.get('rejections'), ('case_id',))
     return ar.keys() == br.keys()
 
@@ -221,6 +239,8 @@ def validate_comparisons(report, previous, revised=False):
             continue
         records = report['cohorts'][cohort]['non_regression']
         current_cases, prior_cases = cases(report, cohort), cases(previous, cohort)
+        if cohort == 'old_product' and report['version'] == 5 and previous['version'] < 5 and not same_inputs(report, previous, cohort, current_cases, prior_cases):
+            raise ValueError('old product scored membership or denominators differ')
         prior_records = indexed(previous['cohorts'][cohort].get('non_regression'), ('mode', 'arms', 'limit', 'name'))
         if previous['version'] == 2 and report['version'] == 2:
             for old_record in prior_records.values():

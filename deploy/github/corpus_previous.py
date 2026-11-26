@@ -12,6 +12,17 @@ from manifest import canonical
 from object_store import fetch_checked
 
 
+def bind_previous_recipe(prior, manifest):
+    recipe = manifest['recipes']['retrieval']
+    if not isinstance(recipe, dict):
+        raise ValueError('previous signed retrieval recipe missing')
+    if prior.get('version') in (2, 3, 4, 5) and not isinstance(prior.get('retrieval_recipe'), dict):
+        raise ValueError(f"previous version {prior['version']} retrieval recipe missing")
+    if 'retrieval_recipe' in prior and canonical(prior['retrieval_recipe']) != canonical(recipe):
+        raise ValueError('previous report retrieval recipe differs from signed manifest')
+    return prior | {'retrieval_recipe': recipe}
+
+
 def verified_previous(report, directory, client, repository, release_row=None, sidecars=None):
     from corpus_registry import release
 
@@ -29,15 +40,7 @@ def verified_previous(report, directory, client, repository, release_row=None, s
     digest = hashlib.sha256(data).hexdigest()
     if digest != previous['report_sha256'] or digest != manifest['report']['sha256']:
         raise ValueError('previous report SHA-256 differs from report or signed manifest')
-    prior = decode(data)
-    recipe = manifest['recipes']['retrieval']
-    if not isinstance(recipe, dict):
-        raise ValueError('previous signed retrieval recipe missing')
-    if prior.get('version') in (2, 3, 4) and not isinstance(prior.get('retrieval_recipe'), dict):
-        raise ValueError(f"previous version {prior['version']} retrieval recipe missing")
-    if 'retrieval_recipe' in prior and canonical(prior['retrieval_recipe']) != canonical(recipe):
-        raise ValueError('previous report retrieval recipe differs from signed manifest')
-    prior = prior | {'retrieval_recipe': recipe}
+    prior = bind_previous_recipe(decode(data), manifest)
     validate_report(report, report['country'], report['rel'], previous_report=prior, release_row=release_row)
     return prior
 

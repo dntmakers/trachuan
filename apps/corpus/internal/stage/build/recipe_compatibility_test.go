@@ -22,6 +22,14 @@ func TestBuildRecipe_Schema8HistoricalGoldens(t *testing.T) {
 	}
 }
 
+func TestBuildRecipe_CurrentSchemaRecipe3Golden(t *testing.T) {
+	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
+	got := New(Config{}).recipeForRetrieval(snapshot, retrieval.Recipe3())
+	if want := "186125b6cebded72897d41bd5b6978f62b709cd67a18904534e3c83266126311"; got != want {
+		t.Fatalf("recipe 3 build hash: got %s want %s", got, want)
+	}
+}
+
 func TestBuildRecipe_SupportsRetrievalRecipe2(t *testing.T) {
 	s := New(Config{})
 	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
@@ -44,7 +52,7 @@ func TestVerifyBuildArtifact_RejectsUnsupportedRetrievalRecipe(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		recipe retrieval.Recipe
-	}{{"recipe 2 with merge", paired2}, {"recipe 3 without merge", paired3}, {"changed value", changed}, {"recipe 4", retrieval.Recipe4()}} {
+	}{{"recipe 2 with merge", paired2}, {"recipe 3 without merge", paired3}, {"changed value", changed}} {
 		t.Run(tc.name, func(t *testing.T) {
 			binding := "current-fixture"
 			artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false, bindingOptions{recipe2: tc.recipe.Version == 2, recipe: &tc.recipe})

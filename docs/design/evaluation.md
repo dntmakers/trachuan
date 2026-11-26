@@ -201,10 +201,11 @@ version's other gates also apply. Legacy parity has no gate. `release_eligible`
 is always false in this baseline, including when `quality_pass` is true.
 Measured failures leave the stage done and the run on its way to `evaluated`,
 with `quality_pass:false` and `release_eligible:false`. Per-case
-`mapping_incomplete` is a reported diagnostic, not a run failure. Malformed
-fixture/map files, incomplete case execution or infrastructure failure fail the
-stage. CLI and status must distinguish completed evaluation from passed quality
-gates.
+`mapping_incomplete` is a reported diagnostic, not a run failure. A predecessor
+report whose gated recall or MRR cannot be recomputed from its case rows fails
+the stage. Malformed fixture/map files, incomplete case execution or
+infrastructure failure fail the stage. CLI and status must distinguish completed
+evaluation from passed quality gates.
 
 Report versions 4 and 5 require the
 [reviewed warning gate](evaluation-warning-cases.md#report-and-release-gate).

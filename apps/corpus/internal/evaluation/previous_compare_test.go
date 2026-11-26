@@ -91,7 +91,7 @@ func TestRun_RefusesIncompatiblePreviousReport(t *testing.T) {
 	}{
 		{"compatible", func(map[string]any) {}},
 		{"version zero", func(o map[string]any) { o["version"] = 0 }},
-		{"version five", func(o map[string]any) { o["version"] = 5 }},
+		{"version six", func(o map[string]any) { o["version"] = 6 }},
 		{"unknown scorer", func(o map[string]any) { o["scorer"] = "agent-eval/7" }},
 		{"legacy fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["Legacy"] = "other" }},
 		{"old product fixture differs", func(o map[string]any) { o["fixture_hashes"].(map[string]any)["OldProduct"] = "other" }},
@@ -110,7 +110,7 @@ func TestRun_RefusesIncompatiblePreviousReport(t *testing.T) {
 				}
 				return
 			}
-			if err == nil || !strings.Contains(err.Error(), "incompatible previous scorer or fixtures") {
+			if err == nil || (!strings.Contains(err.Error(), "incompatible previous scorer or fixtures") && !strings.Contains(err.Error(), "pairing")) {
 				t.Fatalf("error = %v", err)
 			}
 		})

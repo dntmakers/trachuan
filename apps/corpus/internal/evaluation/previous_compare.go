@@ -18,8 +18,13 @@ func comparablePrevious(o Options, suite Suite, r *Report) (*Report, string, err
 	if err != nil {
 		return nil, "", err
 	}
-	if prior.Version < 1 || prior.Version > 4 || !knownPreviousScorer(prior.Scorer, r.Scorer) || prior.FixtureHashes.Legacy != r.FixtureHashes.Legacy || prior.FixtureHashes.OldProduct != r.FixtureHashes.OldProduct {
+	if prior.Version < 1 || prior.Version > 5 || !knownPreviousScorer(prior.Scorer, r.Scorer) || prior.FixtureHashes.Legacy != r.FixtureHashes.Legacy || prior.FixtureHashes.OldProduct != r.FixtureHashes.OldProduct {
 		return nil, "", fmt.Errorf("incompatible previous scorer or fixtures")
+	}
+	if r.Version == 5 {
+		if err = validateCutoverPrevious(&prior, suite); err != nil {
+			return nil, "", err
+		}
 	}
 	if r.revision, err = resolveRevision(suite, &prior); err != nil {
 		return nil, "", err
@@ -34,6 +39,9 @@ func comparablePrevious(o Options, suite Suite, r *Report) (*Report, string, err
 	case !sameValidityOverrides(prior.ValidityOverrides, o.ValidityOverrides):
 		r.PreviousDiff = map[string]any{"reason": "incompatible validity policy"}
 	default:
+		if err = validatePreviousComparisons(&prior, o.Modes); err != nil {
+			return nil, "", err
+		}
 		return &prior, hash, nil
 	}
 	return nil, "", nil
