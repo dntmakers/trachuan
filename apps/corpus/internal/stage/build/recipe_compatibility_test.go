@@ -29,7 +29,7 @@ func TestVerifyBuildArtifact_RejectsUnsupportedRetrievalRecipe(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		recipe retrieval.Recipe
-	}{{"recipe 2 with merge", paired2}, {"recipe 3 without merge", paired3}, {"changed value", changed}} {
+	}{{"recipe 2 with merge", paired2}, {"recipe 3 without merge", paired3}, {"changed value", changed}, {"recipe 4", retrieval.Recipe4()}} {
 		t.Run(tc.name, func(t *testing.T) {
 			binding := "current-fixture"
 			artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false, bindingOptions{recipe2: tc.recipe.Version == 2, recipe: &tc.recipe})

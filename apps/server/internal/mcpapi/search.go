@@ -84,7 +84,7 @@ func prepareSearch(in searchInput) (retrieval.Request, retrieval.Detail, retriev
 }
 
 func searchResolved(ctx context.Context, engine Engine, rel string, req retrieval.Request, detail retrieval.Detail, validation retrieval.Validation) (retrieval.SearchResult, error) {
-	if !validation.Accepted && len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) == 0 && req.IssuedFrom == nil && req.IssuedTo == nil && req.Cursor == "" {
+	if source, ok := engine.(interface{ QueryGate() string }); ok && source.QueryGate() == "vn-marks/1" && !validation.Accepted && len(req.Nodes)+len(req.DocTypes)+len(req.Issuers)+len(req.Documents) == 0 && req.IssuedFrom == nil && req.IssuedTo == nil && req.Cursor == "" {
 		return retrieval.SearchResult{Release: rel, Abstain: true, Reason: validation.Reason, Message: validation.Message}, nil
 	}
 	response, err := engine.Search(ctx, req)

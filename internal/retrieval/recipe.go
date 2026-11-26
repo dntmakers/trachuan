@@ -75,12 +75,17 @@ func Recipe3() Recipe {
 	return r
 }
 
-// Supported reports whether the policy is recipe 2 or 3, ignoring the calibrated
-// threshold and calibration hash.
+func Recipe4() Recipe {
+	r := Recipe3()
+	r.Version = 4
+	r.QueryGate = "vn-restore/1"
+	return r
+}
+
 func (r Recipe) Supported() bool {
 	r.Abstention.Threshold = nil
 	r.Abstention.CalibrationSHA256 = ""
-	return r == Recipe2() || r == Recipe3()
+	return r == Recipe2() || r == Recipe3() || r == Recipe4()
 }
 
 // JSON returns compact fixed-field JSON.

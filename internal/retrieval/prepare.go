@@ -56,16 +56,21 @@ func (e *Engine) prepare(ctx context.Context, req Request, legacy bool) (Prepare
 	if err != nil {
 		return Prepared{}, err
 	}
-	if legacy && v.Reason == "diacritics_required" {
-		v.Accepted = true
-		v.Reason = ""
-		v.Message = ""
-	}
-	p := Prepared{Request: req, Validation: v}
+	v = resolveValidation(v, e.release.RetrievalRecipe, legacy)
+	p := Prepared{Request: req, Validation: v, EffectiveQuery: req.Query}
 	if !v.Accepted {
 		return p, nil
 	}
-	vector, err := e.embedder.Embed(ctx, req.Query)
+	if req.Instant.IsZero() && req.AsOf == nil && e.options.Now != nil {
+		p.collectionDate = e.searchDate(req)
+	}
+	if !legacy && e.release.RetrievalRecipe.Version == 4 && v.Route == routeRestore {
+		p.EffectiveQuery, p.QueryChanged, err = e.restoreQuery(ctx, p)
+		if err != nil {
+			return Prepared{}, err
+		}
+	}
+	vector, err := e.embedder.Embed(ctx, p.EffectiveQuery)
 	if err != nil {
 		return Prepared{}, embedderFailure("query embedding failed", err)
 	}

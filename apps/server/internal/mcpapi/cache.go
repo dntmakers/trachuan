@@ -84,7 +84,19 @@ func (cfg Config) cachedSearch(ctx context.Context, in searchInput, validate fun
 	canonical["issued_to"] = in.IssuedTo
 	raw, _ := json.Marshal([]any{rel, now.Format(time.DateOnly), canonical})
 	key := sha256.Sum256(raw)
-	if raw, ok := scope.Search.Get(rel, key); ok {
+	cacheable := true
+	if validation.RestorationRoute() {
+		source, ok := lease.Engine.(interface{ QueryGate() string })
+		if !ok || source.QueryGate() != "vn-marks/1" {
+			cacheable = false
+		}
+	}
+	if raw, ok := func() ([]byte, bool) {
+		if !cacheable {
+			return nil, false
+		}
+		return scope.Search.Get(rel, key)
+	}(); ok {
 		var data any
 		if err = json.Unmarshal(raw, &data); err != nil {
 			return nil, nil, err
@@ -102,7 +114,7 @@ func (cfg Config) cachedSearch(ctx context.Context, in searchInput, validate fun
 	if err = validate(data); err != nil {
 		return nil, nil, err
 	}
-	if ctx.Err() == nil {
+	if cacheable && out.RestoredQuery == "" && ctx.Err() == nil {
 		scope.Search.Put(rel, key, result.StructuredContent.(json.RawMessage))
 	}
 	return result, data, nil

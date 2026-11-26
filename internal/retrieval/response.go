@@ -139,6 +139,7 @@ type Response struct {
 	Abstain            bool               `json:"abstain"`
 	Reason             string             `json:"reason,omitempty"`
 	Message            string             `json:"message,omitempty"`
+	RestoredQuery      string             `json:"restored_query,omitempty"`
 	Gaps               []Gap              `json:"gaps"`
 	Diagnostics        Diagnostics        `json:"diagnostics"`
 	OutsideFilterCount *int               `json:"outside_filter_count,omitempty"`

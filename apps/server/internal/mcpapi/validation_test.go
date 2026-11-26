@@ -2,12 +2,15 @@ package mcpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"danny.vn/trachuan/internal/retrieval"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func TestMCP_SearchInputBoundaries(t *testing.T) {
@@ -30,12 +33,41 @@ func TestMCP_ReadRejectsUnknownFieldsBeforeResolve(t *testing.T) {
 		t.Fatal("invalid read input reached resolver")
 	}
 }
-func TestMCP_DiacriticsKeepsEngineMessage(t *testing.T) {
+func TestMCP_DiacriticsUsesResolvedEngine(t *testing.T) {
 	h := newHarness(t, nil)
+	h.engine.presented = &retrieval.SearchResult{Release: "20991111", RestoredQuery: "ngân hàng"}
 	r := callTool(t, h, "search", map[string]any{"country": "vn", "query": "ngan hang"})
 	out := resultJSON(t, r)
-	if r.IsError || out["reason"] != "diacritics_required" || out["message"] != "Vui lòng nhập câu hỏi tiếng Việt có dấu hoặc số hiệu văn bản." || out["abstain"] != true || h.engine.calls.Load() != 0 || h.resolver.done.Load() != 1 {
+	if r.IsError || out["restored_query"] != "ngân hàng" || h.engine.calls.Load() != 2 || h.resolver.done.Load() != 1 {
 		t.Fatal(out)
+	}
+	if len(r.Content) != 1 {
+		t.Fatal("missing text copy")
+	}
+	text, ok := r.Content[0].(*mcp.TextContent)
+	if !ok || !strings.Contains(text.Text, `"restored_query":"ngân hàng"`) {
+		t.Fatal("text copy missing restored query")
+	}
+	ops := NewOperations(Config{Resolver: h.resolver, Clock: time.Now})
+	for _, detail := range []string{"compact", "full"} {
+		for _, cursor := range []string{"", "continuation"} {
+			args := map[string]any{"country": "vn", "query": "ngan hang", "detail": detail}
+			if cursor != "" {
+				args["cursor"] = cursor
+			}
+			raw, err := json.Marshal(args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			web, err := ops.Search(context.Background(), raw)
+			if err != nil || !bytes.Contains(web, []byte(`"restored_query":"ngân hàng"`)) {
+				t.Fatalf("web result %s: %v", web, err)
+			}
+			result := callTool(t, h, "search", args)
+			if result.IsError || resultJSON(t, result)["restored_query"] != "ngân hàng" {
+				t.Fatal("MCP restored query missing")
+			}
+		}
 	}
 }
 func TestMCP_StatelessJSONAndProtocolErrors(t *testing.T) {
