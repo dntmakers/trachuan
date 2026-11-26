@@ -39,7 +39,7 @@ type buildRecipe struct {
 	PgRestoreVersion           string `json:"pg_restore_version"`
 }
 
-func (r buildRecipe) hash() string { return r.hashVersion("corpus/6") }
+func (r buildRecipe) hash() string { return r.hashVersion("corpus/8") }
 
 func (r buildRecipe) hashVersion(version string) string {
 	b, _ := json.Marshal(r)
@@ -57,6 +57,10 @@ func (s *Stage) Recipe(snapshot stage.Snapshot) string {
 }
 
 func (s *Stage) recipeForRetrieval(snapshot stage.Snapshot, policy retrieval.Recipe) string {
+	return s.recipeForSchema(snapshot, policy, corpusdb.SchemaVersion)
+}
+
+func (s *Stage) recipeForSchema(snapshot stage.Snapshot, policy retrieval.Recipe, schemaVersion int) string {
 	sources, err := source.Parse(snapshot.SourceList)
 	if err != nil {
 		return ""
@@ -69,13 +73,22 @@ func (s *Stage) recipeForRetrieval(snapshot stage.Snapshot, policy retrieval.Rec
 	if err != nil {
 		return ""
 	}
-	r := buildRecipe{SchemaVersion: corpusdb.SchemaVersion, SchemaSHA256: schema, HeadingProjection: headingProjection,
+	if schemaVersion == 8 {
+		schema = "46fd4c494fb4774456d05dadad3c3da03c5df4deadaee59674b4e22725ade66c"
+	}
+	r := buildRecipe{SchemaVersion: schemaVersion, SchemaSHA256: schema, HeadingProjection: headingProjection,
 		ChunkRecipeHash: chunk.Recipe2().Hash(), DocumentRecipeHash: embedding.DocumentRecipe1().Hash(), QueryRecipeHash: embedding.QueryRecipe1().Hash(), LexicalRecipeHash: lexical.Recipe1().Hash(), RetrievalPolicyHash: policy.Hash(), NormalizerVersion: normalizer.Version, LabelNormalizer: "corpus-labels/1", NumberNormalizationVersion: retrieval.NumberNormalizationVersion, StatusCodesSHA256: fmt.Sprintf("%x", sha256.Sum256(status)), ValidityRulesVersion: validityRulesVersion, CalibrationPolicy: "provisional-old-product/balanced/1", LegacyCasesSHA256: s.cfg.Suite.Hashes.Legacy, DevelopmentCasesSHA256: s.cfg.Suite.Hashes.Development, PostgreSQLMajor: s.cfg.Versions.PostgreSQLMajor, PGVectorVersion: s.cfg.Versions.PGVector, LtreeVersion: s.cfg.Versions.Ltree, PgDumpVersion: s.cfg.Versions.PgDump, PgRestoreVersion: s.cfg.Versions.PgRestore}
 	if len(s.cfg.Suite.Development) > 0 {
 		r.CalibrationPolicy = "old-product+development/balanced/1"
 	}
+	if schemaVersion == 8 {
+		if snapshot.ClassificationSetSHA256 != "" {
+			return r.hashVersion("corpus/7")
+		}
+		return r.hashVersion("corpus/6")
+	}
 	if snapshot.ClassificationSetSHA256 != "" {
-		return r.hashVersion("corpus/7")
+		return r.hashVersion("corpus/9")
 	}
 	return r.hash()
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func databaseMetrics(ctx context.Context, conn *pgx.Conn, loaded Counts) (map[string]int64, int64, int64, error) {
-	tables := []string{"document", "document_summary", "source_file", "provision", "provision_validity", "chunk", "lexical_df", "relation", "coverage_gap", "taxonomy_node", "taxonomy_assignment", "release"}
+	tables := []string{"document", "document_summary", "source_file", "provision", "provision_validity", "chunk", "lexical_df", "relation", "coverage_gap", "taxonomy_node", "taxonomy_assignment", "release_change_set", "release_change", "release"}
 	counts := make(map[string]int64, len(tables)+4)
 	for _, table := range tables {
 		var n int64

@@ -77,6 +77,7 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if err != nil {
 		return stage.Output{}, err
 	}
+	identityInventoryHash := inv.IdentityHash()
 	if s.frozenInputHash(run, inv, correction) != item.InputHash {
 		return stage.Output{}, temporal.NewNonRetryableApplicationError("inventory_changed", "inventory_changed", nil)
 	}
@@ -176,6 +177,10 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 	if err = insertRelease(ctx, conn.Conn(), release); err != nil {
 		return stage.Output{}, err
 	}
+	projection, err := writeChangesProjection(ctx, conn.Conn(), env, run, inv, identityInventoryHash)
+	if err != nil {
+		return stage.Output{}, err
+	}
 	phaseStart = time.Now()
 	tableCounts, relationBytes, indexBytes, err := databaseMetrics(ctx, conn.Conn(), counts)
 	if err != nil {
@@ -223,7 +228,9 @@ func (s *Stage) Process(ctx context.Context, env stage.Env, run stage.Run, item 
 		}
 		timings.observe("dump_hash", phaseStart)
 		timings["total"] = time.Since(started).Milliseconds()
-		record := map[string]any{"version": 1, "country": run.Country, "rel": run.Rel, "database_name": final, "schema_version": corpusdb.SchemaVersion, "build_input_hash": item.InputHash, "build_recipe_hash": recipeHash, "source_manifest_hash": inv.SourceManifestHash(), "identity_inventory_hash": inv.IdentityHash(), "identity_map_sha256": s.cfg.Suite.Hashes.IdentityMap, "development_cases_sha256": s.cfg.Suite.Hashes.Development, "dense_recipe": release.DenseRecipe, "chunk_recipe": release.ChunkRecipe, "lexical_recipe": release.LexicalRecipe, "retrieval_recipe": release.RetrievalRecipe, "lexical_stats": release.LexicalStats, "taxonomy_version": release.TaxonomyVersion, "taxonomy": counts.Taxonomy, "counts": tableCounts, "postgres_version": s.cfg.Versions.PostgreSQLMajor, "pgvector_version": s.cfg.Versions.PGVector, "ltree_version": s.cfg.Versions.Ltree, "pg_dump_version": s.cfg.Versions.PgDump, "worker_version": run.Snapshot.WorkerVersion, "durations_ms": timings, "relation_bytes": relationBytes, "index_bytes": indexBytes, "dump": map[string]any{"sha256": fmt.Sprintf("%x", hasher.Sum(nil)), "bytes": size, "format": "custom"}, "built_at": release.BuiltAt}
+		record := map[string]any{"version": 1, "country": run.Country, "rel": run.Rel, "database_name": final, "schema_version": corpusdb.SchemaVersion, "build_input_hash": item.InputHash, "build_recipe_hash": recipeHash, "source_manifest_hash": inv.SourceManifestHash(), "identity_inventory_hash": identityInventoryHash, "identity_map_sha256": s.cfg.Suite.Hashes.IdentityMap, "development_cases_sha256": s.cfg.Suite.Hashes.Development, "dense_recipe": release.DenseRecipe, "chunk_recipe": release.ChunkRecipe, "lexical_recipe": release.LexicalRecipe, "retrieval_recipe": release.RetrievalRecipe, "lexical_stats": release.LexicalStats, "taxonomy_version": release.TaxonomyVersion, "taxonomy": counts.Taxonomy, "counts": tableCounts, "postgres_version": s.cfg.Versions.PostgreSQLMajor, "pgvector_version": s.cfg.Versions.PGVector, "ltree_version": s.cfg.Versions.Ltree, "pg_dump_version": s.cfg.Versions.PgDump, "worker_version": run.Snapshot.WorkerVersion, "durations_ms": timings, "relation_bytes": relationBytes, "index_bytes": indexBytes, "dump": map[string]any{"sha256": fmt.Sprintf("%x", hasher.Sum(nil)), "bytes": size, "format": "custom"}, "built_at": release.BuiltAt}
+		record["changes_projection"] = ProjectionDigest{Version: projection.Header.Version, SHA256: projection.Digest}
+		record["changes_counts"] = projection.Counts
 		record["predecessor_release"] = run.Snapshot.LockedPredecessor.Release
 		record["predecessor_identity_sha256"] = run.Snapshot.LockedPredecessor.IdentitySHA256
 		if classification != nil {

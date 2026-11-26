@@ -279,7 +279,7 @@ func TestGapSnapshot_IgnoresOrderAndEvidenceRows(t *testing.T) {
 
 func TestRecipe_CoversRegistryDetectorsAndSerialization(t *testing.T) {
 	plain := New(Config{}).Recipe(stage.Snapshot{})
-	if want := stage.RecipeHash(stage.EvidenceStage, "1", detector.LegacyHash(), "[]", "findings.json/2,identity.jsonl/1,changes.jsonl/1"); plain != want {
+	if want := stage.RecipeHash(stage.EvidenceStage, "2", detector.LegacyHash(), "[]", "findings.json/2,identity.jsonl/1,changes.jsonl/1"); plain != want {
 		t.Fatalf("recipe = %s, want %s", plain, want)
 	}
 	if New(Config{Detectors: []Detector{fakeDetector{id: "x"}}}).Recipe(stage.Snapshot{}) == plain {

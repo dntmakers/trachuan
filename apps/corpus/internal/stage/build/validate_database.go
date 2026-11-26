@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/internal/corpusdb"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -35,7 +38,10 @@ func validateDatabase(ctx context.Context, cfg Config, name string, record Build
 	if !matches {
 		return fmt.Errorf("release mismatch: %w", errInvalidDatabase)
 	}
-	for _, table := range []string{"document", "document_summary", "source_file", "provision", "provision_validity", "chunk", "lexical_df", "relation", "coverage_gap", "taxonomy_node", "taxonomy_assignment", "release"} {
+	for _, table := range []string{"document", "document_summary", "source_file", "provision", "provision_validity", "chunk", "lexical_df", "relation", "coverage_gap", "taxonomy_node", "taxonomy_assignment", "release_change_set", "release_change", "release"} {
+		if record.SchemaVersion < 9 && (table == "release_change_set" || table == "release_change") {
+			continue
+		}
 		expected, ok := record.Counts[table]
 		if !ok {
 			return fmt.Errorf("missing corpus count for %s: %w", table, errInvalidDatabase)
@@ -46,6 +52,20 @@ func validateDatabase(ctx context.Context, cfg Config, name string, record Build
 		}
 		if actual != expected {
 			return fmt.Errorf("corpus count mismatch for %s: %w", table, errInvalidDatabase)
+		}
+	}
+	if record.SchemaVersion >= 9 {
+		projection, readErr := corpusdb.ReadReleaseChanges(ctx, db, corpusdb.ReleaseChangeLimits(), nil)
+		if readErr != nil {
+			return projectionReadError(readErr)
+		}
+		run := stage.Run{Country: record.Country, Rel: record.Rel, Snapshot: stage.Snapshot{LockedPredecessor: &stage.LockedPredecessor{Release: record.PredecessorRelease, IdentitySHA256: record.PredecessorIdentitySHA256}}}
+		header, headerErr := ProjectionHeader(run)
+		if headerErr != nil {
+			return fmt.Errorf("projection header: %w", headerErr)
+		}
+		if compareErr := CompareProjection(record, header, projection); compareErr != nil {
+			return fmt.Errorf("%w: %w", errInvalidDatabase, compareErr)
 		}
 	}
 	if err = db.QueryRow(ctx, `SELECT NOT EXISTS (SELECT 1 FROM provision p JOIN document d ON d.id=p.document_id WHERE (p.locator IS NULL) <> (d.text_source='source_tree'))`).Scan(&matches); err != nil {

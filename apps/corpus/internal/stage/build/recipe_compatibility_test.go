@@ -7,11 +7,26 @@ import (
 	"danny.vn/trachuan/internal/retrieval"
 )
 
+func TestBuildRecipe_Schema8HistoricalGoldens(t *testing.T) {
+	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
+	for _, tc := range []struct {
+		policy retrieval.Recipe
+		want   string
+	}{
+		{retrieval.Recipe2(), "ce3ec5d987260fcdfe6308a00cb5193658fafec08084416d4313a2a3c46c7c8c"},
+		{retrieval.Recipe3(), "4c5a1b68b03e133c29dda4a6d6895e562aee8f8b15de97e0668897cd9db6fecf"},
+	} {
+		if got := New(Config{}).recipeForSchema(snapshot, tc.policy, 8); got != tc.want {
+			t.Fatalf("version %d: got %s want %s", tc.policy.Version, got, tc.want)
+		}
+	}
+}
+
 func TestBuildRecipe_SupportsRetrievalRecipe2(t *testing.T) {
 	s := New(Config{})
 	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
 	old := s.recipeForRetrieval(snapshot, retrieval.Recipe2())
-	if old != "93f0e6cc3428d004cadb0d0c42dfef4da47e0d248fac0c27830e61e5e1e564fd" {
+	if old != "5e37f78f3c9498b6c36a53cf9bfdd5b1d33beeca9f99f322691dc9fa101a7c7d" {
 		t.Fatalf("recipe 2 build hash %s", old)
 	}
 	if !s.acceptsRecipeHash(snapshot, old) || !s.acceptsRecipeHash(snapshot, s.Recipe(snapshot)) || s.acceptsRecipeHash(snapshot, "other") {

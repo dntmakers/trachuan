@@ -4,6 +4,7 @@ package corpusdb
 
 import (
 	"context"
+	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -11,6 +12,29 @@ import (
 
 	"danny.vn/trachuan/internal/releasechanges"
 )
+
+func TestReleaseChanges_StreamWriter(t *testing.T) {
+	ctx := context.Background()
+	conn := schemaDB(t)
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := releasechanges.Header{Version: 1, Country: "vn", Release: "r"}
+	written, err := WriteReleaseChangesStream(ctx, tx, header, func(emit func(releasechanges.Row) error) error {
+		return emit(releasechanges.Row{Ordinal: 1, Kind: "document_added", Payload: `{}`})
+	})
+	if err != nil || written.Counts["document_added"] != 1 {
+		t.Fatalf("written=%+v err=%v", written, err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	read, err := ReadReleaseChanges(ctx, conn, ProjectionLimits{KeyCharacters: 100, PayloadBytes: 1000, TotalBytes: 10000}, nil)
+	if err != nil || !reflect.DeepEqual(read, written) {
+		t.Fatalf("read=%+v written=%+v err=%v", read, written, err)
+	}
+}
 
 func TestReleaseChanges_GoldenAndBaseline(t *testing.T) {
 	ctx := context.Background()
@@ -101,6 +125,10 @@ func TestReleaseChanges_RejectsCorruption(t *testing.T) {
 			_, err = ReadReleaseChanges(ctx, conn, limits, nil)
 			if err == nil {
 				t.Fatal("accepted corruption")
+			}
+			var invalid *InvalidProjectionError
+			if !errors.As(err, &invalid) {
+				t.Fatalf("expected invalid projection error, got %v", err)
 			}
 			if strings.HasPrefix(name, "oversize") && !strings.Contains(err.Error(), "exceeds limits") {
 				t.Fatalf("expected limit error, got %v", err)

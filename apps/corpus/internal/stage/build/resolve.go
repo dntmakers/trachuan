@@ -196,7 +196,7 @@ func committedBuild(ctx context.Context, cfg Config, q store.Querier, artifacts 
 		if err != nil {
 			return artifact.Result{}, fmt.Errorf("verify committed build artifact: %w", err)
 		}
-		if !New(cfg).acceptsRecipeHash(run.Snapshot, *item.RecipeHash) || record.BuildRecipeHash != *item.RecipeHash {
+		if record.BuildRecipeHash != *item.RecipeHash {
 			return artifact.Result{}, errors.New("invalid committed build artifact")
 		}
 		return art, nil

@@ -10,6 +10,8 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/source"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
+	"danny.vn/trachuan/internal/corpusdb"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -50,15 +52,28 @@ func headingPool(ctx context.Context, variable, database string) (*pgxpool.Pool,
 	return db, nil
 }
 
+type headingReleaseDB interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func headingRelease(ctx context.Context, db headingReleaseDB, cc, rel string) (string, string, error) {
+	var input, recipe string
+	err := db.QueryRow(ctx, `SELECT build_input_hash,build_recipe_hash FROM release WHERE singleton AND country=$1 AND rel=$2 AND schema_version >= 8 AND schema_version = ANY($3::int[])`, cc, rel, corpusdb.SupportedSchemaVersions()).Scan(&input, &recipe)
+	if err != nil {
+		return "", "", fmt.Errorf("read heading scan release failed: %w", err)
+	}
+	return input, recipe, nil
+}
+
 func headingScan(ctx context.Context, cc, rel, name string, stdout io.Writer) error {
 	db, err := headingPool(ctx, "CORPUS_BUILDER_DATABASE_URL", name)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
-	var input, recipe string
-	if err = db.QueryRow(ctx, `SELECT build_input_hash,build_recipe_hash FROM release WHERE singleton AND country=$1 AND rel=$2 AND schema_version=8`, cc, rel).Scan(&input, &recipe); err != nil {
-		return fmt.Errorf("read heading scan release failed")
+	input, recipe, err := headingRelease(ctx, db, cc, rel)
+	if err != nil {
+		return err
 	}
 	workshop, err := headingPool(ctx, "CORPUS_DATABASE_URL", "")
 	if err != nil {

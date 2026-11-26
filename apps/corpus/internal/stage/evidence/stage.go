@@ -61,9 +61,9 @@ func (s *Stage) Recipe(snapshot stage.Snapshot) string {
 		panic(fmt.Sprintf("encode evidence detectors: %v", err))
 	}
 	if snapshot.ExtractRecordContract == stage.ExtractRecordV1 {
-		return stage.RecipeHash(stage.EvidenceStage, "1", registryHash, string(config), serialization, treeDivergenceRecipe)
+		return stage.RecipeHash(stage.EvidenceStage, "2", registryHash, string(config), serialization, treeDivergenceRecipe)
 	}
-	return stage.RecipeHash(stage.EvidenceStage, "1", registryHash, string(config), serialization)
+	return stage.RecipeHash(stage.EvidenceStage, "2", registryHash, string(config), serialization)
 }
 
 func evidenceRegistryHash(snapshot stage.Snapshot) string {
@@ -252,6 +252,9 @@ func (s *Stage) Resolve(ctx context.Context, env stage.Env, run stage.Run, item 
 	}
 	if err = checkSidecars(env.Artifacts.Abs(art.Path), run.Rel, inputs); err != nil {
 		return stage.Resolution{}, errors.New(err.Error())
+	}
+	if err = s.checkProjection(ctx, env, run, inputs, env.Artifacts.Abs(art.Path)); err != nil {
+		return stage.Resolution{}, err
 	}
 	return stage.Resolution{}, nil
 }

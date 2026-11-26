@@ -13,15 +13,18 @@ import (
 	"danny.vn/trachuan/apps/corpus/internal/evaluation"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/internal/corpusdb"
+	"danny.vn/trachuan/internal/releasechanges"
 	"danny.vn/trachuan/internal/retrieval"
 )
 
 type bindingOptions struct {
-	buildRecipeHash string
-	recipe          *retrieval.Recipe
-	recipe2         bool
-	durations       map[string]int64
-	taxonomy        *TaxonomyStats
+	buildRecipeHash   string
+	recipe            *retrieval.Recipe
+	recipe2           bool
+	legacySchema      bool
+	missingProjection bool
+	durations         map[string]int64
+	taxonomy          *TaxonomyStats
 }
 
 func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...bindingOptions) (artifact.Store, artifact.Result, stage.Run, Config, string) {
@@ -36,6 +39,11 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 	inv := Inventory{Country: "vn", SourceListHash: "sources"}
 	input := New(cfg).frozenInputHash(run, inv, correctionInput{})
 	recipe := New(cfg).Recipe(run.Snapshot)
+	if opts.legacySchema {
+		run.Snapshot.LockedPredecessor = nil
+		input = historicalInputHash(run, inv, cfg)
+		recipe = New(cfg).recipeForSchema(run.Snapshot, retrieval.Recipe3(), 8)
+	}
 	if opts.recipe2 {
 		recipe = New(cfg).recipeForRetrieval(run.Snapshot, retrieval.Recipe2())
 	}
@@ -55,6 +63,19 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 		"worker_version": "worker", "built_at": time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC),
 		"durations_ms": map[string]int64{"total": 1},
 		"dump":         map[string]any{"sha256": hashBytes(dump), "bytes": len(dump), "format": "custom"},
+	}
+	if opts.legacySchema {
+		record["schema_version"] = 8
+		delete(record, "predecessor_release")
+		delete(record, "predecessor_identity_sha256")
+	} else if !opts.missingProjection {
+		header := releasechanges.Header{Version: 1, Country: run.Country, Release: run.Rel, Baseline: true}
+		h, hashErr := releasechanges.NewHasher(header)
+		if hashErr != nil {
+			t.Fatal(hashErr)
+		}
+		record["changes_projection"] = ProjectionDigest{Version: 1, SHA256: h.Sum()}
+		record["changes_counts"] = h.Counts()
 	}
 	policy := retrieval.Recipe3()
 	if opts.recipe2 {
@@ -95,6 +116,28 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 		t.Fatal(err)
 	}
 	return artifacts, art, run, cfg, rowRecipe
+}
+
+func historicalInputHash(run stage.Run, inv Inventory, cfg Config) string {
+	base := stage.RecipeHash("build-input", "2", run.Country, run.Rel, inv.SourceManifestHash(), "8", cfg.Suite.Hashes.IdentityMap)
+	return withHeadingExclusions(withDevelopmentHash(base, cfg.Suite.Hashes.Development), hashBytes([]byte("[]")))
+}
+
+func TestVerifyBuildArtifact_LegacySchema8(t *testing.T) {
+	binding := "current-fixture"
+	artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false, bindingOptions{legacySchema: true})
+	record, _, err := verifyBuildArtifact(artifacts, art, run, cfg)
+	if err != nil || record.SchemaVersion != 8 {
+		t.Fatalf("schema=%d error=%v", record.SchemaVersion, err)
+	}
+}
+
+func TestVerifyBuildArtifact_RejectsMissingProjection(t *testing.T) {
+	binding := "current-fixture"
+	artifacts, art, run, cfg, _ := bindingArtifact(t, &binding, false, bindingOptions{missingProjection: true})
+	if _, _, err := verifyBuildArtifact(artifacts, art, run, cfg); err == nil || !strings.Contains(err.Error(), "projection") {
+		t.Fatalf("error = %v", err)
+	}
 }
 
 func TestVerifyBuildArtifact_RejectsMissingPredecessorLock(t *testing.T) {
