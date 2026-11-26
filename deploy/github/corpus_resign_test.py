@@ -13,8 +13,9 @@ from unittest.mock import patch
 
 import corpus_production
 from corpus_manifest import create as create_manifest, manifest_fields as signed_manifest_fields
-from corpus_test_support import (add_heading_build, digest, git, release_fixture_history, save_older_shape,
-                                 write_evidence, write_fixture)
+from manifest import canonical
+from corpus_test_support import (add_heading_build, digest, git, release_fixture_history, remove_build_record, save_older_shape,
+                                 set_schema_build, write_evidence, write_fixture)
 
 PREVIOUS, REL, CUTOFF = '20990101_1', '20990102_1', '20990102_2'
 DECISION = dict(eval_report_sha256='e' * 64, previous_report_sha256='b' * 64)
@@ -36,6 +37,9 @@ def report_for(rel=PREVIOUS, digest='b' * 64):
 
 
 def create(repository, commit, sequence, country, rel, directory, report_path, **kwargs):
+    if '  build.json' not in (directory / 'MANIFEST.sha256').read_text():
+        row = json.loads((directory / 'release.json').read_bytes())
+        kwargs.setdefault('signed_manifest', {'schema_version': row['schema_version']})
     return create_manifest(repository, commit, sequence, country, rel, directory, report_path,
                            verified_report_hash=digest(report_path.read_bytes()), **kwargs)
 
@@ -120,6 +124,8 @@ class SignedFieldsTest(unittest.TestCase):
                                       identity_sha256=digest((self.path / 'identity.jsonl').read_bytes()),
                                       changes_sha256=digest((self.path / 'changes.jsonl').read_bytes())))
         actual = manifest_fields('dannyota/trachuan', 'f' * 40, 9, 'vn', REL, self.path, self.path / 'report.json')
+        self.assertEqual(canonical(actual), canonical(expected))
+        self.assertEqual(canonical(actual), (Path(__file__).parent / 'testdata/schema-eight-manifest.json').read_bytes())
         self.assertEqual(actual, expected, 'a derived manifest field changed: signed releases keep their old value, '
                                            'so run resign-check for the production and rollback releases first')
 
@@ -197,6 +203,19 @@ class SigningTraceTest(unittest.TestCase):
         missing.pop('schema_version')
         with self.assertRaisesRegex(ValueError, 'schema_version'):
             self.signable(missing, current, existing=signed)
+
+    def test_signed_changes_projection_cannot_change_or_disappear(self):
+        projection = dict(version=1, sha256='a' * 64)
+        signed = manifest(sequence=10, schema_version=9, changes_projection=projection)
+        current = self.production(rel=REL, sequence=10)
+        self.assertIs(self.signable(manifest(schema_version=9, changes_projection=dict(projection)),
+                                    current, existing=signed, resign=True), current)
+        for value in (dict(version=1, sha256='b' * 64), None):
+            rebuilt = manifest(schema_version=9)
+            if value is not None:
+                rebuilt['changes_projection'] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'changes_projection'):
+                self.signable(rebuilt, current, existing=signed, resign=True)
 
     def test_signed_evidence_cannot_change_or_disappear_on_a_later_signing(self):
         evidence = dict(findings_sha256='a' * 64, identity_sha256='b' * 64, changes_sha256='c' * 64)
@@ -286,6 +305,28 @@ class ResignCheckTest(unittest.TestCase):
         self.assertEqual(lines.pop(), self.dispatch().rstrip('\n'))
         self.assertEqual(len(lines), 1)
         self.assertTrue(lines[0].startswith('evidence: signed absent rebuilt {"changes_sha256":'), lines[0])
+
+    def test_pre_eight_resign_when_manifest_names_missing_build(self):
+        set_schema_build(self.path, self.row, self.report, 7)
+        save_older_shape(self.path, self.row)
+        self.signed = json.loads(create('dannyota/trachuan', 'c' * 40, 7, 'vn', REL,
+                                        self.path, self.path / 'report.json'))
+        (self.path / 'build.json').unlink()
+        self.assertEqual(self.run_check()[0], 0)
+        self.row['schema_version'] = 6
+        save_older_shape(self.path, self.row)
+        with self.assertRaisesRegex(ValueError, 'schema'):
+            self.run_check()
+
+    def test_pre_eight_resign_without_build_keeps_signed_schema(self):
+        remove_build_record(self.path, self.row, self.report)
+        save_older_shape(self.path, self.row)
+        self.signed = json.loads(create('dannyota/trachuan', 'c' * 40, 7, 'vn', REL,
+                                        self.path, self.path / 'report.json'))
+        self.assertEqual(self.run_check()[0], 0)
+        self.signed['schema_version'] = 7
+        with self.assertRaisesRegex(ValueError, 'schema'):
+            self.run_check()
 
     def test_matching_upload_directory_reports_no_difference(self):
         code, output = self.run_check()

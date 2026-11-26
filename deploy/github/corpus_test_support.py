@@ -84,7 +84,9 @@ def empty_floors():
 
 def write_fixture(path):
     dump = b'synthetic corpus dump\n'
-    manifest = (digest(dump) + '  corpus.dump\n').encode()
+    build = b'{"schema_version":6}\n'
+    (path / 'build.json').write_bytes(build)
+    manifest = (digest(dump) + '  corpus.dump\n' + digest(build) + '  build.json\n').encode()
     row, hashes = recipe_fixture()
     row.update(country='vn', rel='20990102_1', schema_version=6,
                extensions={'vector': '0.8.1', 'ltree': '1.3'},
@@ -134,7 +136,8 @@ def write_fixture(path):
     (path / 'MANIFEST.sha256').write_bytes(manifest)
     save_fixture(path, row, report)
     manifest = json.loads(create('dannyota/trachuan', 'a' * 40, 1, 'vn', row['rel'], path, path / 'report.json',
-                                 verified_report_hash=digest((path / 'report.json').read_bytes())))
+                                 verified_report_hash=digest((path / 'report.json').read_bytes()),
+                                 signed_manifest={'schema_version': 6}))
     manifest.pop('evidence', None)
     manifest.update(rel='20990101_1', database='corpus_vn_20990101_1', previous='20981231_1')
     manifest['dump']['object'] = 'vn/20990101_1/corpus.dump'
@@ -144,12 +147,18 @@ def write_fixture(path):
 
 
 def signed_create(repository, commit, sequence, country, rel, directory, report_path, **kwargs):
+    row = json.loads((directory / 'release.json').read_bytes())
+    if '  build.json' not in (directory / 'MANIFEST.sha256').read_text():
+        kwargs.setdefault('signed_manifest', {'schema_version': row['schema_version']})
     return create(repository, commit, sequence, country, rel, directory, report_path,
                   verified_report_hash=digest(report_path.read_bytes()), **kwargs)
 
 
 def signed_inputs(country, rel, directory, report_path, **kwargs):
     from corpus_manifest import validated_inputs
+    if '  build.json' not in (directory / 'MANIFEST.sha256').read_text():
+        row = json.loads((directory / 'release.json').read_bytes())
+        kwargs.setdefault('signed_manifest', {'schema_version': row['schema_version']})
     return validated_inputs(country, rel, directory, report_path, signing=True, commit=None,
                             verified_report_hash=digest(report_path.read_bytes()), **kwargs)
 
@@ -257,6 +266,25 @@ def save_older_shape(path, row):
     for field in DECISION_FIELDS:
         older['run'].pop(field, None)
     (path / 'release.json').write_text(json.dumps(older))
+
+
+def set_schema_build(path, row, report, version):
+    build = json.dumps({'schema_version': version}).encode()
+    (path / 'build.json').write_bytes(build)
+    manifest = (digest((path / 'corpus.dump').read_bytes()) + '  corpus.dump\n' +
+                digest(build) + '  build.json\n').encode()
+    (path / 'MANIFEST.sha256').write_bytes(manifest)
+    row['schema_version'] = version
+    row['run']['build_artifact_sha256'] = report['build_artifact_sha256'] = digest(manifest)
+    save_fixture(path, row, report)
+
+
+def remove_build_record(path, row, report):
+    manifest = (digest((path / 'corpus.dump').read_bytes()) + '  corpus.dump\n').encode()
+    (path / 'MANIFEST.sha256').write_bytes(manifest)
+    (path / 'build.json').unlink(missing_ok=True)
+    row['run']['build_artifact_sha256'] = report['build_artifact_sha256'] = digest(manifest)
+    save_fixture(path, row, report)
 
 
 def add_heading_build(path, row, report):

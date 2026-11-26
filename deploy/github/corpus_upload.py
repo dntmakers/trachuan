@@ -106,7 +106,7 @@ def upload(country, rel, directory, report, repository):
 
     receipts = {}
     with tempfile.TemporaryDirectory() as temporary:
-        for name in release_files(row):
+        for name in release_files(row, include_build='build.json' in inputs.expected):
             source = directory / name
             if name in inputs.data:
                 source = Path(temporary) / name

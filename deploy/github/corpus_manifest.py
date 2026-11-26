@@ -8,6 +8,7 @@ import re
 
 from manifest import canonical, positive, require_match
 from repositories import require_listed, workflow
+from corpus_build_schema import SUPPORTED_SCHEMA_VERSIONS, verified_schema
 from corpus_cohorts import cohort_counts
 from corpus_heading_review import heading_review, validate_heading_review
 from corpus_comparison import check_mrr_fields, finite_values, validate_comparisons, versions
@@ -47,9 +48,9 @@ def identity(country, rel):
     require_match(r'[0-9]{8}_[0-9]+', rel, 'rel')
 
 
-def release_files(row):
+def release_files(row, include_build=False):
     names = ('corpus.dump', 'MANIFEST.sha256', 'report.json', 'release.json')
-    if row['schema_version'] >= 8:
+    if row['schema_version'] >= 8 or include_build:
         names += ('build.json',)
     return names + SIDECARS if has_decision(row['run']) else names
 
@@ -176,7 +177,7 @@ def validate_inputs(country, rel, directory, report_path, signing=False):
     return inputs.row, inputs.report
 
 
-def validated_inputs(country, rel, directory, report_path, signing=False, commit='refs/heads/main', verified_report_hash=None):
+def validated_inputs(country, rel, directory, report_path, signing=False, commit='refs/heads/main', verified_report_hash=None, signed_manifest=None):
     identity(country, rel)
     row_bytes = (directory / 'release.json').read_bytes()
     row = decode(row_bytes)
@@ -211,25 +212,25 @@ def validated_inputs(country, rel, directory, report_path, signing=False, commit
     data = {'report.json': report_bytes, 'release.json': row_bytes}
     expected = {name: (hashlib.sha256(value).hexdigest(), len(value)) for name, value in data.items()}
     expected |= {'corpus.dump': (dump_hash, dump_size), 'MANIFEST.sha256': (build_hash, len(manifest_bytes))}
+    if signed_manifest is not None and not signing:
+        raise ValueError('signed schema is only valid for re-signing')
+    schema, record, build_expected = verified_schema(directory, manifest_lines, row, signed_manifest, decode)
+    if build_expected is not None:
+        expected['build.json'] = build_expected
     evidence = None
-    if row['schema_version'] >= 8:
-        build_bytes = (directory / 'build.json').read_bytes()
-        build_digest = hashlib.sha256(build_bytes).hexdigest()
-        build_lines = [line for line in manifest_lines if re.fullmatch(r'[0-9a-f]{64}  build\.json', line)]
-        if build_lines != [build_digest + '  build.json']:
-            raise ValueError('build manifest must name the build.json hash exactly once')
-        expected['build.json'] = (build_digest, len(build_bytes))
-        record = decode(build_bytes)
-        if not isinstance(record, dict):
-            raise ValueError('invalid build record')
+    if schema >= 8:
+        if record is None:
+            raise ValueError('schema requires build record')
         evidence = dict(projection=record.get('heading_projection'),
                         scan_sha256=record.get('heading_scan_sha256'),
                         exclusions_sha256=record.get('heading_exclusions_sha256'))
         validate_heading_evidence(evidence)
     sidecars = None
     if has_decision(run):
-        sidecars = validate_sidecars(row, report, report_bytes, directory, dump_hash, build_hash)
+        sidecars = validate_sidecars(row, report, report_bytes, directory, dump_hash, build_hash, record)
         expected |= {name: (sidecars['evidence'][RUN_FIELDS[name]], (directory / name).stat().st_size) for name in SIDECARS}
+    elif row['schema_version'] == 9:
+        raise ValueError('schema 9 requires evidence sidecars')
     return Inputs(row, report, evidence, sidecars, expected, data)
 
 
@@ -246,7 +247,7 @@ def validate_manifest(obj):
     keys = {'kind', 'version', 'repository', 'commit', 'country', 'rel', 'database',
             'sequence', 'previous', 'dump', 'report', 'build_artifact_sha256',
             'schema_version', 'extensions', 'recipes'}
-    if not isinstance(obj, dict) or set(obj) - {'heading_review', 'heading_evidence', 'evidence'} != keys:
+    if not isinstance(obj, dict) or set(obj) - {'heading_review', 'heading_evidence', 'evidence', 'changes_projection'} != keys:
         raise ValueError('invalid corpus manifest fields')
     if 'heading_review' in obj:
         validate_heading_review(obj['heading_review'])
@@ -260,7 +261,16 @@ def validate_manifest(obj):
     require_match(r'[0-9a-f]{40}', obj['commit'], 'commit')
     require_match(r'[0-9]{8}(?:_[0-9]+)?', obj['previous'], 'previous rel')
     positive(obj['sequence'], 'sequence')
-    positive(obj['schema_version'], 'schema version')
+    if type(obj['schema_version']) is not int or obj['schema_version'] not in SUPPORTED_SCHEMA_VERSIONS:
+        raise ValueError('unsupported schema version')
+    if obj['schema_version'] == 9:
+        projection = obj.get('changes_projection')
+        if (not isinstance(projection, dict) or set(projection) != {'version', 'sha256'} or
+                type(projection['version']) is not int or projection['version'] != 1):
+            raise ValueError('invalid changes projection')
+        require_match(r'[0-9a-f]{64}', projection['sha256'], 'changes projection hash')
+    elif 'changes_projection' in obj:
+        raise ValueError('changes projection is forbidden outside schema 9')
     if obj['schema_version'] >= 8:
         validate_heading_evidence(obj.get('heading_evidence'))
     elif 'heading_evidence' in obj:
@@ -293,10 +303,10 @@ def read_manifest(data):
 
 
 def manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report=None,
-                    verified_report_hash=None):
+                    verified_report_hash=None, signed_manifest=None):
     row, report, evidence, sidecars, expected, _ = validated_inputs(
         country, rel, directory, report_path, signing=True, commit=None if verified_report_hash is not None else commit,
-        verified_report_hash=verified_report_hash)
+        verified_report_hash=verified_report_hash, signed_manifest=signed_manifest)
     if previous_report is not None:
         validate_report(report, country, rel, previous_report=previous_report, release_row=row)
     obj = dict(kind='trachuan.corpus-release', version=1, repository=repository,
@@ -312,13 +322,15 @@ def manifest_fields(repository, commit, sequence, country, rel, directory, repor
         obj['heading_evidence'] = evidence
     if sidecars is not None:
         obj['evidence'] = sidecars['evidence']
+        if row['schema_version'] == 9:
+            obj['changes_projection'] = sidecars['changes_projection']
     return obj
 
 
 def create(repository, commit, sequence, country, rel, directory, report_path, previous_report=None,
-           heading_reviews_path=None, verified_report_hash=None):
+           heading_reviews_path=None, verified_report_hash=None, signed_manifest=None):
     obj = manifest_fields(repository, commit, sequence, country, rel, directory, report_path, previous_report,
-                          verified_report_hash=verified_report_hash)
+                          verified_report_hash=verified_report_hash, signed_manifest=signed_manifest)
     review = heading_review(rel, heading_reviews_path)
     if review is not None:
         obj['heading_review'] = review
@@ -336,9 +348,9 @@ def main():
     args = parser.parse_args()
     if args.command == 'validate':
         require_status_country(args.country)
-        row, _ = validate_inputs(args.country, args.rel, args.directory, args.report)
+        inputs = validated_inputs(args.country, args.rel, args.directory, args.report)
         if args.list_files:
-            print('\n'.join(release_files(row)))
+            print('\n'.join(release_files(inputs.row, include_build='build.json' in inputs.expected)))
     else:
         if args.list_files:
             parser.error('--list-files requires validate')
@@ -352,7 +364,7 @@ def main():
         commit = os.environ['GITHUB_SHA']
         row, report, _, sidecars, _, _ = validated_inputs(
             args.country, args.rel, args.directory, args.report, signing=True,
-            commit=None if verified_hash is not None else commit, verified_report_hash=verified_hash)
+            commit=None if verified_hash is not None else commit, verified_report_hash=verified_hash, signed_manifest=signed)
         if sidecars is not None:
             print('Open findings allowed: review {review}, info {info}'.format(**sidecars['open']))
             print('Findings against {rel}: new {new}, gone {gone}'.format(rel=sidecars['predecessor']['rel'], **sidecars['changed']))
@@ -360,7 +372,7 @@ def main():
         (args.directory / 'manifest.json').write_bytes(create(
             repository, os.environ['GITHUB_SHA'], int(os.environ['GITHUB_RUN_NUMBER']),
             args.country, args.rel, args.directory, args.report, previous_report=previous_report,
-            verified_report_hash=verified_hash))
+            verified_report_hash=verified_hash, signed_manifest=signed))
 
 
 if __name__ == '__main__':

@@ -114,7 +114,7 @@ def resign_differences(country, rel, directory, temporary, repository):
         return signed, [('report_sha256', signed['report']['sha256'], local_hash)]
     rebuilt = validate_manifest(manifest_fields(repository, signed['commit'], signed['sequence'], country, rel,
                                                 directory, directory / 'report.json',
-                                                verified_report_hash=signed['report']['sha256']))
+                                                verified_report_hash=signed['report']['sha256'], signed_manifest=signed))
     return signed, [(field, shown(signed, field), shown(rebuilt, field)) for field in changed_fields(signed, rebuilt)]
 
 

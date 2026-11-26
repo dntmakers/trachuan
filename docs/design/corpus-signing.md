@@ -108,3 +108,16 @@ covers `sources/vn-heading-exclusions.yaml` like the corrections
 
 A release with a [decision](release-evidence.md#selected-report) also carries
 `evidence: {findings_sha256, identity_sha256, changes_sha256}`.
+
+`schema_version` comes from a verified source before any file or check is
+chosen. A re-sign of a verified `<cc>-<rel>` manifest keeps that manifest's
+`schema_version`. Below schema 8 a missing `build.json` does not block it; from
+schema 8 the re-sign reads `build.json` as the first signing did. A storage
+object that cannot be read fails the re-sign closed. A first signing and an
+upload take it from the build record: the report binds `MANIFEST.sha256`, which
+must name `build.json`; they check its line, read it, and use its schema
+version. A first signing without `build.json` is refused. In both cases
+`release.json` must state the same version, and a version outside the supported
+list is refused. Only then do they choose which files and checks apply, such as
+`heading_evidence` from schema 8 and `changes_projection` from schema 9, so no
+unsigned file can change the schema of a release.

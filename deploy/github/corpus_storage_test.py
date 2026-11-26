@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from corpus_evidence import LIMITS, SIDECARS
 from corpus_upload_test import FAKE
-from corpus_test_support import add_heading_build, digest, save_fixture, save_older_shape, signed_create as create, write_fixture
+from corpus_test_support import add_heading_build, digest, remove_build_record, save_fixture, save_older_shape, set_schema_build, signed_create as create, write_fixture
 
 
 class CorpusStorageTest(unittest.TestCase):
@@ -28,7 +28,7 @@ class CorpusStorageTest(unittest.TestCase):
         self.remote.mkdir()
         self.row, self.report = write_fixture(self.remote)
         self.row['schema_version'] = 7
-        save_fixture(self.remote, self.row, self.report)
+        remove_build_record(self.remote, self.row, self.report)
         executable = self.path / 'aws'
         executable.write_text(FAKE)
         executable.chmod(0o755)
@@ -84,6 +84,24 @@ class CorpusStorageTest(unittest.TestCase):
                 self.storage.download('vn', '20990102_1', self.report_sha256(), value, self.path / 'malformed')
             self.assertFalse(self.log.exists())
             self.assertFalse((self.path / 'malformed').exists())
+
+    def test_resign_refuses_unreadable_stray_build_object(self):
+        set_schema_build(self.remote, self.row, self.report, 7)
+        for name, fault in [('oversized', {'FAKE_HEAD_SIZES': json.dumps({'build.json': 16 * 1024**2 + 1})}),
+                            ('unreadable', {'FAKE_BAD_SIZE': 'build.json'}),
+                            ('denied', {'FAKE_HEAD_DENIED': 'build.json'})]:
+            with self.subTest(name=name), patch.dict(os.environ, self.env | fault, clear=True), \
+                    self.assertRaisesRegex(ValueError, 'build.json'):
+                self.storage.download('vn', '20990102_1', self.report_sha256(), '', self.path / name)
+
+    def test_resign_downloads_legacy_without_named_build_object(self):
+        set_schema_build(self.remote, self.row, self.report, 7)
+        (self.remote / 'build.json').unlink()
+        output = self.path / 'legacy-missing-build'
+        with patch.dict(os.environ, self.env, clear=True):
+            self.storage.download('vn', '20990102_1', self.report_sha256(), '', output)
+        self.assertFalse((output / 'build.json').exists())
+        self.assertEqual((output / 'corpus.dump').read_bytes(), (self.remote / 'corpus.dump').read_bytes())
 
     def test_empty_release_pin_downloads_without_registry_tools(self):
         self.install_registry_fakes()
@@ -147,27 +165,31 @@ class CorpusStorageTest(unittest.TestCase):
             self.storage.download('../', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / 'unused')
         self.assertFalse(self.log.exists())
 
-    def test_older_shape_downloads_four_objects_and_never_its_stray_evidence(self):
+    def test_older_shape_downloads_available_evidence_before_signed_schema_is_known(self):
         save_older_shape(self.remote, self.row)
         output = self.path / 'older'
         with patch.dict(os.environ, self.env, clear=True):
             self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), output)
-        self.assertEqual(sorted(path.name for path in output.iterdir()), sorted(['corpus.dump', 'MANIFEST.sha256', 'release.json', 'report.json']))
+        self.assertEqual(sorted(path.name for path in output.iterdir()),
+                         sorted(['corpus.dump', 'MANIFEST.sha256', 'release.json', 'report.json', *SIDECARS]))
         for name in SIDECARS:
             (self.remote / name).unlink()
         with patch.dict(os.environ, self.env, clear=True):
             self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / 'older-without-evidence')
 
-    def test_decision_release_missing_evidence_refuses_before_dump_download(self):
+    def test_decision_release_missing_evidence_is_refused_by_signing(self):
+        from corpus_manifest import validated_inputs
         for name in SIDECARS:
             with self.subTest(name=name):
                 data = (self.remote / name).read_bytes()
                 (self.remote / name).unlink()
                 self.log.unlink(missing_ok=True)
-                with patch.dict(os.environ, self.env, clear=True), self.assertRaisesRegex(ValueError, 'evidence files'):
-                    self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / ('missing-' + name))
-                calls = [json.loads(line) for line in self.log.read_text().splitlines()]
-                self.assertFalse(any('get-object' in call['args'] and 'vn/20990102_1/corpus.dump' in call['args'] for call in calls))
+                output = self.path / ('missing-' + name)
+                with patch.dict(os.environ, self.env, clear=True):
+                    self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), output)
+                with patch('corpus_manifest.validate_authorized'), self.assertRaises((ValueError, OSError)):
+                    validated_inputs('vn', '20990102_1', output, output / 'report.json', signing=True,
+                                     signed_manifest={'schema_version': 7})
                 (self.remote / name).write_bytes(data)
 
     def test_evidence_limits_are_sixteen_mib_and_one_gib(self):
@@ -252,6 +274,19 @@ class CorpusStorageTest(unittest.TestCase):
                     self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / version)
                 self.assertFalse((self.path / version).exists())
 
+    def test_schema_nine_build_refuses_spoofed_release_after_download(self):
+        from corpus_manifest import validated_inputs
+        set_schema_build(self.remote, self.row, self.report, 9)
+        for version in (7, 8, 10):
+            self.row['schema_version'] = version
+            (self.remote / 'release.json').write_text(json.dumps(self.row))
+            self.log.unlink(missing_ok=True)
+            output = self.path / f'spoof-{version}'
+            with self.subTest(version=version), patch.dict(os.environ, self.env, clear=True):
+                self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), output)
+                with patch('corpus_manifest.validate_authorized'), self.assertRaisesRegex(ValueError, 'schema'):
+                    validated_inputs('vn', '20990102_1', output, output / 'report.json', signing=True)
+
     def test_schema_eight_downloads_all_eight_objects_after_all_heads(self):
         add_heading_build(self.remote, self.row, self.report)
         output = self.path / 'schema-eight'
@@ -286,14 +321,15 @@ class CorpusStorageTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / f'fault-{index}')
 
-    def test_schema_eight_missing_build_record_refuses_before_dump_download(self):
+    def test_schema_eight_missing_build_record_is_refused_by_signing(self):
+        from corpus_manifest import validated_inputs
         add_heading_build(self.remote, self.row, self.report)
         (self.remote / 'build.json').unlink()
+        output = self.path / 'missing-build'
         with patch.dict(os.environ, self.env, clear=True):
-            with self.assertRaises(ValueError):
-                self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), self.path / 'missing-build')
-        calls = [json.loads(line) for line in self.log.read_text().splitlines()]
-        self.assertFalse(any('get-object' in call['args'] and 'vn/20990102_1/corpus.dump' in call['args'] for call in calls))
+            self.storage.download('vn', '20990102_1', self.report_sha256(), self.release_sha256(), output)
+        with patch('corpus_manifest.validate_authorized'), self.assertRaises((ValueError, OSError)):
+            validated_inputs('vn', '20990102_1', output, output / 'report.json', signing=True)
 
     def test_schema_eight_counts_build_record_in_free_space_check(self):
         add_heading_build(self.remote, self.row, self.report)
