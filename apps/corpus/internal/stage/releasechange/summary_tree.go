@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type summaryDocument struct {
+type SummaryDocument struct {
 	Key, NumberNorm, StatusClass string
 	EffFrom, EffTo               *string
 	IsCurrent, ValidityConflict  bool
@@ -15,28 +15,28 @@ type summaryDocument struct {
 	TextComplete, Baseline       bool
 }
 
-type assignment struct {
+type Assignment struct {
 	Node    int64  `json:"node"`
 	Family  int64  `json:"family"`
 	Method  string `json:"method"`
 	Exclude bool   `json:"exclude"`
 }
 
-type summaryProvision struct {
+type SummaryProvision struct {
 	ID          int64
 	ParentID    *int64
 	Anchor      string
 	TextSHA256  string
-	Assignments []assignment
-	Validity    []validityRow
+	Assignments []Assignment
+	Validity    []ValidityRow
 }
 
-type taxonomyNode struct {
+type TaxonomyNode struct {
 	Code   string
 	Served bool
 }
 
-type summaryRelation struct {
+type SummaryRelation struct {
 	Kind, Method    string
 	SourceKey       string
 	SourceNumber    string
@@ -49,12 +49,12 @@ type summaryRelation struct {
 	TargetNode      *string
 }
 
-func (d summaryDocument) line() documentLine {
+func (d SummaryDocument) line() documentLine {
 	return documentLine{Type: recordDocument, Key: d.Key, NumberNorm: d.NumberNorm, StatusClass: d.StatusClass, EffFrom: d.EffFrom, EffTo: d.EffTo, IsCurrent: d.IsCurrent, ValidityConflict: d.ValidityConflict, TextSource: d.TextSource, TextComplete: d.TextComplete, Baseline: d.Baseline}
 }
 
 type provisionTree struct {
-	byID     map[int64]*summaryProvision
+	byID     map[int64]*SummaryProvision
 	suffixed map[string]bool
 }
 
@@ -71,8 +71,8 @@ func cutSuffix(component string) (string, bool) {
 	return component[:i], true
 }
 
-func newProvisionTree(rows []summaryProvision) *provisionTree {
-	t := &provisionTree{byID: make(map[int64]*summaryProvision, len(rows)), suffixed: map[string]bool{}}
+func newProvisionTree(rows []SummaryProvision) *provisionTree {
+	t := &provisionTree{byID: make(map[int64]*SummaryProvision, len(rows)), suffixed: map[string]bool{}}
 	for i := range rows {
 		p := &rows[i]
 		t.byID[p.ID] = p
@@ -87,8 +87,8 @@ func newProvisionTree(rows []summaryProvision) *provisionTree {
 	return t
 }
 
-func (t *provisionTree) lineage(p *summaryProvision) ([]*summaryProvision, error) {
-	chain := []*summaryProvision{p}
+func (t *provisionTree) lineage(p *SummaryProvision) ([]*SummaryProvision, error) {
+	chain := []*SummaryProvision{p}
 	for current := p; current.ParentID != nil; {
 		parent := t.byID[*current.ParentID]
 		if parent == nil {
@@ -103,7 +103,7 @@ func (t *provisionTree) lineage(p *summaryProvision) ([]*summaryProvision, error
 	return chain, nil
 }
 
-func (t *provisionTree) ambiguous(chain []*summaryProvision) bool {
+func (t *provisionTree) ambiguous(chain []*SummaryProvision) bool {
 	for _, p := range chain {
 		prefix := ""
 		for component := range strings.SplitSeq(p.Anchor, "/") {
@@ -128,7 +128,7 @@ func methodRank(method string) int {
 	return 3
 }
 
-func effectiveCodes(chain []*summaryProvision, nodes map[int64]taxonomyNode) ([]string, error) {
+func effectiveCodes(chain []*SummaryProvision, nodes map[int64]TaxonomyNode) ([]string, error) {
 	decided := map[int64]bool{}
 	codes := []string{}
 	for _, p := range chain {
@@ -176,11 +176,11 @@ func compareOptional(a, b *string) int {
 	return strings.Compare(*a, *b)
 }
 
-func compareValidity(a, b validityRow) int {
+func compareValidity(a, b ValidityRow) int {
 	return cmp.Or(strings.Compare(a.StatusClass, b.StatusClass), compareOptional(a.EffFrom, b.EffFrom), compareOptional(a.EffTo, b.EffTo), strings.Compare(a.Method, b.Method))
 }
 
-func provisionLines(key string, rows []summaryProvision, nodes map[int64]taxonomyNode) ([]provisionLine, error) {
+func provisionLines(key string, rows []SummaryProvision, nodes map[int64]TaxonomyNode) ([]provisionLine, error) {
 	for i := 1; i < len(rows); i++ {
 		if rows[i-1].Anchor >= rows[i].Anchor {
 			return nil, refuse("%s provisions are not in strict anchor order at %s", key, rows[i].Anchor)
@@ -200,7 +200,7 @@ func provisionLines(key string, rows []summaryProvision, nodes map[int64]taxonom
 		}
 		validity := slices.Clone(p.Validity)
 		if validity == nil {
-			validity = []validityRow{}
+			validity = []ValidityRow{}
 		}
 		slices.SortFunc(validity, compareValidity)
 		line := provisionLine{Type: recordProvision, Key: key, Anchor: p.Anchor, Ambiguous: tree.ambiguous(chain), TextSHA256: p.TextSHA256, Nodes: codes, Validity: validity}
@@ -226,7 +226,7 @@ func textMethod(method string) bool {
 	return text && !reference
 }
 
-func relationFor(r summaryRelation) relationIdentity {
+func relationFor(r SummaryRelation) relationIdentity {
 	source := r.SourceKey
 	out := relationIdentity{Type: recordRelation, Kind: r.Kind, Method: r.Method,
 		Source: relationEnd{Key: &source, Number: r.SourceNumber, InRelease: r.SourceInRelease, Anchor: r.SourceAnchor},
@@ -250,7 +250,7 @@ type sortedRelation struct {
 	line     relationLine
 }
 
-func relationLines(rows []summaryRelation) ([]sortedRelation, error) {
+func relationLines(rows []SummaryRelation) ([]sortedRelation, error) {
 	out := make([]sortedRelation, 0, len(rows))
 	for _, r := range rows {
 		identity := relationFor(r)

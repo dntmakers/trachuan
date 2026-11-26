@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"bytes"
@@ -13,7 +13,7 @@ type changesCase struct {
 	t                  *testing.T
 	dir                string
 	previous, current  *fakeSummary
-	before, after      members
+	before, after      Members
 	predecessorBinding string
 }
 
@@ -35,7 +35,7 @@ func (c *changesCase) inputs() changeInputs {
 	if binding == "" {
 		binding = hashPrefix + bareSHA256(data)
 	}
-	return changeInputs{current: cur, predecessor: prev, members: c.after, bindings: changesBindings{identityBindings: identityTestBindings(testRel), PredecessorRel: previousRel, PredecessorIdentitySHA256: binding}}
+	return changeInputs{current: cur, predecessor: prev, Members: c.after, bindings: ChangesBindings{IdentityBindings: identityTestBindings(testRel), PredecessorRel: previousRel, PredecessorIdentitySHA256: binding}}
 }
 
 func (c *changesCase) run() (string, error) {
@@ -302,7 +302,7 @@ func TestWriteChanges_RefusesUnboundOrDamagedSummaries(t *testing.T) {
 			mutate(c, &in)
 			var buf bytes.Buffer
 			err := writeChanges(&buf, in)
-			var refused *inputError
+			var refused *InputError
 			if !errors.As(err, &refused) {
 				t.Fatalf("err = %v", err)
 			}

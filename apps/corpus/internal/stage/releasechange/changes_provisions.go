@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"slices"
@@ -29,8 +29,8 @@ type validityChange struct {
 	Type       string        `json:"type"`
 	Key        string        `json:"key"`
 	Anchor     string        `json:"anchor"`
-	Added      []validityRow `json:"added"`
-	Removed    []validityRow `json:"removed"`
+	Added      []ValidityRow `json:"added"`
+	Removed    []ValidityRow `json:"removed"`
 	Provenance bool          `json:"provenance,omitempty"`
 	Ambiguous  bool          `json:"ambiguous,omitempty"`
 }
@@ -104,7 +104,7 @@ func newProvisionPlan(in changeInputs, before, after map[string]summaryRecord, h
 	if len(p.preloaded) == 0 {
 		return p, nil
 	}
-	r, err := openSummary(in.predecessor, &identityHeader{})
+	r, err := openSummary(in.predecessor, &IdentityHeader{})
 	if err != nil {
 		return nil, err
 	}
@@ -124,13 +124,13 @@ func newProvisionPlan(in changeInputs, before, after map[string]summaryRecord, h
 	}
 }
 
-func (p *provisionPlan) pass(kind string, out *lineWriter) error {
-	current, err := openSummary(p.in.current, &identityHeader{})
+func (p *provisionPlan) pass(kind string, emit func(any) error) error {
+	current, err := openSummary(p.in.current, &IdentityHeader{})
 	if err != nil {
 		return err
 	}
 	defer current.close()
-	previous, err := openSummary(p.in.predecessor, &identityHeader{})
+	previous, err := openSummary(p.in.predecessor, &IdentityHeader{})
 	if err != nil {
 		return err
 	}
@@ -147,14 +147,14 @@ func (p *provisionPlan) pass(kind string, out *lineWriter) error {
 				return err
 			}
 		}
-		if err = compareProvisions(out, kind, key, before, after, p.flags[key]); err != nil {
+		if err = compareProvisions(emit, kind, key, before, after, p.flags[key]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func compareProvisions(out *lineWriter, kind, key string, before, after []summaryRecord, provenance bool) error {
+func compareProvisions(emit func(any) error, kind, key string, before, after []summaryRecord, provenance bool) error {
 	i, j := 0, 0
 	for i < len(before) || j < len(after) {
 		var record any
@@ -177,7 +177,7 @@ func compareProvisions(out *lineWriter, kind, key string, before, after []summar
 			j++
 		}
 		if record != nil {
-			if err := out.write(record); err != nil {
+			if err := emit(record); err != nil {
 				return err
 			}
 		}
@@ -217,7 +217,7 @@ func setDiff(before, after []string) []string {
 	return slices.Compact(out)
 }
 
-func validityKey(v validityRow) string {
+func validityKey(v ValidityRow) string {
 	optional := func(s *string) string {
 		if s == nil {
 			return "\x01"
@@ -227,12 +227,12 @@ func validityKey(v validityRow) string {
 	return v.StatusClass + "\x00" + optional(v.EffFrom) + "\x00" + optional(v.EffTo) + "\x00" + v.Method
 }
 
-func validityDiff(before, after []validityRow) (added, removed []validityRow) {
+func validityDiff(before, after []ValidityRow) (added, removed []ValidityRow) {
 	counts := map[string]int{}
 	for _, v := range before {
 		counts[validityKey(v)]++
 	}
-	added, removed = []validityRow{}, []validityRow{}
+	added, removed = []ValidityRow{}, []ValidityRow{}
 	for _, v := range after {
 		if counts[validityKey(v)] > 0 {
 			counts[validityKey(v)]--

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,7 +18,7 @@ func (s *Stage) summaryFor(pool *pgxpool.Pool) summarySource {
 	if s.summary != nil {
 		return s.summary(pool)
 	}
-	return sqlRelease{q: pool}
+	return releasechange.NewSQLRelease(pool)
 }
 
 func writeFile(path string, write func(io.Writer) error) error {
@@ -44,7 +45,7 @@ func writeSidecars(ctx context.Context, dir, rel string, inputs frozenInputs, m 
 		return err
 	}
 	return writeFile(filepath.Join(dir, changesFile), func(w io.Writer) error {
-		return writeChanges(w, changeInputs{current: identity, predecessor: inputs.predecessor.identityPath, members: m, bindings: inputs.changesBindings(rel)})
+		return releasechange.WriteChanges(w, releasechange.ChangeInputs{Current: identity, Predecessor: inputs.predecessor.identityPath, Members: m, Bindings: inputs.changesBindings(rel)})
 	})
 }
 

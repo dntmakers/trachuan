@@ -106,7 +106,7 @@ func (s *Stage) Plan(ctx context.Context, env stage.Env, run stage.Run) ([]stage
 	var refused *inputError
 	switch {
 	case errors.As(err, &refused):
-		return []stage.Item{{Key: itemKey(run), InputHash: stage.RecipeHash("evidence-input-refused", "1", refused.reason)}}, nil
+		return []stage.Item{{Key: itemKey(run), InputHash: stage.RecipeHash("evidence-input-refused", "1", refused.Reason)}}, nil
 	case err != nil:
 		return nil, err
 	}

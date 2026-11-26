@@ -4,9 +4,14 @@ package evidence
 
 import (
 	"bytes"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 	"strings"
 	"testing"
 )
+
+func identityTestBindings(rel string) identityBindings {
+	return identityBindings{Rel: rel, DumpSHA256: hashPrefix + strings.Repeat("d", 64), BuildArtifactSHA256: hashPrefix + strings.Repeat("b", 64), ReportSHA256: hashPrefix + strings.Repeat("c", 64)}
+}
 
 func TestSummary_AgainstReleaseDatabase(t *testing.T) {
 	f := newReleaseFixture(t)
@@ -34,7 +39,7 @@ func TestSummary_AgainstReleaseDatabase(t *testing.T) {
 
 	m := activeMembers("vn:vbpl:2099001", "vn:vbpl:2099002", "vn:vbpl:2099003")
 	var buf bytes.Buffer
-	if err := writeIdentity(f.ctx, &buf, sqlRelease{f.pool}, m, identityTestBindings(testRel)); err != nil {
+	if err := writeIdentity(f.ctx, &buf, releasechange.NewSQLRelease(f.pool), m, identityTestBindings(testRel)); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{

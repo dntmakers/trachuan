@@ -9,26 +9,14 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
+	"danny.vn/trachuan/apps/corpus/internal/stage/releasechange"
 )
 
 func membersFrom(inv build.Inventory, identityInventoryHash string) (members, error) {
 	if inv.Version != 2 {
 		return members{}, refuse("identity summary needs the run's frozen membership inventory")
 	}
-	if inv.IdentityHash() != identityInventoryHash {
-		return members{}, refuse("membership inventory differs from the build's")
-	}
-	m := members{active: map[string]bool{}, disposition: map[string]string{}, replacement: map[string]string{}}
-	for _, e := range inv.Membership.Entries {
-		m.disposition[e.DocumentKey] = e.Disposition
-		switch {
-		case e.Disposition == "active":
-			m.active[e.DocumentKey] = true
-		case e.Disposition == "source_replaced" && e.ReplacementKey != nil:
-			m.replacement[e.DocumentKey] = *e.ReplacementKey
-		}
-	}
-	return m, nil
+	return releasechange.NewMembers(inv.Membership.Entries, inv.IdentityHash(), identityInventoryHash)
 }
 
 func (s *Stage) loadMembers(ctx context.Context, env stage.Env, run stage.Run, buildDir string) (members, error) {

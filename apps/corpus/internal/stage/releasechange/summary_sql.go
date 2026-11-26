@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"context"
@@ -19,15 +19,15 @@ const summaryRelationsSQL = `SELECT r.kind, r.method, r.source_key, r.source_num
  r.target_key, r.target_number, r.target_document_id IS NOT NULL, tp.anchor, r.target_node_id
  FROM relation r LEFT JOIN provision sp ON sp.id=r.source_provision_id LEFT JOIN provision tp ON tp.id=r.target_provision_id`
 
-func (s sqlRelease) SummaryDocuments(ctx context.Context) ([]summaryDocument, error) {
+func (s SQLRelease) SummaryDocuments(ctx context.Context) ([]SummaryDocument, error) {
 	rows, err := s.q.Query(ctx, summaryDocumentsSQL)
 	if err != nil {
 		return nil, fmt.Errorf("read summary documents: %w", err)
 	}
 	defer rows.Close()
-	var out []summaryDocument
+	var out []SummaryDocument
 	for rows.Next() {
-		var d summaryDocument
+		var d SummaryDocument
 		if err = rows.Scan(&d.Key, &d.NumberNorm, &d.StatusClass, &d.EffFrom, &d.EffTo, &d.IsCurrent, &d.ValidityConflict, &d.TextSource, &d.TextComplete, &d.Baseline); err != nil {
 			return nil, fmt.Errorf("read summary documents: %w", err)
 		}
@@ -39,16 +39,16 @@ func (s sqlRelease) SummaryDocuments(ctx context.Context) ([]summaryDocument, er
 	return out, nil
 }
 
-func (s sqlRelease) SummaryNodes(ctx context.Context) (map[int64]taxonomyNode, error) {
+func (s SQLRelease) SummaryNodes(ctx context.Context) (map[int64]TaxonomyNode, error) {
 	rows, err := s.q.Query(ctx, `SELECT id, code, status='active' AND provision_count>0 FROM taxonomy_node`)
 	if err != nil {
 		return nil, fmt.Errorf("read taxonomy nodes: %w", err)
 	}
 	defer rows.Close()
-	out := map[int64]taxonomyNode{}
+	out := map[int64]TaxonomyNode{}
 	for rows.Next() {
 		var id int64
-		var n taxonomyNode
+		var n TaxonomyNode
 		if err = rows.Scan(&id, &n.Code, &n.Served); err != nil {
 			return nil, fmt.Errorf("read taxonomy nodes: %w", err)
 		}
@@ -60,17 +60,17 @@ func (s sqlRelease) SummaryNodes(ctx context.Context) (map[int64]taxonomyNode, e
 	return out, nil
 }
 
-func (s sqlRelease) SummaryProvisions(ctx context.Context, fn func(string, []summaryProvision) error) error {
+func (s SQLRelease) SummaryProvisions(ctx context.Context, fn func(string, []SummaryProvision) error) error {
 	rows, err := s.q.Query(ctx, summaryProvisionsSQL)
 	if err != nil {
 		return fmt.Errorf("read summary provisions: %w", err)
 	}
 	defer rows.Close()
 	current := ""
-	var group []summaryProvision
+	var group []SummaryProvision
 	for rows.Next() {
 		var key, text string
-		var p summaryProvision
+		var p SummaryProvision
 		var assignments, validity []byte
 		if err = rows.Scan(&key, &p.ID, &p.ParentID, &p.Anchor, &text, &assignments, &validity); err != nil {
 			return fmt.Errorf("read summary provisions: %w", err)
@@ -100,14 +100,14 @@ func (s sqlRelease) SummaryProvisions(ctx context.Context, fn func(string, []sum
 	return nil
 }
 
-func (s sqlRelease) SummaryRelations(ctx context.Context, fn func(summaryRelation) error) error {
+func (s SQLRelease) SummaryRelations(ctx context.Context, fn func(SummaryRelation) error) error {
 	rows, err := s.q.Query(ctx, summaryRelationsSQL)
 	if err != nil {
 		return fmt.Errorf("read summary relations: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var r summaryRelation
+		var r SummaryRelation
 		if err = rows.Scan(&r.Kind, &r.Method, &r.SourceKey, &r.SourceNumber, &r.SourceInRelease, &r.SourceAnchor, &r.TargetKey, &r.TargetNumber, &r.TargetInRelease, &r.TargetAnchor, &r.TargetNode); err != nil {
 			return fmt.Errorf("read summary relations: %w", err)
 		}

@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"bufio"
@@ -36,7 +36,7 @@ func ProjectStream(input io.ReadSeeker, emit func(releasechanges.Row) error) err
 	var header struct {
 		Schema   int             `json:"schema"`
 		Baseline *bool           `json:"baseline"`
-		Bindings changesBindings `json:"bindings"`
+		Bindings ChangesBindings `json:"bindings"`
 	}
 	if err := json.Unmarshal(scanner.Bytes(), &header); err != nil {
 		return fmt.Errorf("line 1: %w", err)

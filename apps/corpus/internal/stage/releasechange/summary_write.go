@@ -1,4 +1,4 @@
-package evidence
+package releasechange
 
 import (
 	"context"
@@ -7,22 +7,22 @@ import (
 	"strings"
 )
 
-type summarySource interface {
-	SummaryDocuments(context.Context) ([]summaryDocument, error)
-	SummaryNodes(context.Context) (map[int64]taxonomyNode, error)
-	SummaryProvisions(context.Context, func(string, []summaryProvision) error) error
-	SummaryRelations(context.Context, func(summaryRelation) error) error
+type SummarySource interface {
+	SummaryDocuments(context.Context) ([]SummaryDocument, error)
+	SummaryNodes(context.Context) (map[int64]TaxonomyNode, error)
+	SummaryProvisions(context.Context, func(string, []SummaryProvision) error) error
+	SummaryRelations(context.Context, func(SummaryRelation) error) error
 }
 
-type members struct {
+type Members struct {
 	active      map[string]bool
 	disposition map[string]string
 	replacement map[string]string
 }
 
-func writeIdentity(ctx context.Context, w io.Writer, src summarySource, m members, b identityBindings) error {
+func WriteIdentity(ctx context.Context, w io.Writer, src SummarySource, m Members, b IdentityBindings) error {
 	out := newLineWriter(w)
-	if err := out.write(identityHeader{Schema: summarySchema, Bindings: b}); err != nil {
+	if err := out.write(IdentityHeader{Schema: summarySchema, Bindings: b}); err != nil {
 		return err
 	}
 	present, err := writeDocuments(ctx, out, src, m)
@@ -34,7 +34,7 @@ func writeIdentity(ctx context.Context, w io.Writer, src summarySource, m member
 		return err
 	}
 	last := ""
-	err = src.SummaryProvisions(ctx, func(key string, rows []summaryProvision) error {
+	err = src.SummaryProvisions(ctx, func(key string, rows []SummaryProvision) error {
 		if key <= last {
 			return refuse("provisions of %s follow %s", key, last)
 		}
@@ -56,8 +56,8 @@ func writeIdentity(ctx context.Context, w io.Writer, src summarySource, m member
 	if err != nil {
 		return err
 	}
-	var relations []summaryRelation
-	if err = src.SummaryRelations(ctx, func(r summaryRelation) error {
+	var relations []SummaryRelation
+	if err = src.SummaryRelations(ctx, func(r SummaryRelation) error {
 		relations = append(relations, r)
 		return nil
 	}); err != nil {
@@ -75,7 +75,7 @@ func writeIdentity(ctx context.Context, w io.Writer, src summarySource, m member
 	return out.flush()
 }
 
-func writeDocuments(ctx context.Context, out *lineWriter, src summarySource, m members) (map[string]bool, error) {
+func writeDocuments(ctx context.Context, out *lineWriter, src SummarySource, m Members) (map[string]bool, error) {
 	docs, err := src.SummaryDocuments(ctx)
 	if err != nil {
 		return nil, err
