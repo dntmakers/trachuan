@@ -46,7 +46,6 @@ func TestRun_PreviousWarningRecordsIgnored(t *testing.T) {
 		value any
 	}{
 		{"wrong top-level shape", "not an array"},
-		{"extreme numeric shape", json.RawMessage(`1e10000`)},
 		{"wrong record shape", []any{42}},
 		{"removed overrides inside record", []any{map[string]any{"historical_policy": "agent", "merge_siblings": true}}},
 		{"malformed nested match", []any{map[string]any{"search": "not an array"}}},
@@ -73,6 +72,11 @@ func TestRun_PreviousWarningRecordsIgnored(t *testing.T) {
 		})
 	}
 	object := reportObject(t, baseline)
+	object["warning_cases"] = json.RawMessage(`[1e10000]`)
+	if _, err = decodePreviousReport(encodeObject(t, object)); err == nil || !strings.Contains(err.Error(), "non-finite") {
+		t.Fatalf("non-finite warning record: error %v", err)
+	}
+	object = reportObject(t, baseline)
 	object["outside"] = map[string]any{"historical_policy": "agent"}
 	if _, err = decodePreviousReport(encodeObject(t, object)); err == nil {
 		t.Fatal("outside removed override accepted")

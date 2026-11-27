@@ -33,7 +33,7 @@ func revisedSuites(t *testing.T) (Suite, Suite) {
 	current.Development = append([]Case(nil), previous.Development...)
 	current.Development[0].Tags = []string{"identifier", "transition"}
 	current.Development[2].Tags = []string{"historical", "multi_document"}
-	current.Hashes.Development = "revised-development"
+	current.Hashes.Development = testDigest("revised-development")
 	current.PreviousDevelopment = map[string][]byte{previous.Hashes.Development: data}
 	return previous, current
 }
@@ -227,7 +227,7 @@ func TestRun_HistoricalPolicyRemoved(t *testing.T) {
 	}
 	for _, value := range []string{`null`, `"agent"`} {
 		marked := strings.Replace(string(previous), `"version":4`, `"historical_policy":`+value+`,"version":4`, 1)
-		marked = strings.Replace(marked, `"non_current_tail":null`, `"historical_policy":`+value+`,"non_current_tail":null`, 1)
+		marked = strings.ReplaceAll(marked, `"non_regression":[{`, `"non_regression":[{"historical_policy":`+value+`,`)
 		path := filepath.Join(t.TempDir(), "report.json")
 		if err = os.WriteFile(path, []byte(marked), 0600); err != nil {
 			t.Fatal(err)

@@ -68,7 +68,7 @@ func revisionPair(t *testing.T, previous, current []revisionCase) (Report, Repor
 	t.Helper()
 	p, r := toleranceReport(t, .5), toleranceReport(t, .5)
 	p.Version, p.Scorer = 2, "agent-eval/5"
-	p.FixtureHashes.Development = "previous-development"
+	p.FixtureHashes.Development = testDigest("previous-development")
 	previousFixture := setDevelopmentRecords(t, &p, previous)
 	currentFixture := setDevelopmentRecords(t, &r, current)
 	cohorts, err := previousCohorts(&p)
@@ -279,7 +279,7 @@ func TestRevision_PlainRecordAfterRevisionRecord(t *testing.T) {
 
 func TestRevision_UnresolvedRevisionRefused(t *testing.T) {
 	p, r := toleranceReport(t, .7), toleranceReport(t, .7)
-	r.FixtureHashes.Development = "revised"
+	r.FixtureHashes.Development = testDigest("revised")
 	if err := finishQuality(&r, &p); err == nil || r.QualityPass {
 		t.Fatal("revised fixture compared without a revision")
 	}

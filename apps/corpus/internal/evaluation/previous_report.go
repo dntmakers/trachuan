@@ -6,6 +6,9 @@ import (
 )
 
 func decodePreviousReport(data []byte) (Report, error) {
+	if err := rejectDuplicateKeys(data); err != nil {
+		return Report{}, fmt.Errorf("previous report: %w", err)
+	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return Report{}, fmt.Errorf("decode previous report: %w", err)
@@ -26,6 +29,15 @@ func decodePreviousReport(data []byte) (Report, error) {
 	if err = json.Unmarshal(clean, &report); err != nil {
 		return Report{}, fmt.Errorf("decode previous report: %w", err)
 	}
+	if root, ok := legacy.(map[string]any); ok {
+		scanned := make(map[string]any, len(root))
+		for key, value := range root {
+			if key != "retrieval_recipe" {
+				scanned[key] = value
+			}
+		}
+		report.carriesOverride = carriesResearchOverride(scanned)
+	}
 	if report.Version >= 2 && report.Version <= 4 {
 		if root, ok := legacy.(map[string]any); ok {
 			if rows, ok := root["rejections"].([]any); ok {
@@ -42,6 +54,9 @@ func decodePreviousReport(data []byte) (Report, error) {
 				}
 			}
 		}
+	}
+	if err = validatePreviousFloorFields(clean); err != nil {
+		return Report{}, err
 	}
 	if report.Version >= 2 {
 		if err := validatePreviousMRR(legacy); err != nil {
@@ -86,4 +101,34 @@ func rejectRemovedOverrides(fields map[string]any) error {
 		return fmt.Errorf("incompatible previous historical_policy override: the research override was removed")
 	}
 	return nil
+}
+
+func carriesResearchOverride(value any) bool {
+	switch fields := value.(type) {
+	case map[string]any:
+		for key, child := range fields {
+			switch key {
+			case "cap_override", "article_cap_override", "non_current_tail":
+				if child != nil {
+					return true
+				}
+			case "not_yet_eligible":
+				if child != false {
+					return true
+				}
+			}
+			if carriesResearchOverride(child) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range fields {
+			if carriesResearchOverride(child) {
+				return true
+			}
+		}
+	case string:
+		return fields == "research_override"
+	}
+	return false
 }

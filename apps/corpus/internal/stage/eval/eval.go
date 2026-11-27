@@ -258,9 +258,9 @@ func (s *Stage) Resolve(_ context.Context, env stage.Env, run stage.Run, item st
 	if err != nil {
 		return stage.Resolution{}, fmt.Errorf("read report: %w", err)
 	}
-	var r evaluation.Report
-	if err = json.Unmarshal(data, &r); err != nil {
-		return stage.Resolution{}, fmt.Errorf("decode report: %w", err)
+	r, err := evaluation.DecodeReport(data)
+	if err != nil {
+		return stage.Resolution{}, err
 	}
 	if r.Status != "complete" || r.Country != run.Country || r.Rel != run.Rel || r.ReleaseEligible {
 		return stage.Resolution{}, fmt.Errorf("invalid evaluation report")

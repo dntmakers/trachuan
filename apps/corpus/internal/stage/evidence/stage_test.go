@@ -104,6 +104,19 @@ func (f *fixture) sync() {
 	f.queries.inventories[f.run.ID] = inventoryJSON(f.t, f.gaps, inventoryItemFor("build", key, f.build), inventoryItemFor("eval", key, art))
 }
 
+func (f *fixture) syncRaw(mutate func(string) string) {
+	f.t.Helper()
+	data, err := json.Marshal(f.report)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	body := mutate(string(data))
+	f.reportSum = bareSHA256([]byte(body))
+	art := f.publish("eval", f.reportSum, map[string]string{"report.json": body})
+	key := f.run.Country + "/" + f.run.Rel
+	f.queries.inventories[f.run.ID] = inventoryJSON(f.t, f.gaps, inventoryItemFor("build", key, f.build), inventoryItemFor("eval", key, art))
+}
+
 func inventoryItemFor(name, key string, art artifact.Result) inventoryItem {
 	path, sum := art.Path, art.SHA256
 	return inventoryItem{Stage: name, ItemKey: key, State: "done", Path: &path, ArtifactSHA256: &sum}
@@ -485,6 +498,16 @@ func TestProcess_PredecessorRefusals(t *testing.T) {
 				t.Fatal("refused input left the item without a hash")
 			}
 		})
+	}
+}
+
+func TestProcess_RefusesDuplicateReportKeys(t *testing.T) {
+	f := newFixture(t, noneDecision())
+	f.syncRaw(func(body string) string {
+		return strings.Replace(body, `"status":"complete"`, `"status":"failed","status":"complete"`, 1)
+	})
+	if _, _, err := f.process(); err == nil || !strings.Contains(err.Error(), "duplicate JSON field") {
+		t.Fatalf("err = %v", err)
 	}
 }
 

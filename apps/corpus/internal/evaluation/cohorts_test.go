@@ -54,7 +54,7 @@ func developmentSuite() Suite {
 	entry := s.Map.Entries[0]
 	entry.CaseID = "development-positive"
 	s.Map.Entries = append(s.Map.Entries, entry)
-	s.Hashes.Development = "development-fixture"
+	s.Hashes.Development = testDigest("development-fixture")
 	return s
 }
 
@@ -214,7 +214,7 @@ func TestDevelopment_NonRegressionIsIndependent(t *testing.T) {
 			t.Fatalf("comparison: %+v", comparison)
 		}
 	}
-	s.Hashes.Development = "changed"
+	s.Hashes.Development = testDigest("changed")
 	if _, _, err = Run(context.Background(), &recordedEngine{fakeEngine: fakeEngine{date: date}}, s, options); err == nil {
 		t.Fatal("changed development fixture compared")
 	}

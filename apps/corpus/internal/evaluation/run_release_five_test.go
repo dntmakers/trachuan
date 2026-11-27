@@ -71,6 +71,8 @@ func TestReleaseValidator_AcceptsGoVersionFiveCutover(t *testing.T) {
 			t.Fatalf("Go accepted %s", tc.name)
 		}
 	}
+	writePreviousShapeTampers(t, ctx, dir, previous, currentEngine, suite, date)
+	writePreviousWarningRecords(t, ctx, dir, previous, currentEngine, suite, date)
 	legacy, old := releaseLegacyFixtures(t, suite)
 	for name, data := range map[string][]byte{"fixture.json": fixture, "legacy.json": legacy, "old-product.json": old} {
 		if err = os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {

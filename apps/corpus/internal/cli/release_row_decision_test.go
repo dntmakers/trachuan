@@ -186,6 +186,7 @@ func TestReleaseDecision_RefusesUnverifiableReport(t *testing.T) {
 	tampered := eval
 	tampered.ArtifactHash = strings.Repeat("0", 64)
 	badDecision := stage.PreviousReport{SHA256: "NOT-HEX"}
+	duplicate, _ := evalReleaseItem(t, artifacts, `{"status":"failed","status":"complete"}`)
 	for name, tc := range map[string]struct {
 		decision stage.PreviousReport
 		items    []releaseItem
@@ -193,6 +194,7 @@ func TestReleaseDecision_RefusesUnverifiableReport(t *testing.T) {
 		"no eval item":   {decision, nil},
 		"other manifest": {decision, []releaseItem{tampered}},
 		"bad decision":   {badDecision, []releaseItem{eval}},
+		"duplicate key":  {decision, []releaseItem{duplicate}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			summary := releaseRun{}

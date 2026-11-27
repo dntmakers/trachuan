@@ -106,6 +106,17 @@ func previousTamperCases() []previousTamper {
 			r.Cohorts["old_product"] = c
 			r.Floors = c.Floors
 		}},
+		{"swapped old product floors", func(r *Report) {
+			c := r.Cohorts["old_product"]
+			c.Floors[0], c.Floors[1] = c.Floors[1], c.Floors[0]
+			r.Cohorts["old_product"] = c
+			r.Floors = c.Floors
+		}},
+		{"swapped development floors", func(r *Report) {
+			c := r.Cohorts["development"]
+			c.Floors[0], c.Floors[1] = c.Floors[1], c.Floors[0]
+			r.Cohorts["development"] = c
+		}},
 		{"duplicate development precision", func(r *Report) {
 			c := r.Cohorts["development"]
 			for _, m := range c.Metrics {

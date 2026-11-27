@@ -1,6 +1,7 @@
 import math
 
 from corpus_cohorts import cohort_counts
+from corpus_report_contract import no_research_override
 from corpus_watermark import carried_high_water
 
 
@@ -47,7 +48,9 @@ def indexed(records, fields):
         raise ValueError('missing report records')
     out = {}
     for record in records:
-        if not isinstance(record, dict) or any(field not in record for field in fields):
+        if not isinstance(record, dict) or any(field not in record for field in fields) or \
+                any(type(record[field]) is not int if field == 'limit' else not isinstance(record[field], str)
+                    for field in fields):
             raise ValueError('invalid report record')
         key = tuple(record[field] for field in fields)
         if key in out:
@@ -225,9 +228,17 @@ def check_mrr_fields(record):
             raise ValueError('invalid MRR loss identity or rank')
 
 
+def check_previous_records(previous):
+    no_research_override({key: value for key, value in previous.items() if key not in ('retrieval_recipe', 'warning_cases')})
+    cohort = (previous.get('cohorts') or {}).get('old_product')
+    if not isinstance(cohort, dict) or previous.get('non_regression') != cohort.get('non_regression'):
+        raise ValueError('previous top-level non_regression differs from old_product')
+
+
 def validate_comparisons(report, previous, revised=False):
     versions(previous)
     finite_values(previous)
+    check_previous_records(previous)
     if report['version'] < previous['version']:
         raise ValueError(f"report version cannot downgrade from {previous['version']} to {report['version']}")
     current_counts, prior_counts = cohort_counts(report), cohort_counts(previous)

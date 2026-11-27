@@ -167,6 +167,7 @@ type CompactSizeGate struct {
 }
 
 type Report struct {
+	carriesOverride        bool
 	RetrievalRecipe        json.RawMessage `json:"retrieval_recipe,omitempty"`
 	RetrievalRecipeVersion int             `json:"retrieval_recipe_version,omitempty"`
 	ValidityOverrides

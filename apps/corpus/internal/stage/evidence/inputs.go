@@ -188,16 +188,9 @@ func (s *Stage) resolveInputs(ctx context.Context, env stage.Env, run stage.Run,
 	if err != nil {
 		return frozenInputs{}, fmt.Errorf("read selected report: %w", err)
 	}
-	var report struct {
-		Status              string `json:"status"`
-		Country             string `json:"country"`
-		Rel                 string `json:"rel"`
-		BuildArtifactSHA256 string `json:"build_artifact_sha256"`
-		DumpSHA256          string `json:"dump_sha256"`
-		PreviousDiff        any    `json:"previous_diff"`
-	}
-	if err = json.Unmarshal(data, &report); err != nil {
-		return frozenInputs{}, refuse("decode selected report: %v", err)
+	report, err := evaluation.DecodeReport(data)
+	if err != nil {
+		return frozenInputs{}, refuse("selected report: %v", err)
 	}
 	if report.Status != "complete" || report.Country != run.Country || report.Rel != run.Rel {
 		return frozenInputs{}, refuse("selected report does not belong to %s", key)
@@ -208,7 +201,7 @@ func (s *Stage) resolveInputs(ctx context.Context, env stage.Env, run stage.Run,
 	if !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(report.DumpSHA256) {
 		return frozenInputs{}, refuse("selected report has no dump SHA-256")
 	}
-	compared, err := evaluation.Report{PreviousDiff: report.PreviousDiff}.ComparedRelease()
+	compared, err := report.ComparedRelease()
 	if err != nil {
 		return frozenInputs{}, refuse("selected report: %v", err)
 	}

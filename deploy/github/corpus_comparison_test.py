@@ -107,6 +107,42 @@ class CorpusComparisonTest(unittest.TestCase):
             with self.subTest(index=index), self.assertRaises(ValueError):
                 self.validate(candidate, previous)
 
+    def test_refuses_malformed_previous_records(self):
+        mutations = {
+            'top-level record without mode': lambda p: p['non_regression'][0].pop('mode'),
+            'top-level differs from old_product': lambda p: p['non_regression'][0].update(value=.5),
+            'top-level null name': lambda p: p['non_regression'][0].update(name=None),
+            'cohort record null name': lambda p: p['cohorts']['old_product']['non_regression'][0].update(name=None),
+            'cohort record float limit': lambda p: p['cohorts']['old_product']['non_regression'][0].update(limit=20.0),
+            'metric null mode': lambda p: p['cohorts']['development']['metrics'][0].update(mode=None),
+            'metric float limit': lambda p: p['cohorts']['development']['metrics'][0].update(limit=8.0),
+            'case row float limit': lambda p: p['cases'][0].update(limit=8.0),
+            'case row null arms': lambda p: p['cases'][0].update(arms=None),
+            'cap override': lambda p: p.update(cap_override=4),
+            'article cap override': lambda p: p['cohorts']['old_product']['metrics'][0].update(article_cap_override=2),
+            'non-current tail': lambda p: p['cases'][0].update(non_current_tail=1),
+            'not yet eligible': lambda p: p.update(not_yet_eligible=True),
+            'historical policy': lambda p: p.update(historical_policy='agent'),
+        }
+        for name, mutate in mutations.items():
+            previous, candidate = reports()
+            mutate(previous)
+            if name.startswith('top-level') and name != 'top-level differs from old_product':
+                mutate(candidate)
+            with self.subTest(name), self.assertRaises(ValueError):
+                self.validate(candidate, previous)
+        previous, candidate = reports()
+        self.validate(candidate, previous)
+
+    def test_previous_warning_records_are_not_read(self):
+        previous, candidate = reports()
+        previous['warning_cases'] = [dict(entry_id='x', cap_override=4, not_yet_eligible=True,
+                                          search=[dict(non_current_tail=1, article_cap_override=2)])]
+        self.validate(candidate, previous)
+        previous['unrelated'] = dict(cap_override=4)
+        with self.assertRaises(ValueError):
+            self.validate(candidate, previous)
+
     def test_version_one_cannot_claim_tolerance(self):
         previous, candidate = reports()
         candidate.update(version=1, scorer='agent-eval/4')
@@ -153,6 +189,7 @@ class CorpusComparisonTest(unittest.TestCase):
                     if record['name'] == 'mrr':
                         record['high_water'] = high_water
             candidate['non_regression'] = copy.deepcopy(candidate['cohorts']['old_product']['non_regression'])
+            previous['non_regression'] = copy.deepcopy(previous['cohorts']['old_product']['non_regression'])
             if allowed:
                 self.validate(candidate, previous)
                 previous['cohorts']['development']['non_regression'][0].pop('high_water')

@@ -86,7 +86,7 @@ func validatePreviousPrecision(cohort Cohort) error {
 	if len(cohort.Floors) != 2 {
 		return fmt.Errorf("precision floors differ")
 	}
-	for _, mode := range []retrieval.Mode{"exact", "ann"} {
+	for i, mode := range []retrieval.Mode{"exact", "ann"} {
 		var metric Metric
 		count := 0
 		for _, candidate := range cohort.Metrics {
@@ -97,6 +97,9 @@ func validatePreviousPrecision(cohort Cohort) error {
 		}
 		if count != 1 {
 			return fmt.Errorf("%s current law precision metric missing or duplicated", mode)
+		}
+		if metric.NonCurrentTail != nil || metric.NotYetEligible || metric.CapOverride != nil || metric.ArticleCapOverride != nil {
+			return fmt.Errorf("%s current law precision carries a research override", mode)
 		}
 		if metric.Denominator < 0 || metric.Numerator < 0 || metric.Numerator > float64(metric.Denominator) || math.Trunc(metric.Numerator) != metric.Numerator {
 			return fmt.Errorf("invalid %s current law precision", mode)
@@ -115,17 +118,9 @@ func validatePreviousPrecision(cohort Cohort) error {
 				status = "pass"
 			}
 		}
-		found := false
-		for _, floor := range cohort.Floors {
-			if floor.Mode == mode {
-				if found || floor.Status != status || floor.Floor != .99 || !reflect.DeepEqual(floor.Metric, metric) {
-					return fmt.Errorf("invalid %s precision floor", mode)
-				}
-				found = true
-			}
-		}
-		if !found {
-			return fmt.Errorf("missing %s precision floor", mode)
+		floor := cohort.Floors[i]
+		if floor.Status != status || floor.Floor != .99 || !reflect.DeepEqual(floor.Metric, metric) {
+			return fmt.Errorf("invalid %s precision floor", mode)
 		}
 	}
 	return nil
