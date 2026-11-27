@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMounted } from '@vueuse/core'
 import { computed, onMounted, ref } from 'vue'
 import { loginError, type Language } from '../../i18n'
 import { pagesMessages } from '../../i18n/pages'
@@ -19,6 +20,7 @@ const email = ref('')
 const password = ref('')
 const error = ref('')
 const busy = ref(false)
+const hydrated = useMounted()
 const client = useAuthApi()
 const secrets = usePageSecrets(() => { password.value = '' })
 async function signIn() {
@@ -42,10 +44,12 @@ async function signIn() {
     <p v-if="urlError" class="notice notice--warn" role="status">{{ urlError }}</p>
     <a class="btn google-button" :href="google"><img src="/google-g.png" alt="" width="20" height="20">{{ labels.google }}</a>
     <form class="auth-form" @submit.prevent="signIn">
-      <label>{{ labels.email }}<input v-model="email" class="input" type="email" autocomplete="username" required></label>
-      <label>{{ labels.password }}<input v-model="password" class="input" type="password" autocomplete="current-password" required></label>
-      <p v-if="error" class="notice" role="alert">{{ error }}</p>
-      <button class="btn btn-primary" :disabled="busy">{{ labels.signIn }}</button>
+      <fieldset :disabled="!hydrated">
+        <label>{{ labels.email }}<input v-model="email" class="input" type="email" autocomplete="username" required></label>
+        <label>{{ labels.password }}<input v-model="password" class="input" type="password" autocomplete="current-password" required></label>
+        <p v-if="error" class="notice" role="alert">{{ error }}</p>
+        <button class="btn btn-primary" :disabled="busy">{{ labels.signIn }}</button>
+      </fieldset>
     </form>
     <div class="auth-actions"><NuxtLink to="/signup">{{ labels.signup }}</NuxtLink><NuxtLink to="/reset">{{ labels.reset }}</NuxtLink></div>
   </div></div>
