@@ -20,3 +20,4 @@
   .recovery-codes { font-size: 11px; padding-left: 2em; }
   .recovery-codes li span { white-space: normal; overflow-wrap: normal; word-break: normal; }
 }
+.auth-form fieldset { display: flex; flex-direction: column; gap: 16px; min-width: 0; margin: 0; padding: 0; border: 0; }
