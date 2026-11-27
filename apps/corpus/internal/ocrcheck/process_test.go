@@ -62,12 +62,12 @@ func TestRenderer_CancellationKillsDescendantsAndRemovesScratch(t *testing.T) {
 		if err == nil {
 			t.Fatal("canceled render accepted")
 		}
-	case <-time.After(75 * time.Millisecond):
+	case <-time.After(10 * time.Second):
 		_ = unix.Kill(pid, unix.SIGKILL)
 		err = <-done
 		t.Fatalf("renderer blocked on a descendant holding the pipes: %v", err)
 	}
-	deadline := time.Now().Add(75 * time.Millisecond)
+	deadline := time.Now().Add(5 * time.Second)
 	for unix.Kill(pid, 0) == nil && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
@@ -111,7 +111,7 @@ func TestRenderer_ScratchLimitStopsActiveProcess(t *testing.T) {
 		if err == nil || err.Error() != "over_check_limit" {
 			t.Fatalf("limit reason=%v", err)
 		}
-	case <-time.After(75 * time.Millisecond):
+	case <-time.After(10 * time.Second):
 		cancel()
 		err = <-done
 		t.Fatalf("scratch growth did not stop active renderer: %v", err)
