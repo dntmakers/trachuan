@@ -285,22 +285,26 @@ def recorded_match(row, corpus, label):
 
 
 def recorded_prelude(row, corpus='law', label='corpus'):
-    return ('SELECT EXISTS (SELECT FROM public.release_journal WHERE ' + recorded_match(row, corpus, label) +
-            ') AS recorded \\gset\n'
-            "SELECT pg_catalog.set_config('" + RECORDED + "', :'recorded', true) AS ignored \\gset")
+    body = ("\nBEGIN\n  PERFORM pg_catalog.set_config('" + RECORDED + "', EXISTS (SELECT FROM public.release_journal WHERE " +
+            recorded_match(row, corpus, label) + ")::text, true);\nEND;\n")
+    tag = next(name for name in ('recorded' + str(n) for n in range(len(body))) if '$' + name + '$' not in body)
+    return 'DO $' + tag + '$' + body + '$' + tag + '$;'
 
 
 def settled_check(target):
     return ('settled := current_db IS NOT DISTINCT FROM ' + target + " AND pg_catalog.current_setting('" +
-            RECORDED + "') = 't';\n  PERFORM pg_catalog.set_config('" + SETTLED + "', settled::text, true);")
+            RECORDED + "')::boolean;\n  PERFORM pg_catalog.set_config('" + SETTLED + "', settled::text, true);")
 
 
 def finish_journal(row, corpus='law', label='corpus'):
-    return ("SELECT pg_catalog.current_setting('" + SETTLED + "')::boolean AS settled \\gset\n"
-            '\\if :settled\n'
-            'SELECT pg_catalog.row_to_json(j) FROM public.release_journal j WHERE ' +
-            recorded_match(row, corpus, label) + ' ORDER BY id DESC LIMIT 1;\n'
-            '\\else\n' + journal(row, 'activated', corpus, label) + '\n\\endif')
+    fields, value = journal_values(row, 'activated', corpus, label)
+    values = ','.join(literal(value[f]) + ('::jsonb' if f == 'manifest' else '') for f in fields)
+    settled = "pg_catalog.current_setting('" + SETTLED + "')::boolean"
+    return ('WITH inserted AS (INSERT INTO public.release_journal (' + ','.join(fields) + ') SELECT ' + values +
+            ' WHERE NOT ' + settled + ' RETURNING *)\n'
+            'SELECT pg_catalog.row_to_json(r) FROM (SELECT * FROM inserted UNION ALL SELECT * FROM '
+            'public.release_journal WHERE ' + settled + ' AND ' + recorded_match(row, corpus, label) +
+            ' ORDER BY id DESC LIMIT 1) r;')
 
 
 def activate(row, projection=0, retire=None):

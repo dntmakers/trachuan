@@ -54,7 +54,7 @@ class FrameworksSqlTest(unittest.TestCase):
                 self.assertEqual(positions, sorted(positions))
                 self.assertIn('ON CONFLICT (country) DO NOTHING', sql)
                 self.assertIn("'frameworks')\n    ON CONFLICT (country,db_name)", sql)
-                self.assertIn("'frameworks activated','frameworks')", sql)
+                self.assertIn("'frameworks activated','frameworks' WHERE NOT", sql)
                 self.assertEqual("DELETE FROM public.retired_release WHERE corpus_kind='frameworks'" in sql,
                                  mode == 'retained')
         self.assertIn('IS DISTINCT FROM NULL', frameworks.activate(frameworks_row('new', None)))

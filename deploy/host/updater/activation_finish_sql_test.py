@@ -216,3 +216,17 @@ class FinishRepeatTest(unittest.TestCase):
                 journal = json.loads(self.snapshot(key)[2])
                 self.assertEqual([r['operation_id'] for r in journal], ['f' * 32, row['operation_id']])
                 self.assertEqual([r['db_name'] for r in json.loads(self.snapshot(key)[1])], [PREVIOUS[key]])
+
+    def test_a_hostile_manifest_round_trips_and_settles_on_the_repeat(self):
+        hostile = "$recorded0$ $activation$ $$ ' '' \\ \\gset \\if \" ; DROP TABLE release_journal; --"
+        for key, make in self.cases():
+            with self.subTest(kind=key):
+                self.setUp()
+                row = self.prepared(key, make)
+                row['manifest'] = dict(row['manifest'], note=hostile, nested={'text': hostile})
+                first = json.loads(self.run_sql('auth', self.statement(key, row)))
+                after_first = self.snapshot(key)
+                second = json.loads(self.run_sql('auth', self.statement(key, row)))
+                self.assertEqual(second, first)
+                self.assertEqual(first['manifest']['note'], hostile)
+                self.assertEqual(self.snapshot(key), after_first)
