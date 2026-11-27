@@ -28,10 +28,14 @@ the artifact store. `corpus start` freezes that choice as the
 [selected report](../design/release-evidence.md#selected-report) decision; a
 different previous release needs a new run and `rel`.
 
-To publish LLM subjects, run `corpus classify pack` and pass its digest as
-`--classification-set SHA256` to `corpus start` with the production comparison
-report. Review the `unassigned` gaps and the staged LLM gate before upload. See
-[Publish](../design/classification-publish.md#rollout).
+Every `corpus start` that creates a run also takes `--classification-set SHA256`
+or `--no-classification-set`. Update both the worker and the `corpus` binary
+that runs `corpus start` before the first run created with these flags. To keep
+the LLM subjects the production release serves, pass the set its run froze
+(`classification_set_sha256` in the snapshot that
+`corpus status <cc> <production rel>` prints), or run `corpus classify pack` and
+pass a new digest. Review the `unassigned` gaps and the staged LLM gate before
+upload. See [Publish](../design/classification-publish.md#rollout).
 
 When the run is `evaluated`, accept its reviewed gaps with `corpus accept-gaps`.
 The report to upload is `report.json` of the run's `eval` artifact. A
@@ -52,7 +56,17 @@ REPOSITORY=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 BUILD=/path/to/verified-build-artifact
 UPLOAD=/path/to/new-upload-directory
 PREVIOUS=/path/to/production-upload-directory/report.json
-corpus start "$CC" "$REL" --previous-report "$PREVIOUS"
+(
+  set -eu
+  production_rel=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["rel"])' "$PREVIOUS")
+  status_json=$(corpus status "$CC" "$production_rel")
+  set_sha=$(printf '%s' "$status_json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["Run"]["Snapshot"].get("classification_set_sha256", ""))')
+  if [ -n "$set_sha" ]; then
+    corpus start "$CC" "$REL" --previous-report "$PREVIOUS" --classification-set "$set_sha"
+  else
+    corpus start "$CC" "$REL" --previous-report "$PREVIOUS" --no-classification-set
+  fi
+)
 ```
 
 After the run is `evaluated`:

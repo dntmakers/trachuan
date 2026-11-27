@@ -74,12 +74,14 @@ that artifact and verify those exact bytes against the digest. A missing or
 changed set fails closed. The store is the trust boundary: hashing a file
 outside it does not prove that `pack` verified it. No extra signature is needed.
 
-No selection on a new run means no LLM layer. A restart reuses the frozen choice
-and refuses a replacement; changing the set takes a new `REL`. Include
-`classification_set_sha256` in `build.json` and the build input hash. Without a
-set, preserve the existing build identity. The release row already records
-`build_input_hash`, and the signed release binds `build.json` through the build
-manifest. No schema or host change is needed.
+A new run takes exactly one of `--classification-set SHA256` and
+`--no-classification-set`; the second builds without the LLM layer, so dropping
+published LLM rows is a choice made at start, never an omission. A restart
+reuses the frozen choice and refuses a replacement; changing the set takes a new
+`REL`. Include `classification_set_sha256` in `build.json` and the build input
+hash. Without a set, preserve the existing build identity. The release row
+already records `build_input_hash`, and the signed release binds `build.json`
+through the build manifest. No schema or host change is needed.
 
 Write LLM rows after seeds, gated inheritance and manual rows, before counting
 effective assignments. Share the `trial-openai` eligibility rule: only `dieu`

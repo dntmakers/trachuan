@@ -52,7 +52,7 @@ func lifecycleDeps(t *testing.T) Deps {
 		t.Fatal(err)
 	}
 	t.Cleanup(w.Stop)
-	return Deps{TaskQueue: rel, DB: db, Temporal: server.Client(), Stages: []string{"discover", "fetch"}, RecipesFor: func(stage.Snapshot) map[string]string { return map[string]string{"discover": "one", "fetch": "two"} }, SourceList: json.RawMessage(`{}`)}
+	return Deps{NoClassificationSet: true, TaskQueue: rel, DB: db, Temporal: server.Client(), Stages: []string{"discover", "fetch"}, RecipesFor: func(stage.Snapshot) map[string]string { return map[string]string{"discover": "one", "fetch": "two"} }, SourceList: json.RawMessage(`{}`)}
 }
 
 func insertLifecycleRun(t *testing.T, d Deps, state string, updated time.Time, snapshot stage.Snapshot, next *string) {
