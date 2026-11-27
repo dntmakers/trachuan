@@ -8,7 +8,7 @@ import { changesMessages } from '../i18n/changes'
 afterEach(() => vi.unstubAllGlobals())
 it.each(['vi', 'en'] as const)('provides labels for every served kind in %s', language => {
   const labels = changesMessages(language)
-  for (const kind of ['document_added', 'document_removed', 'document_validity', 'provision_validity', 'provision_text', 'document_key'] as const) expect(labels[kind]).toBeTruthy()
+  for (const kind of ['document_added', 'document_removed', 'document_validity', 'provision_text', 'document_key'] as const) expect(labels[kind]).toBeTruthy()
 })
 it.each(['vi', 'en'] as const)('shows validity and source context in %s', language => {
   vi.stubGlobal('useState', () => ref(language))
@@ -20,14 +20,13 @@ it.each(['vi', 'en'] as const)('shows validity and source context in %s', langua
   expect(wrapper.text()).toContain('2020-01-01')
   expect(wrapper.get('a').attributes('href')).toBe('/vn/documents/vn:vbpl:2?release=20990101')
 })
-it.each(['text', 'unknown', 'toString', 'constructor'])('keeps the raw method code %s even when another label uses it', method => {
+it.each(['toString', 'constructor', '__proto__'])('shows the raw status %s and a missing value as not recorded', status => {
   vi.stubGlobal('useState', () => ref('vi'))
   vi.stubGlobal('computed', computed)
-  const wrapper = mount(ChangeRow, { props: { release: '20990101', item: { kind: 'provision_validity', key: 'vn:vbpl:1', anchor: 'dieu-1', change: 'added', validity: { status_class: 'unknown', eff_from: null, eff_to: null, method } } } })
-  expect(wrapper.text()).toContain(`Phương pháp: ${method}`)
-  expect(wrapper.text()).toContain('Trạng thái: Không rõ')
+  const wrapper = mount(ChangeRow, { props: { release: '20990101', item: { kind: 'document_validity', key: 'vn:vbpl:1', status_class: { before: status, after: null } } as never } })
+  expect(wrapper.text()).toContain(`Trước: ${status}`)
+  expect(wrapper.text()).toContain('Sau: Chưa ghi nhận')
 })
-
 it.each(['membership', 'coverage', 'source'] as const)('labels removal cause %s and never links its text', cause => {
   vi.stubGlobal('useState', () => ref('en'))
   vi.stubGlobal('computed', computed)

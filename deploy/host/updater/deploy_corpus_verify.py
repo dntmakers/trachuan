@@ -10,6 +10,9 @@ from .deploy_corpus_sql import RELEASE
 from .deploy_io import canonical, decode, read_json_bytes
 from .deploy_verify import accepted, flags, match, positive
 
+PROJECTION_VERSION = 2
+PROJECTION_KINDS = ('document_added', 'document_removed', 'document_validity', 'provision_text', 'document_key')
+
 
 def release_name(value):
     match(RELEASE, value, 'corpus release')
@@ -55,7 +58,7 @@ def manifest(data, rules):
     if 'changes_projection' in obj:
         value = obj['changes_projection']
         if (not isinstance(value, dict) or set(value) != {'version', 'sha256'}
-                or type(value['version']) is not int or value['version'] != 1):
+                or type(value['version']) is not int or value['version'] != PROJECTION_VERSION):
             raise ValueError('invalid changes projection')
         match('[0-9a-f]{64}', value['sha256'], 'changes projection hash')
     dump = obj['dump']
@@ -146,8 +149,9 @@ def projection(obj, report):
         return None
     value = report.get('changes_projection')
     fields = {'version', 'sha256', 'release', 'previous', 'baseline', 'counts'}
-    kinds = {'document_added', 'document_removed', 'document_validity', 'provision_validity', 'provision_text', 'document_key'}
+    kinds = set(PROJECTION_KINDS)
     if (not isinstance(value, dict) or set(value) != fields or type(value['version']) is not int
+            or value['version'] != PROJECTION_VERSION
             or value['version'] != obj['changes_projection']['version']
             or value['sha256'] != obj['changes_projection']['sha256'] or value['release'] != obj['rel']
             or value['previous'] != obj['previous'] or type(value['baseline']) is not bool

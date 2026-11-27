@@ -9,7 +9,7 @@ import (
 
 func TestChangeSchema_AllRulesReachValidator(t *testing.T) {
 	schemas := ChangePayloadSchemas()
-	if len(schemas) != 6 {
+	if len(schemas) != 5 {
 		t.Fatalf("kinds: %d", len(schemas))
 	}
 	for kind, schema := range schemas {

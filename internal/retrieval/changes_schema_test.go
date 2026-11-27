@@ -15,7 +15,6 @@ func TestChangePayload_ClosedTypedSchemas(t *testing.T) {
 		{"document_removed", `{"cause":"source","key":"vn:1"}`, "cause", `{"cause":2,"key":"vn:1"}`, `{"cause":"bad","key":"vn:1"}`},
 		{"document_key", `{"before_key":"vn:old","key":"vn:1"}`, "before_key", `{"before_key":false,"key":"vn:1"}`, ""},
 		{"document_validity", `{"key":"vn:1","status_class":{"before":"unknown","after":"in_force"}}`, "key", `{"key":"vn:1","is_current":{"before":"yes","after":true}}`, `{"key":"vn:1","status_class":{"before":"bad","after":"in_force"}}`},
-		{"provision_validity", `{"anchor":"p1","change":"added","key":"vn:1","validity":{"status_class":"in_force","eff_from":null,"eff_to":"2020-01-01","method":"text"}}`, "validity", `{"anchor":"p1","change":"added","key":"vn:1","validity":{"status_class":"in_force","eff_from":false,"eff_to":null,"method":"text"}}`, `{"anchor":"p1","change":"added","key":"vn:1","validity":{"status_class":"bad","eff_from":null,"eff_to":null,"method":"text"}}`},
 		{"provision_text", `{"ambiguous":false,"anchor":"p1","change":"changed","key":"vn:1","provenance":false}`, "provenance", `{"ambiguous":"no","anchor":"p1","change":"changed","key":"vn:1","provenance":false}`, `{"ambiguous":false,"anchor":"p1","change":"bad","key":"vn:1","provenance":false}`},
 	}
 	for _, tc := range cases {

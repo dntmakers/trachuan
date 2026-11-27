@@ -32,7 +32,7 @@ func ProjectionHeader(run stage.Run) (releasechanges.Header, error) {
 	if lock == nil {
 		return releasechanges.Header{}, fmt.Errorf("missing locked predecessor")
 	}
-	h := releasechanges.Header{Version: 1, Country: run.Country, Release: run.Rel, Baseline: lock.IdentitySHA256 == stage.NoPreviousReport}
+	h := releasechanges.Header{Version: releasechanges.Version, Country: run.Country, Release: run.Rel, Baseline: lock.IdentitySHA256 == stage.NoPreviousReport}
 	if lock.Release != stage.NoPreviousReport {
 		value := lock.Release
 		h.Predecessor = &value

@@ -114,7 +114,7 @@ func TestCheckDatabase_UsesReadOnlyRoleAndRealSearchAndRead(t *testing.T) {
 	client := embedding.NewClient("http://embedder", &http.Client{Transport: transport})
 	previous := "20990101"
 	rel := strings.TrimPrefix(name, "corpus_vn_")
-	header := releasechanges.Header{Version: 1, Country: "vn", Release: rel, Predecessor: &previous, Baseline: true}
+	header := releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: rel, Predecessor: &previous, Baseline: true}
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestCheckDatabase_UsesReadOnlyRoleAndRealSearchAndRead(t *testing.T) {
 	if err = tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	expected := &ProjectionExpected{Version: 1, SHA256: written.Digest, Release: rel, Previous: previous}
+	expected := &ProjectionExpected{Version: releasechanges.Version, SHA256: written.Digest, Release: rel, Previous: previous}
 	projection, err := checkTarget(ctx, readOnly, name, client, expected)
 	if err != nil || projection == nil || !projection.Baseline || projection.Counts["document_added"] != 0 {
 		t.Fatalf("target projection: %v", err)

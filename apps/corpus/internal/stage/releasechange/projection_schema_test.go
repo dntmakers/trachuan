@@ -33,16 +33,6 @@ func TestProjection_ClosedSchema(t *testing.T) {
 	}
 }
 
-func TestProjection_RemovedValidityHandleBudget(t *testing.T) {
-	source := func(yield func(any) error) error {
-		return yield(validityChange{Type: changeValidity, Key: "a", Anchor: strings.Repeat("x", 500), Added: []ValidityRow{}, Removed: []ValidityRow{{StatusClass: strings.Repeat("s", 3100), Method: "text"}}})
-	}
-	err := ProjectRecords(false, source, func(releasechanges.Row) error { return nil })
-	if err == nil || !strings.Contains(err.Error(), "ordinal 1") {
-		t.Fatal(err)
-	}
-}
-
 func TestProjection_ExactPayloads(t *testing.T) {
 	source := func(yield func(any) error) error {
 		records := []any{
@@ -74,12 +64,22 @@ func TestProjection_ExactPayloads(t *testing.T) {
 		`document_key {"before_key":"old","key":"c"}`,
 		`document_validity {"is_current":{"after":false,"before":true},"key":"c","source_change":{"before_key":"old"}}`,
 		`provision_text {"ambiguous":false,"anchor":"x","change":"changed","key":"c","provenance":false}`,
-		`provision_validity {"anchor":"x","change":"added","key":"c","source_change":{"before_key":"old"},"validity":{"eff_from":null,"eff_to":null,"method":"text","status_class":"in_force"}}`,
-		`provision_validity {"anchor":"x","change":"removed","key":"c","source_change":{"before_key":"old"},"validity":{"eff_from":null,"eff_to":null,"method":"text","status_class":"expired"}}`,
 	}
 	a, _ := json.Marshal(got)
 	b, _ := json.Marshal(want)
 	if string(a) != string(b) {
 		t.Fatalf("got %s want %s", a, b)
+	}
+}
+
+func TestProjection_ProvisionValidityYieldsNoRow(t *testing.T) {
+	for _, flags := range []struct{ provenance, ambiguous bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		source := func(yield func(any) error) error {
+			return yield(validityChange{Type: changeValidity, Key: "c", Anchor: "x", Added: []ValidityRow{{StatusClass: "in_force", Method: "text"}}, Removed: []ValidityRow{{StatusClass: "expired", Method: "text"}}, Provenance: flags.provenance, Ambiguous: flags.ambiguous})
+		}
+		var rows []releasechanges.Row
+		if err := ProjectRecords(false, source, func(row releasechanges.Row) error { rows = append(rows, row); return nil }); err != nil || len(rows) != 0 {
+			t.Fatalf("flags %+v rows %v err %v", flags, rows, err)
+		}
 	}
 }

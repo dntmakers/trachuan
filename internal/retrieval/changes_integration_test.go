@@ -27,14 +27,13 @@ func TestChanges_ProjectionAndPaging(t *testing.T) {
 		{Ordinal: 3, Kind: "provision_text", Key: &key, Payload: `{"ambiguous":false,"anchor":"p5","change":"changed","key":"vn:1","provenance":false}`},
 		{Ordinal: 4, Kind: "document_removed", Key: &old, Key2: &key, Payload: `{"cause":"source","key":"vn:old","replaced_by":"vn:1"}`},
 		{Ordinal: 5, Kind: "document_validity", Key: &key, Key2: &old, Payload: `{"eff_to":{"after":"2024-01-01","before":null},"key":"vn:1","source_change":{"before_key":"vn:old"}}`},
-		{Ordinal: 6, Kind: "provision_validity", Key: &key, Key2: &old, Payload: `{"anchor":"p5","change":"removed","key":"vn:1","source_change":{"before_key":"vn:old"},"validity":{"eff_from":null,"eff_to":null,"method":"source","status_class":"in_force"}}`},
 	}
 	ctx := context.Background()
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: 1, Country: "vn", Release: e.release.Rel, Predecessor: &previous, PredecessorIdentityHash: &hash}, rows); err != nil {
+	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: e.release.Rel, Predecessor: &previous, PredecessorIdentityHash: &hash}, rows); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -68,16 +67,16 @@ func TestChanges_ProjectionAndPaging(t *testing.T) {
 		t.Fatalf("items: %+v", got)
 	}
 	defaults, err := e.Changes(ctx, ChangesRequest{Country: "vn"})
-	if err != nil || len(defaults.Items) != 4 || len(defaults.Counts) != 6 {
+	if err != nil || len(defaults.Items) != 3 || len(defaults.Counts) != 5 || !absent(defaults.Counts, "provision_validity") {
 		t.Fatalf("defaults: %+v %v", defaults, err)
 	}
-	for _, kind := range []string{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"} {
+	for _, kind := range []string{"document_added", "document_removed", "document_validity", "provision_text", "document_key"} {
 		page, err := e.Changes(ctx, ChangesRequest{Country: "vn", Kinds: []string{kind}})
 		if err != nil || len(page.Items) != 1 || page.Counts[kind] != 1 {
 			t.Fatalf("kind %s: %+v %v", kind, page, err)
 		}
 	}
-	for _, tc := range []struct{ kind, document string }{{"document_added", key}, {"document_removed", key}, {"document_removed", old}, {"document_validity", old}, {"provision_validity", old}, {"document_key", old}, {"document_key", key}} {
+	for _, tc := range []struct{ kind, document string }{{"document_added", key}, {"document_removed", key}, {"document_removed", old}, {"document_validity", old}, {"document_key", old}, {"document_key", key}} {
 		page, err := e.Changes(ctx, ChangesRequest{Country: "vn", Kinds: []string{tc.kind}, Document: tc.document})
 		if err != nil || len(page.Items) != 1 {
 			t.Fatalf("filter %s %s: %+v %v", tc.kind, tc.document, page, err)
@@ -93,19 +92,18 @@ func TestChanges_ProjectionAndPaging(t *testing.T) {
 			t.Fatalf("removed handle %s: %+v %v", kind, page, err)
 		}
 	}
-	removedValidity, err := e.Changes(ctx, ChangesRequest{Country: "vn", Kinds: []string{"provision_validity"}})
-	if err != nil || len(removedValidity.Items) != 1 || !strings.Contains(string(removedValidity.Items[0]), `"handle":"vn:1#p5"`) {
-		t.Fatalf("removed validity handle: %+v %v", removedValidity, err)
+	if _, err = e.Changes(ctx, ChangesRequest{Country: "vn", Kinds: []string{"provision_validity"}}); !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("provision_validity kind: %v", err)
 	}
 	filtered, err := e.Changes(ctx, ChangesRequest{Country: "vn", Kinds: []string{"document_key"}, Document: old})
 	if err != nil || len(filtered.Items) != 1 {
 		t.Fatalf("filter: %+v %v", filtered, err)
 	}
-	readExec(t, db, `UPDATE release_change_set SET version=2`)
+	readExec(t, db, `UPDATE release_change_set SET version=1`)
 	if _, err = e.Changes(ctx, ChangesRequest{Country: "vn"}); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("invalid set: %v", err)
 	}
-	readExec(t, db, `UPDATE release_change_set SET version=1`)
+	readExec(t, db, `UPDATE release_change_set SET version=2`)
 	readExec(t, db, `UPDATE release_change SET payload='{}' WHERE ordinal=1`)
 	if _, err = e.Changes(ctx, ChangesRequest{Country: "vn"}); !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("invalid row: %v", err)
@@ -151,7 +149,7 @@ func TestChanges_States(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: 1, Country: "vn", Release: e.release.Rel, Baseline: true}, nil); err != nil {
+	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: e.release.Rel, Baseline: true}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -178,4 +176,9 @@ func containsChangesItems(b []byte) bool {
 		return false
 	}
 	return fmt.Sprint(v["items"]) == "[]"
+}
+
+func absent(counts map[string]int64, kind string) bool {
+	_, ok := counts[kind]
+	return !ok
 }

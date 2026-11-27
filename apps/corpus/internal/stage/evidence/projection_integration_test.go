@@ -72,7 +72,7 @@ func TestCheckProjection_RejectsStoredCorruption(t *testing.T) {
 			if err = tx.Commit(ctx); err != nil {
 				t.Fatal(err)
 			}
-			record := build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: 1, SHA256: result.Digest}, ChangesCounts: result.Counts}
+			record := build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: releasechanges.Version, SHA256: result.Digest}, ChangesCounts: result.Counts}
 			if kind == "record" {
 				record.ChangesProjection.SHA256 = strings.Repeat("0", 64)
 			}

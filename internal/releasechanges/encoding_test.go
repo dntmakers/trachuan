@@ -14,7 +14,7 @@ func TestEncoding_Golden(t *testing.T) {
 		t.Fatal(err)
 	}
 	var output bytes.Buffer
-	h, err := NewWriter(Header{Version: 1, Country: "vn", Release: "r"}, &output)
+	h, err := NewWriter(Header{Version: Version, Country: "vn", Release: "r"}, &output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,11 +60,11 @@ func TestHasher_InvalidRows(t *testing.T) {
 		header Header
 		row    Row
 	}{
-		{Header{Version: 1, Country: "vn", Release: "r", Baseline: true}, Row{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `{}`}},
-		{Header{Version: 1, Country: "vn", Release: "r"}, Row{Ordinal: 2, Kind: "document_added", Key: &key, Payload: `{}`}},
-		{Header{Version: 1, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "unknown", Key: &key, Payload: `{}`}},
-		{Header{Version: 1, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `null`}},
-		{Header{Version: 1, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "document_added", Key: &empty, Payload: `{}`}},
+		{Header{Version: Version, Country: "vn", Release: "r", Baseline: true}, Row{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `{}`}},
+		{Header{Version: Version, Country: "vn", Release: "r"}, Row{Ordinal: 2, Kind: "document_added", Key: &key, Payload: `{}`}},
+		{Header{Version: Version, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "unknown", Key: &key, Payload: `{}`}},
+		{Header{Version: Version, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `null`}},
+		{Header{Version: Version, Country: "vn", Release: "r"}, Row{Ordinal: 1, Kind: "document_added", Key: &empty, Payload: `{}`}},
 	} {
 		h, err := NewHasher(tc.header)
 		if err != nil {
@@ -74,7 +74,7 @@ func TestHasher_InvalidRows(t *testing.T) {
 			t.Fatalf("accepted %+v", tc.row)
 		}
 	}
-	h, err := NewHasher(Header{Version: 1, Country: "vn", Release: "r"})
+	h, err := NewHasher(Header{Version: Version, Country: "vn", Release: "r"})
 	if err != nil {
 		t.Fatal(err)
 	}

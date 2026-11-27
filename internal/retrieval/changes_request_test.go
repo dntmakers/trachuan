@@ -16,7 +16,7 @@ func TestChangesRequest_Validation(t *testing.T) {
 		valid       bool
 	}{
 		{"default", `{"country":"vn"}`, true},
-		{"all kinds", `{"country":"vn","kinds":["document_added","document_removed","document_validity","provision_validity","provision_text","document_key"],"document":"vn:vbpl:123","limit":50}`, true},
+		{"all kinds", `{"country":"vn","kinds":["document_added","document_removed","document_validity","provision_text","document_key"],"document":"vn:vbpl:123","limit":50}`, true},
 		{"minimum", `{"country":"vn","limit":1}`, true},
 		{"missing country", `{}`, false}, {"wrong country", `{"country":"us"}`, false},
 		{"unknown field", `{"country":"vn","extra":1}`, false}, {"duplicate field", `{"country":"vn","country":"vn"}`, false},
@@ -25,7 +25,7 @@ func TestChangesRequest_Validation(t *testing.T) {
 		{"null limit", `{"country":"vn","limit":null}`, false}, {"null cursor", `{"country":"vn","cursor":null}`, false},
 		{"wrong type", `{"country":"vn","limit":"20"}`, false}, {"empty kinds", `{"country":"vn","kinds":[]}`, false},
 		{"duplicate kinds", `{"country":"vn","kinds":["document_added","document_added"]}`, false},
-		{"unknown kind", `{"country":"vn","kinds":["other"]}`, false}, {"relation", `{"country":"vn","kinds":["relation"]}`, false},
+		{"provision_validity", `{"country":"vn","kinds":["provision_validity"]}`, false}, {"unknown kind", `{"country":"vn","kinds":["other"]}`, false}, {"relation", `{"country":"vn","kinds":["relation"]}`, false},
 		{"invalid document", `{"country":"vn","document":"vn:a#b"}`, false}, {"empty document", `{"country":"vn","document":""}`, false},
 		{"zero limit", `{"country":"vn","limit":0}`, false}, {"large limit", `{"country":"vn","limit":51}`, false},
 		{"empty release", `{"country":"vn","release":""}`, false}, {"empty cursor", `{"country":"vn","cursor":""}`, false},

@@ -42,7 +42,7 @@ func TestProjectChanges_FixtureDigest(t *testing.T) {
 	}
 	previous := fixtureHeader.Bindings.Predecessor
 	identity := strings.TrimPrefix(fixtureHeader.Bindings.Identity, "sha256:")
-	h, err := releasechanges.NewHasher(releasechanges.Header{Version: 1, Country: "vn", Release: fixtureHeader.Bindings.Rel, Predecessor: &previous, PredecessorIdentityHash: &identity, Baseline: fixtureHeader.Baseline})
+	h, err := releasechanges.NewHasher(releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: fixtureHeader.Bindings.Rel, Predecessor: &previous, PredecessorIdentityHash: &identity, Baseline: fixtureHeader.Baseline})
 	if err != nil {
 		t.Fatal(err)
 	}

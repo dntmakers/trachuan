@@ -33,7 +33,7 @@ func TestChanges_BytePagingAndIndexSeeks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: 1, Country: "vn", Release: e.release.Rel, Predecessor: &previous, PredecessorIdentityHash: &hash}, rows); err != nil {
+	if err = corpusdb.WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: e.release.Rel, Predecessor: &previous, PredecessorIdentityHash: &hash}, rows); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {

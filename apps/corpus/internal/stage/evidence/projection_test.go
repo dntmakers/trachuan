@@ -39,7 +39,7 @@ func TestCheckProjection_RejectsMismatchedRecordBeforeDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: 1, SHA256: strings.Repeat("0", 64)}, ChangesCounts: h.Counts()}
+	record := build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: releasechanges.Version, SHA256: strings.Repeat("0", 64)}, ChangesCounts: h.Counts()}
 	raw, err := json.Marshal(record)
 	if err != nil {
 		t.Fatal(err)

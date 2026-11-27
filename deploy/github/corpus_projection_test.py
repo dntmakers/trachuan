@@ -15,7 +15,7 @@ class EncodingTest(unittest.TestCase):
     def test_Encoding_Golden(self):
         payload = projection.canonical_payload('{"z":null,"s":"\\\"\\\\\\u0001Việt","n":-2,"zero":0}'.encode())
         output = io.BytesIO()
-        writer = projection.Hasher(1, 'vn', 'r', output=output)
+        writer = projection.Hasher(projection.VERSION, 'vn', 'r', output=output)
         writer.add(1, 'document_added', 'vn:key', None, payload)
         self.assertEqual(output.getvalue(), (GOLDEN / 'projection.txt').read_bytes())
         self.assertEqual((writer.digest + '\n').encode(), (GOLDEN / 'projection.sha256').read_bytes())
@@ -33,32 +33,33 @@ class EncodingTest(unittest.TestCase):
         cases = [(True, 1, 'document_added', 'key', '{}'), (False, 2, 'document_added', 'key', '{}'), (False, 1, 'unknown', 'key', '{}'), (False, 1, 'document_added', 'key', 'null'), (False, 1, 'document_added', '', '{}'), (False, 1, 'document_added', 'a\tb', '{}'), (False, 1, 'document_added', 'a\nb', '{}'), (False, 1, 'document_added', 'a\x00b', '{}'), (False, 1, 'document_added', '\ud800', '{}')]
         for baseline, ordinal, kind, key, payload in cases:
             with self.subTest(key=key, kind=kind, ordinal=ordinal), self.assertRaises(ValueError):
-                projection.Hasher(1, 'vn', 'r', baseline=baseline).add(ordinal, kind, key, None, payload)
-        writer = projection.Hasher(1, 'vn', 'r')
+                projection.Hasher(projection.VERSION, 'vn', 'r', baseline=baseline).add(ordinal, kind, key, None, payload)
+        writer = projection.Hasher(projection.VERSION, 'vn', 'r')
         writer.add(1, 'document_added', 'key', None, '{}')
         with self.assertRaises(ValueError):
             writer.add(1, 'document_added', 'key', None, '{}')
 
     def test_Header_Invalid(self):
-        for args in [(2, 'vn', 'r', None, None), (1, '', 'r', None, None), (1, 'vn', '', None, None), (1, 'vn', 'r', '', None), (1, 'vn', 'r', None, 'A' * 64), (1, 'vn', 'r', None, 'a' * 63), (1, 'v\nn', 'r', None, None)]:
+        v = projection.VERSION
+        for args in [(0, 'vn', 'r', None, None), (1, 'vn', 'r', None, None), (3, 'vn', 'r', None, None), (v, '', 'r', None, None), (v, 'vn', '', None, None), (v, 'vn', 'r', '', None), (v, 'vn', 'r', None, 'A' * 64), (v, 'vn', 'r', None, 'a' * 63), (v, 'v\nn', 'r', None, None)]:
             with self.subTest(args=args), self.assertRaises(ValueError):
                 projection.Hasher(*args)
 
     def test_Hasher_RejectsNonBooleanBaseline(self):
         for baseline in ('false', 0, 1, None, 0.0):
             with self.subTest(baseline=baseline), self.assertRaises(ValueError):
-                projection.Hasher(1, 'vn', 'r', baseline=baseline)
+                projection.Hasher(projection.VERSION, 'vn', 'r', baseline=baseline)
 
     def test_Hasher_RejectsNonIntegerVersionAndOrdinal(self):
         for value in (True, 1.0):
             with self.assertRaises(ValueError):
                 projection.Hasher(value, 'vn', 'r')
             with self.assertRaises(ValueError):
-                projection.Hasher(1, 'vn', 'r').add(value, 'document_added', 'a', None, '{}')
+                projection.Hasher(projection.VERSION, 'vn', 'r').add(value, 'document_added', 'a', None, '{}')
 
     def test_Writer_RejectsNoncanonical(self):
         with self.assertRaises(ValueError):
-            projection.Hasher(1, 'vn', 'r').add(1, 'document_added', 'a', None, '{"z":-0, "a":1}')
+            projection.Hasher(projection.VERSION, 'vn', 'r').add(1, 'document_added', 'a', None, '{"z":-0, "a":1}')
 
 
 FIXTURE = ROOT / "apps/corpus/internal/stage/releasechange/testdata"
@@ -80,7 +81,7 @@ class SidecarTest(unittest.TestCase):
                     raise ValueError('projection exceeds byte limit')
                 self.used += len(data)
         budget = Budget()
-        writer = projection.Hasher(1, 'vn', 'r', output=budget)
+        writer = projection.Hasher(projection.VERSION, 'vn', 'r', output=budget)
         payload = '{"text":"' + 'x' * 3800 + '"}'
         for ordinal in range(1, case['rows'] + 1):
             writer.add(ordinal, 'document_added', f'k{ordinal:06d}', None, payload)
@@ -186,17 +187,19 @@ class SidecarTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             projection.project(io.BytesIO(data), 'vn')
 
-    def test_Projection_RemovedValidityHandleBudget(self):
-        row = {'type': 'provision_validity', 'key': 'a', 'anchor': 'x' * 500,
-               'added': [], 'removed': [{'status_class': 's' * 3100,
-               'eff_from': None, 'eff_to': None, 'method': 'text'}]}
-        with self.assertRaises(ValueError):
-            projection.project(io.BytesIO(input_bytes(records=[row])), 'vn')
+    def test_Projection_ProvisionValidityYieldsNoRow(self):
+        for flags in ({}, {'provenance': False, 'ambiguous': False}, {'provenance': True}, {'ambiguous': True}):
+            row = dict({'type': 'provision_validity', 'key': 'a', 'anchor': 'x',
+                        'added': [{'status_class': 'in_force', 'eff_from': None, 'eff_to': None, 'method': 'text'}],
+                        'removed': []}, **flags)
+            with self.subTest(flags=flags):
+                got = projection.project(io.BytesIO(input_bytes(records=[DOCUMENT, row])), 'vn')
+                self.assertEqual([item.kind for item in got.rows], ['document_added'])
+                self.assertNotIn('provision_validity', got.counts)
 
     def test_Projection_LongHandleOmitted(self):
-        row = {'type': 'provision_validity', 'key': 'k' * 300, 'anchor': 'a' * 300,
-               'added': [], 'removed': [{'status_class': 'expired',
-               'eff_from': None, 'eff_to': None, 'method': 'text'}]}
+        row = {'type': 'provision', 'key': 'k' * 300, 'anchor': 'a' * 300, 'change': 'added',
+               'text_sha256': {'before': None, 'after': None}}
         got = projection.project(io.BytesIO(input_bytes(records=[row])), 'vn')
         self.assertEqual(len(got.rows), 1)
 
@@ -210,7 +213,7 @@ class SidecarTest(unittest.TestCase):
 
     def test_BuildWriterAndDatabaseReaderBudgetIncludesHeader(self):
         baseline = dict(HEADER, baseline=True, bindings=dict(HEADER['bindings'], predecessor_identity_sha256='none'))
-        size = len(b'v1\tvn\tr\told\t\t1\n')
+        size = len(b'v2\tvn\tr\told\t\t1\n')
         with self.assertRaises(ValueError):
             projection.project(io.BytesIO(input_bytes(baseline)), 'vn', row_limit=size - 1)
         self.assertEqual(projection.project(io.BytesIO(input_bytes(baseline)), 'vn', row_limit=size).rows, [])
@@ -238,9 +241,8 @@ class SidecarTest(unittest.TestCase):
     def test_ProjectChanges_ContextAndTuples(self):
         rows = [{"type":"document_key","key":"new","before":"old"}, {"type":"document_legal","key":"new","eff_from":{"before":None,"after":"2099-01-01"}}, {"type":"document_provenance","key":"new","baseline":{"before":True,"after":False}}, {"type":"provision_validity","key":"new","anchor":"a","added":[{"status_class":"active","eff_from":None,"eff_to":None,"method":"text"}],"removed":[]}]
         got = projection.project(io.BytesIO(input_bytes(records=rows)), "vn")
-        self.assertEqual(len(got.rows), 3)
+        self.assertEqual(len(got.rows), 2)
         self.assertEqual(got.rows[1].key2, "old")
-        self.assertEqual(json.loads(got.rows[2].payload)["validity"]["eff_from"], None)
         baseline = dict(HEADER, baseline=True, bindings=dict(HEADER['bindings'], predecessor_identity_sha256='none'))
         self.assertEqual(projection.project(io.BytesIO(input_bytes(baseline)), "vn").rows, [])
         with self.assertRaises(ValueError):

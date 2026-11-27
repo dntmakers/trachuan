@@ -26,7 +26,15 @@ func WriteReleaseChangesStream(ctx context.Context, tx pgx.Tx, header releasecha
 		return ProjectionResult{}, fmt.Errorf("write projection: %w", err)
 	}
 	counts := h.Counts()
-	_, err = tx.Exec(ctx, `INSERT INTO release_change_set (version,country,release,predecessor,predecessor_identity_hash,baseline,document_added,document_removed,document_validity,provision_validity,provision_text,document_key,digest) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, header.Version, header.Country, header.Release, header.Predecessor, header.PredecessorIdentityHash, header.Baseline, counts["document_added"], counts["document_removed"], counts["document_validity"], counts["provision_validity"], counts["provision_text"], counts["document_key"], h.Sum())
+	args := []any{header.Version, header.Country, header.Release, header.Predecessor, header.PredecessorIdentityHash, header.Baseline}
+	placeholders := "$1,$2,$3,$4,$5,$6"
+	for i, kind := range releasechanges.Kinds() {
+		args = append(args, counts[kind])
+		placeholders += fmt.Sprintf(",$%d", i+7)
+	}
+	args = append(args, h.Sum())
+	placeholders += fmt.Sprintf(",$%d", len(args))
+	_, err = tx.Exec(ctx, `INSERT INTO release_change_set (version,country,release,predecessor,predecessor_identity_hash,baseline,`+releasechanges.CountColumns()+`,digest) VALUES (`+placeholders+`)`, args...)
 	if err != nil {
 		return ProjectionResult{}, fmt.Errorf("insert projection set: %w", err)
 	}

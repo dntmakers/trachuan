@@ -4,7 +4,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { afterEach, expect, it, vi } from 'vitest'
 import ChangesPage from '../app/pages/vn/changes.vue'
 
-const counts = { document_added: 1, document_removed: 0, document_validity: 0, provision_validity: 0, provision_text: 0, document_key: 0 }
+const counts = { document_added: 1, document_removed: 0, document_validity: 0, provision_text: 0, document_key: 0 }
 afterEach(() => vi.unstubAllGlobals())
 it('keeps filters in request bodies and clears expired pages', async () => {
   const requests: Record<string, unknown>[] = []

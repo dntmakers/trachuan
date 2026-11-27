@@ -69,12 +69,12 @@ func bindingArtifact(t *testing.T, binding *string, oldRecipe bool, options ...b
 		delete(record, "predecessor_release")
 		delete(record, "predecessor_identity_sha256")
 	} else if !opts.missingProjection {
-		header := releasechanges.Header{Version: 1, Country: run.Country, Release: run.Rel, Baseline: true}
+		header := releasechanges.Header{Version: releasechanges.Version, Country: run.Country, Release: run.Rel, Baseline: true}
 		h, hashErr := releasechanges.NewHasher(header)
 		if hashErr != nil {
 			t.Fatal(hashErr)
 		}
-		record["changes_projection"] = ProjectionDigest{Version: 1, SHA256: h.Sum()}
+		record["changes_projection"] = ProjectionDigest{Version: releasechanges.Version, SHA256: h.Sum()}
 		record["changes_counts"] = h.Counts()
 	}
 	policy := retrieval.Recipe4()

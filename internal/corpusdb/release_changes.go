@@ -74,12 +74,12 @@ func ReadReleaseChanges(ctx context.Context, db projectionBeginner, limits Proje
 		return ProjectionResult{}, fmt.Errorf("begin projection snapshot: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var counts [6]int
+	var counts [releasechanges.KindCount]int
 	var digest *string
 	var country, release *string
 	var setCount int
 	var headerOK bool
-	err = tx.QueryRow(ctx, `SELECT version,CASE WHEN ok THEN country END,CASE WHEN ok THEN release END,CASE WHEN ok THEN predecessor END,CASE WHEN ok THEN predecessor_identity_hash END,baseline,document_added,document_removed,document_validity,provision_validity,provision_text,document_key,CASE WHEN ok THEN digest END,count(*) OVER (),ok FROM (SELECT *, (octet_length(country) <= 2 AND octet_length(release) <= 11 AND coalesce(octet_length(predecessor),0) <= 11 AND coalesce(octet_length(predecessor_identity_hash),0) <= 64 AND octet_length(digest) <= 64 AND 8::bigint + octet_length(version::text) + octet_length(country) + octet_length(release) + coalesce(octet_length(predecessor),0) + coalesce(octet_length(predecessor_identity_hash),0) <= $1) AS ok FROM release_change_set) bounded`, limits.TotalBytes).Scan(&header.Version, &country, &release, &header.Predecessor, &header.PredecessorIdentityHash, &header.Baseline, &counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5], &digest, &setCount, &headerOK)
+	err = tx.QueryRow(ctx, `SELECT version,CASE WHEN ok THEN country END,CASE WHEN ok THEN release END,CASE WHEN ok THEN predecessor END,CASE WHEN ok THEN predecessor_identity_hash END,baseline,`+releasechanges.CountColumns()+`,CASE WHEN ok THEN digest END,count(*) OVER (),ok FROM (SELECT *, (octet_length(country) <= 2 AND octet_length(release) <= 11 AND coalesce(octet_length(predecessor),0) <= 11 AND coalesce(octet_length(predecessor_identity_hash),0) <= 64 AND octet_length(digest) <= 64 AND 8::bigint + octet_length(version::text) + octet_length(country) + octet_length(release) + coalesce(octet_length(predecessor),0) + coalesce(octet_length(predecessor_identity_hash),0) <= $1) AS ok FROM release_change_set) bounded`, limits.TotalBytes).Scan(releasechanges.SetDestinations(&header, &country, &release, &digest, &setCount, &headerOK, counts[:])...)
 	if err != nil {
 		var scanErr pgx.ScanArgError
 		var pgErr *pgconn.PgError
@@ -103,7 +103,7 @@ func ReadReleaseChanges(ctx context.Context, db projectionBeginner, limits Proje
 	if headerBytes > limits.TotalBytes {
 		return ProjectionResult{}, invalidProjection("projection exceeds total limit")
 	}
-	result, err := tx.Query(ctx, `SELECT ordinal, CASE WHEN ok THEN kind END, CASE WHEN ok THEN key END, CASE WHEN ok THEN key2 END, CASE WHEN ok THEN payload END, ok FROM (SELECT *, (kind IN ('document_added','document_removed','document_validity','provision_validity','provision_text','document_key') AND coalesce(char_length(key),0) <= $1 AND coalesce(char_length(key2),0) <= $1 AND octet_length(payload) <= $2 AND $3::numeric + sum(octet_length(ordinal::text)::numeric + octet_length(kind) + coalesce(octet_length(key),0) + coalesce(octet_length(key2),0) + octet_length(payload) + 5) OVER (ORDER BY ordinal) <= $4) AS ok FROM release_change) bounded ORDER BY ordinal`, limits.KeyCharacters, limits.PayloadBytes, headerBytes, limits.TotalBytes)
+	result, err := tx.Query(ctx, `SELECT ordinal, CASE WHEN ok THEN kind END, CASE WHEN ok THEN key END, CASE WHEN ok THEN key2 END, CASE WHEN ok THEN payload END, ok FROM (SELECT *, (kind = ANY($5::text[]) AND coalesce(char_length(key),0) <= $1 AND coalesce(char_length(key2),0) <= $1 AND octet_length(payload) <= $2 AND $3::numeric + sum(octet_length(ordinal::text)::numeric + octet_length(kind) + coalesce(octet_length(key),0) + coalesce(octet_length(key2),0) + octet_length(payload) + 5) OVER (ORDER BY ordinal) <= $4) AS ok FROM release_change) bounded ORDER BY ordinal`, limits.KeyCharacters, limits.PayloadBytes, headerBytes, limits.TotalBytes, releasechanges.Kinds())
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "42P01" {
@@ -140,7 +140,7 @@ func ReadReleaseChanges(ctx context.Context, db projectionBeginner, limits Proje
 		return ProjectionResult{}, fmt.Errorf("stream projection: %w", err)
 	}
 	actual := h.Counts()
-	for i, kind := range []string{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"} {
+	for i, kind := range releasechanges.Kinds() {
 		if counts[i] != actual[kind] {
 			return ProjectionResult{}, invalidProjection("projection count mismatch: %s", kind)
 		}

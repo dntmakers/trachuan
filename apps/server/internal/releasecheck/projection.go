@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"danny.vn/trachuan/internal/corpusdb"
+	"danny.vn/trachuan/internal/releasechanges"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -42,7 +43,7 @@ func checkProjection(ctx context.Context, db projectionDB, schema int, expected 
 	if err != nil {
 		return nil, errors.New("invalid projection")
 	}
-	if result.Header.Version != expected.Version {
+	if expected.Version != releasechanges.Version || result.Header.Version != expected.Version {
 		return nil, errors.New("projection version mismatch")
 	}
 	if result.Header.Country != "vn" || result.Header.Release != expected.Release {

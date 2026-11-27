@@ -3,6 +3,7 @@
 package releasecheck
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -25,14 +26,13 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	previous := "20990101"
-	identity := strings.Repeat("b", 64)
-	header := releasechanges.Header{Version: 1, Country: "vn", Release: "20990102", Predecessor: &previous, PredecessorIdentityHash: &identity}
+	header, fixtureRow := fixtureProjection()
 	tx, err := db.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	result, err := corpusdb.WriteReleaseChangesStream(ctx, tx, header, func(emit func(releasechanges.Row) error) error {
-		return emit(releasechanges.Row{Ordinal: 1, Kind: "document_added", Payload: `{"x":1}`})
+		return emit(fixtureRow)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -40,7 +40,14 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 	if err = tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	expected := &ProjectionExpected{Version: 1, SHA256: result.Digest, Release: header.Release, Previous: previous}
+	assembled, err := checkProjection(ctx, db, 9, &ProjectionExpected{Version: releasechanges.Version, SHA256: result.Digest, Release: header.Release, Previous: previous})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := encodeReport(t, assembled); !bytes.Equal(got, readReportFixture(t)) {
+		t.Fatalf("checkProjection report differs from fixture:\n%s", got)
+	}
+	expected := &ProjectionExpected{Version: releasechanges.Version, SHA256: result.Digest, Release: header.Release, Previous: previous}
 	cases := []struct {
 		name, sql string
 		change    func(*ProjectionExpected)
@@ -48,7 +55,7 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 	}{
 		{name: "match"},
 		{name: "digest", change: func(e *ProjectionExpected) { e.SHA256 = strings.Repeat("a", 64) }, want: "projection digest mismatch"},
-		{name: "version", change: func(e *ProjectionExpected) { e.Version = 2 }, want: "projection version mismatch"},
+		{name: "version", change: func(e *ProjectionExpected) { e.Version = 1 }, want: "projection version mismatch"},
 		{name: "release", change: func(e *ProjectionExpected) { e.Release = "20990103" }, want: "projection release mismatch"},
 		{name: "previous", change: func(e *ProjectionExpected) { e.Previous = "20990103" }, want: "projection previous release mismatch"},
 		{name: "payload", sql: `UPDATE release_change SET payload='{"x":2}'`, want: "invalid projection"},
@@ -103,7 +110,7 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 	if _, err := db.Exec(ctx, `DELETE FROM release_change; DELETE FROM release_change_set`); err != nil {
 		t.Fatal(err)
 	}
-	baseline := releasechanges.Header{Version: 1, Country: "vn", Release: "20990102", Baseline: true}
+	baseline := releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: "20990102", Baseline: true}
 	tx, err = db.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +122,7 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 	if err = tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	baseExpected := &ProjectionExpected{Version: 1, SHA256: baseResult.Digest, Release: baseline.Release}
+	baseExpected := &ProjectionExpected{Version: releasechanges.Version, SHA256: baseResult.Digest, Release: baseline.Release}
 	baseReport, err := checkProjection(ctx, db, 9, baseExpected)
 	if err != nil || baseReport.Previous != nil || baseReport.Counts["document_added"] != 0 {
 		t.Fatalf("baseline: %v", err)
@@ -149,8 +156,8 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 		t.Fatalf("baseline absent predecessor: %v", err)
 	}
 	for _, invalidHeader := range []releasechanges.Header{
-		{Version: 1, Country: "vn", Release: "20990102", Predecessor: &previous},
-		{Version: 1, Country: "vn", Release: "20990102", Predecessor: &previous, PredecessorIdentityHash: &identity, Baseline: true},
+		{Version: releasechanges.Version, Country: "vn", Release: "20990102", Predecessor: &previous},
+		{Version: releasechanges.Version, Country: "vn", Release: "20990102", Predecessor: &previous, PredecessorIdentityHash: header.PredecessorIdentityHash, Baseline: true},
 	} {
 		if _, err = db.Exec(ctx, `DELETE FROM release_change_set`); err != nil {
 			t.Fatal(err)
@@ -166,7 +173,7 @@ func TestProjection_VerifiesSnapshot(t *testing.T) {
 		if err = tx.Commit(ctx); err != nil {
 			t.Fatal(err)
 		}
-		invalidExpected := &ProjectionExpected{Version: 1, SHA256: invalidResult.Digest, Release: invalidHeader.Release, Previous: previous}
+		invalidExpected := &ProjectionExpected{Version: releasechanges.Version, SHA256: invalidResult.Digest, Release: invalidHeader.Release, Previous: previous}
 		if _, err = checkProjection(ctx, db, 9, invalidExpected); err == nil || err.Error() != "invalid projection" {
 			t.Fatalf("inconsistent baseline: %v", err)
 		}

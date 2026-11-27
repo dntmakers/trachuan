@@ -3,7 +3,7 @@ package releasechanges
 import "testing"
 
 func TestHasher_Stream(t *testing.T) {
-	h := Header{Version: 1, Country: "vn", Release: "r"}
+	h := Header{Version: Version, Country: "vn", Release: "r"}
 	key := "a"
 	rows := []Row{{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `{"key":"a"}`}}
 	expected, err := Digest(h, rows)

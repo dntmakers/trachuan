@@ -25,7 +25,7 @@ func projectionReadError(err error) error {
 
 func validateProjectionRecord(record BuildRecord, run stage.Run) error {
 	digest, err := hex.DecodeString(record.ChangesProjection.SHA256)
-	if record.ChangesProjection.Version != 1 || err != nil || len(digest) != 32 || record.ChangesProjection.SHA256 != strings.ToLower(record.ChangesProjection.SHA256) {
+	if record.ChangesProjection.Version != releasechanges.Version || err != nil || len(digest) != 32 || record.ChangesProjection.SHA256 != strings.ToLower(record.ChangesProjection.SHA256) {
 		return fmt.Errorf("invalid build projection digest or version")
 	}
 	header, err := ProjectionHeader(run)

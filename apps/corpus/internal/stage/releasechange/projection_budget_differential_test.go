@@ -26,7 +26,7 @@ func (b *differentialBudget) Write(p []byte) (int, error) {
 
 func TestProjection_BuildBudgetDifferential(t *testing.T) {
 	budget := &differentialBudget{limit: 128 * 1024 * 1024}
-	writer, err := releasechanges.NewWriter(releasechanges.Header{Version: 1, Country: "vn", Release: "r"}, budget)
+	writer, err := releasechanges.NewWriter(releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: "r"}, budget)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -121,7 +121,7 @@ func projectRecords(baseline bool, source func(func(projectionRecord) error) err
 		item["kind"], _ = json.Marshal(kind)
 		if kind != "document_removed" && (kind != "provision_text" || (projectionString(payload, "change") != "removed" && !projectionBool(payload, "ambiguous"))) {
 			handle := key
-			if kind == "provision_text" || kind == "provision_validity" {
+			if kind == "provision_text" {
 				handle += "#" + projectionString(payload, "anchor")
 			}
 			if utf8.RuneCountInString(handle) <= 512 {
@@ -182,34 +182,6 @@ func projectRecords(baseline bool, source func(func(projectionRecord) error) err
 				b, _ := json.Marshal(projectionBool(record, flag))
 				payload[flag] = b
 			}
-		case "provision_validity":
-			if projectionBool(record, "provenance") || projectionBool(record, "ambiguous") {
-				return nil
-			}
-			for _, change := range []string{"added", "removed"} {
-				var tuples []json.RawMessage
-				if err := json.Unmarshal(record[change], &tuples); err != nil {
-					return fmt.Errorf("decode validity %s: %w", change, err)
-				}
-				for _, tuple := range tuples {
-					p := projectionFields(record, "key", "anchor")
-					p["change"], _ = json.Marshal(change)
-					p["validity"] = tuple
-					if state, ok := context[key]; ok {
-						source := state.fields()
-						b, err := json.Marshal(source)
-						if err != nil {
-							return fmt.Errorf("encode source change: %w", err)
-						}
-						p["source_change"] = b
-						key2 = projectionString(source, "before_key")
-					}
-					if err := appendRow(kind, key, key2, p); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
 		default:
 			return nil
 		}

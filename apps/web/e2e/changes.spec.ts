@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { clientAddress } from './client-address'
 
 const account = { id: 1, email: 'test@example.invalid', created_at: '2099-01-01T00:00:00Z', csrf_token: 'csrf' }
-const counts = { document_added: 0, document_removed: 0, document_validity: 2, provision_validity: 0, provision_text: 1, document_key: 1 }
+const counts = { document_added: 0, document_removed: 0, document_validity: 2, provision_text: 1, document_key: 1 }
 const comparison = { country: 'vn', release: '20990101', previous_release: '20980101', state: 'available', counts }
 const rows = [
   { kind: 'document_validity', key: 'vn:vbpl:2', handle: 'vn:vbpl:2', eff_from: { before: null, after: '2099-01-01' }, source_change: { before_key: 'vn:vbpl:1' } },

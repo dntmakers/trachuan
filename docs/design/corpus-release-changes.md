@@ -5,7 +5,9 @@ Part of [corpus release](corpus-release.md).
 ## Schema version changes
 
 `server release-check` refuses a release whose `schema_version` the serving
-image cannot read. A version change ships in this order:
+image cannot read. A projection version change inside one schema version follows
+the same order ([version 2](release-changes-encoding.md#version-2)). A version
+change ships in this order:
 
 1. Tag and deploy the first image whose server reads the new version; it keeps
    serving the active release. Confirm it live and healthy.

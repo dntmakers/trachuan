@@ -82,7 +82,7 @@ func changesFixture(t *testing.T, version int, baseline bool) (*harness, *change
 		}
 		prev := "20991109"
 		key, old := "vn:1", "vn:old"
-		header := releasechanges.Header{Version: 1, Country: "vn", Release: "20991110_1", Baseline: baseline}
+		header := releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: "20991110_1", Baseline: baseline}
 		var rows []releasechanges.Row
 		if !baseline {
 			header.Predecessor = &prev
@@ -91,9 +91,8 @@ func changesFixture(t *testing.T, version int, baseline bool) (*harness, *change
 				{Ordinal: 1, Kind: "document_added", Key: &key, Payload: `{"cause":"membership","key":"vn:1"}`},
 				{Ordinal: 2, Kind: "document_removed", Key: &old, Payload: `{"cause":"source","key":"vn:old"}`},
 				{Ordinal: 3, Kind: "document_validity", Key: &key, Payload: `{"eff_to":{"after":"2024-01-01","before":null},"key":"vn:1"}`},
-				{Ordinal: 4, Kind: "provision_validity", Key: &key, Payload: `{"anchor":"p1","change":"removed","key":"vn:1","validity":{"eff_from":null,"eff_to":null,"method":"source","status_class":"in_force"}}`},
-				{Ordinal: 5, Kind: "provision_text", Key: &key, Payload: `{"ambiguous":false,"anchor":"p1","change":"changed","key":"vn:1","provenance":false}`},
-				{Ordinal: 6, Kind: "document_key", Key: &key, Key2: &old, Payload: `{"before_key":"vn:old","key":"vn:1"}`},
+				{Ordinal: 4, Kind: "provision_text", Key: &key, Payload: `{"ambiguous":false,"anchor":"p1","change":"changed","key":"vn:1","provenance":false}`},
+				{Ordinal: 5, Kind: "document_key", Key: &key, Key2: &old, Payload: `{"before_key":"vn:old","key":"vn:1"}`},
 			}
 		}
 		if err = corpusdb.WriteReleaseChanges(ctx, tx, header, rows); err != nil {
@@ -164,7 +163,7 @@ func TestChanges_RealEngine(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h, limiter, _ := changesFixture(t, tc.version, tc.baseline)
 			pages := 0
-			args := map[string]any{"country": "vn", "limit": 1, "kinds": []string{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"}}
+			args := map[string]any{"country": "vn", "limit": 1, "kinds": []string{"document_added", "document_removed", "document_validity", "provision_text", "document_key"}}
 			var items []map[string]any
 			for {
 				result := callTool(t, h, "changes", args)
@@ -179,7 +178,7 @@ func TestChanges_RealEngine(t *testing.T) {
 				}
 				if tc.state == "available" {
 					counts, ok := out["counts"].(map[string]any)
-					if !ok || len(counts) != 6 || counts["document_removed"] != float64(1) || out["previous_release"] != "20991109" {
+					if !ok || len(counts) != 5 || counts["document_removed"] != float64(1) || out["previous_release"] != "20991109" {
 						t.Fatalf("comparison metadata: %+v", out)
 					}
 				}
@@ -204,7 +203,7 @@ func TestChanges_RealEngine(t *testing.T) {
 				}
 			}
 			if tc.state == "available" {
-				if len(items) != 6 || items[0]["handle"] != "vn:1" || items[1]["kind"] != "document_removed" || items[1]["handle"] != nil {
+				if len(items) != 5 || items[0]["handle"] != "vn:1" || items[1]["kind"] != "document_removed" || items[1]["handle"] != nil {
 					t.Fatalf("items: %+v", items)
 				}
 				pair := items[2]["eff_to"].(map[string]any)
@@ -213,6 +212,7 @@ func TestChanges_RealEngine(t *testing.T) {
 				}
 			}
 			wantError(t, callTool(t, h, "changes", map[string]any{"country": "vn", "kinds": []string{"relation"}}), "invalid_request")
+			wantError(t, callTool(t, h, "changes", map[string]any{"country": "vn", "kinds": []string{"provision_validity"}}), "invalid_request")
 			wantError(t, callTool(t, h, "changes", map[string]any{"country": "vn", "release": "20990101"}), "release_expired")
 		})
 	}

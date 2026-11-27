@@ -6,10 +6,29 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
+
+const Version = 2
+
+var kinds = [...]string{"document_added", "document_removed", "document_validity", "provision_text", "document_key"}
+
+const KindCount = len(kinds)
+
+func Kinds() []string { return slices.Clone(kinds[:]) }
+
+func CountColumns() string { return strings.Join(kinds[:], ",") }
+
+func SetDestinations[T int | int64](header *Header, country, release, digest **string, setCount *int, ok *bool, counts []T) []any {
+	dest := []any{&header.Version, country, release, &header.Predecessor, &header.PredecessorIdentityHash, &header.Baseline}
+	for i := range counts {
+		dest = append(dest, &counts[i])
+	}
+	return append(dest, digest, setCount, ok)
+}
 
 type Header struct {
 	Version                 int
@@ -61,7 +80,7 @@ func NewWriter(header Header, output io.Writer) (*Hasher, error) {
 }
 
 func newHasher(header Header, output io.Writer, writer bool) (*Hasher, error) {
-	if header.Version != 1 {
+	if header.Version != Version {
 		return nil, fmt.Errorf("unknown projection version %d", header.Version)
 	}
 	if header.Country == "" || header.Release == "" {
@@ -91,8 +110,11 @@ func newHasher(header Header, output io.Writer, writer bool) (*Hasher, error) {
 	if header.Baseline {
 		baseline = "1"
 	}
-	h := &Hasher{hash: sha256.New(), output: output, baseline: header.Baseline, writer: writer, counts: map[string]int{"document_added": 0, "document_removed": 0, "document_validity": 0, "provision_validity": 0, "provision_text": 0, "document_key": 0}}
-	if err := h.write(strings.Join([]string{"v1", header.Country, header.Release, predecessor, identity, baseline}, "\t") + "\n"); err != nil {
+	h := &Hasher{hash: sha256.New(), output: output, baseline: header.Baseline, writer: writer, counts: make(map[string]int, len(kinds))}
+	for _, kind := range kinds {
+		h.counts[kind] = 0
+	}
+	if err := h.write(strings.Join([]string{"v" + strconv.Itoa(Version), header.Country, header.Release, predecessor, identity, baseline}, "\t") + "\n"); err != nil {
 		return nil, err
 	}
 	return h, nil
