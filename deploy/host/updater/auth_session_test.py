@@ -200,6 +200,19 @@ class SwapStatementTest(unittest.TestCase):
                 self.assertIn('INSERT INTO public.release_journal', text)
                 self.assertEqual(text.count('BEGIN;'), 1)
 
+    def test_a_recorded_activation_skips_every_write_and_returns_the_recorded_row(self):
+        for name, sql, row in (('law', law, law_row), ('frameworks', frameworks, frameworks_row)):
+            text = sql.activate(row(), retire=self.RETIRE if name == 'law' else ('frameworks_20990101', 'b' * 64))
+            with self.subTest(kind=name):
+                prelude = text.split('DO $activation$')[0]
+                for column in law.ROW_FIELDS + ('step', 'state', 'message', 'corpus_kind'):
+                    self.assertIn(column + ' IS NOT DISTINCT FROM', prelude)
+                self.assertIn("step IS NOT DISTINCT FROM 'activated'", prelude)
+                self.assertIn('IF NOT settled THEN', text)
+                self.assertIn('\\if :settled', text)
+                self.assertEqual(text.count('INSERT INTO public.release_journal'), 1)
+                self.assertLess(text.index('\\if :settled'), text.index('INSERT INTO public.release_journal'))
+
     def test_the_summary_fields_are_written_on_every_swap(self):
         text = law.activate(law_row(), 1, self.RETIRE)
         self.assertIn('summary_projection=1', text)

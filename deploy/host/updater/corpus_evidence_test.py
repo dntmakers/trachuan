@@ -103,7 +103,7 @@ class EvidenceActivationTest(LawCase, unittest.TestCase):
                     carried = dict(base, evidence=EVIDENCE)
                     text = sql.activate(dict(db.rows[0], manifest=carried), projection)
                     journaled = json.dumps(carried, separators=(',', ':'))
-                    self.assertEqual(text.count(journaled), 1)
+                    self.assertEqual(text.count(journaled), 3)
                     self.assertEqual(text.replace(journaled, json.dumps(base, separators=(',', ':'))),
                                      sql.activate(dict(db.rows[0], manifest=base), projection))
 

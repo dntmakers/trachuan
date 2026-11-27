@@ -211,13 +211,17 @@ def written(step, label='corpus'):
     return dict(state='complete' if terminal else 'open', message=label + ' ' + step)
 
 
-def journal(row, step, corpus='law', label='corpus'):
-    fields = ROW_FIELDS + ('step', 'state', 'message')
-    value = dict(row, step=step, **written(step, label))
+def journal_values(row, step, corpus, label):
+    fields = ROW_FIELDS + ('step', 'state', 'message', 'corpus_kind')
+    value = dict(row, step=step, corpus_kind=corpus, **written(step, label))
     value['manifest'] = json.dumps(row['manifest'], separators=(',', ':')) if row['manifest'] else None
-    if corpus != 'law':
-        fields += ('corpus_kind',)
-        value['corpus_kind'] = corpus
+    return fields, value
+
+
+def journal(row, step, corpus='law', label='corpus'):
+    fields, value = journal_values(row, step, corpus, label)
+    if corpus == 'law':
+        fields = fields[:-1]
     return ('INSERT INTO public.release_journal (' + ','.join(fields) + ') VALUES (' +
             ','.join(literal(value[f]) for f in fields) +
             ') RETURNING pg_catalog.row_to_json(release_journal);')
@@ -270,6 +274,35 @@ def retirement(country, retire, check=database, kind_column='', kind_value=''):
       retain_until=EXCLUDED.retain_until,dropped_at=NULL,dump_sha256=EXCLUDED.dump_sha256{kind_update};"""
 
 
+RECORDED = 'trachuan.activation_recorded'
+SETTLED = 'trachuan.activation_settled'
+
+
+def recorded_match(row, corpus, label):
+    fields, value = journal_values(row, 'activated', corpus, label)
+    return ' AND '.join(f + ' IS NOT DISTINCT FROM ' + literal(value[f]) + ('::jsonb' if f == 'manifest' else '')
+                        for f in fields)
+
+
+def recorded_prelude(row, corpus='law', label='corpus'):
+    return ('SELECT EXISTS (SELECT FROM public.release_journal WHERE ' + recorded_match(row, corpus, label) +
+            ') AS recorded \\gset\n'
+            "SELECT pg_catalog.set_config('" + RECORDED + "', :'recorded', true) AS ignored \\gset")
+
+
+def settled_check(target):
+    return ('settled := current_db IS NOT DISTINCT FROM ' + target + " AND pg_catalog.current_setting('" +
+            RECORDED + "') = 't';\n  PERFORM pg_catalog.set_config('" + SETTLED + "', settled::text, true);")
+
+
+def finish_journal(row, corpus='law', label='corpus'):
+    return ("SELECT pg_catalog.current_setting('" + SETTLED + "')::boolean AS settled \\gset\n"
+            '\\if :settled\n'
+            'SELECT pg_catalog.row_to_json(j) FROM public.release_journal j WHERE ' +
+            recorded_match(row, corpus, label) + ' ORDER BY id DESC LIMIT 1;\n'
+            '\\else\n' + journal(row, 'activated', corpus, label) + '\n\\endif')
+
+
 def activate(row, projection=0, retire=None):
     if type(projection) is not int or projection not in (0, 1):
         raise ValueError('invalid activation projection')
@@ -278,8 +311,9 @@ def activate(row, projection=0, retire=None):
     retained = ("DELETE FROM public.retired_release WHERE corpus_kind='law' AND country=" + country +
                 ' AND db_name=' + target + ';' if row['mode'] == 'retained' else '')
     return f"""BEGIN;
+{recorded_prelude(row)}
 DO $activation$
-DECLARE current_db text; changed bigint;
+DECLARE current_db text; changed bigint; settled boolean;
 BEGIN
   SELECT active_db INTO current_db FROM public.corpus_release WHERE country={country} FOR UPDATE;
   IF NOT FOUND THEN
@@ -288,17 +322,20 @@ BEGIN
   IF current_db IS DISTINCT FROM {target} AND current_db IS DISTINCT FROM {expected} THEN
     RAISE EXCEPTION 'active corpus changed';
   END IF;
-  UPDATE public.corpus_release SET active_db={target},activated_at=now(),activated_by='activator',
-    summary_database={target},summary_projection={projection},headings_approved={approved}
-    WHERE country={country} AND (active_db={target} OR active_db IS NOT DISTINCT FROM {expected});
-  GET DIAGNOSTICS changed = ROW_COUNT;
-  IF changed <> 1 THEN
-    RAISE EXCEPTION 'active corpus update must affect exactly one row';
+  {settled_check(target)}
+  IF NOT settled THEN
+    UPDATE public.corpus_release SET active_db={target},activated_at=now(),activated_by='activator',
+      summary_database={target},summary_projection={projection},headings_approved={approved}
+      WHERE country={country} AND (active_db={target} OR active_db IS NOT DISTINCT FROM {expected});
+    GET DIAGNOSTICS changed = ROW_COUNT;
+    IF changed <> 1 THEN
+      RAISE EXCEPTION 'active corpus update must affect exactly one row';
+    END IF;
+    {retirement(country, retire)}
+    {retained}
   END IF;
-  {retirement(country, retire)}
-  {retained}
 END;
 $activation$;
-{journal(row, 'activated')}
+{finish_journal(row)}
 COMMIT;
 """

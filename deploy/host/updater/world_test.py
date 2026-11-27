@@ -206,6 +206,10 @@ class World:
         if self.swap_error:
             raise self.swap_error
         target, expected = row['database_name'], row['expected_active_db']
+        recorded = [r for r in self.rows if r['operation_id'] == row['operation_id'] and r['step'] == 'activated']
+        if recorded and self.pointer_value == target:
+            self.crash('swap:after')
+            return recorded[-1]
         if self.pointer_value not in (target, expected):
             raise TableFailure('active pointer changed')
         self.pointer_value = target

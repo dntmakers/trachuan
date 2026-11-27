@@ -346,9 +346,13 @@ class CrashPoints(RecoveryChecks):
         oid = self.finishing_crash('swap:after')
         self.assertEqual(self.stored()['operation']['step'], 'swapping')
         self.assertEqual(self.db.pointer_value, self.name)
+        rows, retired = list(self.db.rows), dict(self.db.table_retired)
         self.assertTrue(self.again())
-        self.assertEqual(len(self.db.swaps), 2)
-        self.assertEqual(self.db.swaps[-1]['retired'], self.active_name)
+        self.assertEqual(len(self.db.swaps), 1)
+        self.assertEqual(self.db.swaps[0]['retired'], self.active_name)
+        self.assertEqual(self.db.rows, rows)
+        self.assertEqual(self.db.table_retired, retired)
+        self.assertEqual([r['step'] for r in self.db.rows].count('activated'), 1)
         self.finished(oid)
 
     def test_crash_after_the_record_says_activated_settles_only(self):
