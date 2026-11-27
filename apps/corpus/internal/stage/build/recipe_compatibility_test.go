@@ -25,7 +25,7 @@ func TestBuildRecipe_Schema8HistoricalGoldens(t *testing.T) {
 func TestBuildRecipe_CurrentSchemaRecipe3Golden(t *testing.T) {
 	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
 	got := New(Config{}).recipeForRetrieval(snapshot, retrieval.Recipe3())
-	if want := "186125b6cebded72897d41bd5b6978f62b709cd67a18904534e3c83266126311"; got != want {
+	if want := "f3268e9e98885d37a96d8e1f682dbfd6676547c30b551ce30c30d6c1ef7573d7"; got != want {
 		t.Fatalf("recipe 3 build hash: got %s want %s", got, want)
 	}
 }
@@ -34,7 +34,7 @@ func TestBuildRecipe_SupportsRetrievalRecipe2(t *testing.T) {
 	s := New(Config{})
 	snapshot := stage.Snapshot{SourceList: []byte(`{}`)}
 	old := s.recipeForRetrieval(snapshot, retrieval.Recipe2())
-	if old != "5e37f78f3c9498b6c36a53cf9bfdd5b1d33beeca9f99f322691dc9fa101a7c7d" {
+	if old != "5584f21666a015233ced53c6ba764cebd7d579aace489ef26536963bae68fff8" {
 		t.Fatalf("recipe 2 build hash %s", old)
 	}
 	if !s.acceptsRecipeHash(snapshot, old) || !s.acceptsRecipeHash(snapshot, s.Recipe(snapshot)) || s.acceptsRecipeHash(snapshot, "other") {

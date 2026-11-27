@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { changesMessage, changesRequest, changeReaderLink } from '../app/utils/changes'
 
-const counts = { document_added: 0, document_removed: 0, document_validity: 0, provision_validity: 0, provision_text: 0, document_key: 0 }
+const counts = { document_added: 0, document_removed: 0, document_validity: 0, provision_text: 0, document_key: 0 }
 
 describe('release changes', () => {
   it('distinguishes baseline, unavailable, zero counts and no matches', () => {

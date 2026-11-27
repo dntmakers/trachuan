@@ -46,7 +46,7 @@ func TestChangesSchemas_StateAndHandleRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	counts := `"counts":{"document_added":0,"document_removed":0,"document_validity":0,"provision_validity":0,"provision_text":1,"document_key":0}`
+	counts := `"counts":{"document_added":0,"document_removed":0,"document_validity":0,"provision_text":1,"document_key":0}`
 	available := `{"country":"vn","release":"20991110","state":"available","previous_release":"20991109",` + counts + `,"items":`
 	base := `{"country":"vn","release":"20991110","state":"baseline","items":[]`
 	missing := `{"country":"vn","release":"20991110","state":"unavailable","items":[]`

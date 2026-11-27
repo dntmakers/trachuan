@@ -30,7 +30,6 @@ type ChangeField struct {
 }
 
 func ChangePayloadSchemas() map[string]ChangeSchema {
-	str := ChangeSchema{Type: "string", MinLength: 1}
 	key := ChangeSchema{Type: "string", Format: "document-key", MinLength: 1, MaxLength: ReadHandleMax}
 	anchor := ChangeSchema{Type: "string", MinLength: 1, MaxLength: ReadHandleMax}
 	date := ChangeSchema{Type: "string", Format: "date", Nullable: true}
@@ -46,14 +45,12 @@ func ChangePayloadSchemas() map[string]ChangeSchema {
 		return object(map[string]ChangeField{"before": required(s), "after": required(s)})
 	}
 	source := object(map[string]ChangeField{"before_key": optional(key), "text_source": optional(pair(textSource)), "text_complete": optional(pair(boolean)), "baseline": optional(pair(boolean))})
-	validity := object(map[string]ChangeField{"status_class": required(status), "eff_from": required(date), "eff_to": required(date), "method": required(str)})
 	return map[string]ChangeSchema{
-		"document_added":     object(map[string]ChangeField{"key": required(key), "cause": required(cause)}),
-		"document_removed":   object(map[string]ChangeField{"key": required(key), "cause": required(cause), "replaced_by": optional(key)}),
-		"document_key":       object(map[string]ChangeField{"key": required(key), "before_key": required(key)}),
-		"document_validity":  object(map[string]ChangeField{"key": required(key), "source_change": optional(source), "status_class": optional(pair(status)), "eff_from": optional(pair(date)), "eff_to": optional(pair(date)), "is_current": optional(pair(boolean)), "validity_conflict": optional(pair(boolean))}),
-		"provision_validity": object(map[string]ChangeField{"key": required(key), "anchor": required(anchor), "change": required(enum("added", "removed")), "validity": required(validity), "source_change": optional(source)}),
-		"provision_text":     object(map[string]ChangeField{"key": required(key), "anchor": required(anchor), "change": required(enum("added", "removed", "changed")), "provenance": required(boolean), "ambiguous": required(boolean)}),
+		"document_added":    object(map[string]ChangeField{"key": required(key), "cause": required(cause)}),
+		"document_removed":  object(map[string]ChangeField{"key": required(key), "cause": required(cause), "replaced_by": optional(key)}),
+		"document_key":      object(map[string]ChangeField{"key": required(key), "before_key": required(key)}),
+		"document_validity": object(map[string]ChangeField{"key": required(key), "source_change": optional(source), "status_class": optional(pair(status)), "eff_from": optional(pair(date)), "eff_to": optional(pair(date)), "is_current": optional(pair(boolean)), "validity_conflict": optional(pair(boolean))}),
+		"provision_text":    object(map[string]ChangeField{"key": required(key), "anchor": required(anchor), "change": required(enum("added", "removed", "changed")), "provenance": required(boolean), "ambiguous": required(boolean)}),
 	}
 }
 
@@ -89,7 +86,7 @@ func validateChangePayload(row releasechanges.Row) (map[string]json.RawMessage, 
 		_ = json.Unmarshal(fields["before_key"], &secondary)
 	case "document_removed":
 		_ = json.Unmarshal(fields["replaced_by"], &secondary)
-	case "document_validity", "provision_validity":
+	case "document_validity":
 		var source map[string]json.RawMessage
 		_ = json.Unmarshal(fields["source_change"], &source)
 		_ = json.Unmarshal(source["before_key"], &secondary)

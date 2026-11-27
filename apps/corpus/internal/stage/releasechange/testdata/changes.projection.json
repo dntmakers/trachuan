@@ -1,11 +1,10 @@
 {
-  "sha256": "b23da6ec3e1a3ce9d1374857bfc07545a162997f132ff9f00e2e820f54ae8d99",
+  "sha256": "d28f6b6ec981933d3a569228c5246fc7fd84b86f8a09a8df7a98d576adfb1c40",
   "counts": {
     "document_added": 3,
+    "document_key": 1,
     "document_removed": 3,
     "document_validity": 1,
-    "provision_validity": 0,
-    "provision_text": 6,
-    "document_key": 1
+    "provision_text": 6
   }
 }

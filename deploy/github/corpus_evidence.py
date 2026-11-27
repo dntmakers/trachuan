@@ -2,7 +2,7 @@ import hashlib
 import json
 
 from manifest import require_match
-from corpus_projection import KINDS, project
+from corpus_projection import KINDS, VERSION, project
 
 FINDINGS, IDENTITY, CHANGES = 'findings.json', 'identity.jsonl', 'changes.jsonl'
 SIDECARS = (FINDINGS, IDENTITY, CHANGES)
@@ -200,7 +200,7 @@ def validate_projection(row, record, path, changes_hash):
     counts = record.get('changes_counts')
     if not isinstance(stored, dict) or set(stored) != {'version', 'sha256'}:
         raise ValueError('invalid changes projection')
-    if type(stored['version']) is not int or stored['version'] != 1:
+    if type(stored['version']) is not int or stored['version'] != VERSION:
         raise ValueError('unsupported changes projection version')
     require_match(r'[0-9a-f]{64}', stored['sha256'], 'changes projection hash')
     if (not isinstance(counts, dict) or set(counts) != set(KINDS) or
@@ -213,7 +213,7 @@ def validate_projection(row, record, path, changes_hash):
             raise ValueError('changes differ from verified sidecar')
     if result.digest != stored['sha256'] or result.counts != counts:
         raise ValueError('changes projection differs from build')
-    return {'version': 1, 'sha256': result.digest}
+    return {'version': VERSION, 'sha256': result.digest}
 
 
 def validate_sidecars(row, report, report_bytes, directory, dump_hash, build_hash, build_record=None):

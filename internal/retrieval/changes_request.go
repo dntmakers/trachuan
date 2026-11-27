@@ -81,7 +81,7 @@ func normalizeChangesRequest(req ChangesRequest) (ChangesRequest, changesCursor,
 		return ChangesRequest{}, changesCursor{}, ErrInvalidRequest
 	}
 	if req.Kinds == nil {
-		req.Kinds = []string{"document_added", "document_removed", "document_validity", "provision_validity"}
+		req.Kinds = []string{"document_added", "document_removed", "document_validity"}
 	} else {
 		req.Kinds = slices.Clone(req.Kinds)
 	}
@@ -90,7 +90,7 @@ func normalizeChangesRequest(req ChangesRequest) (ChangesRequest, changesCursor,
 	}
 	slices.Sort(req.Kinds)
 	for i, kind := range req.Kinds {
-		if !slices.Contains([]string{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"}, kind) || i > 0 && kind == req.Kinds[i-1] {
+		if !slices.Contains(releasechanges.Kinds(), kind) || i > 0 && kind == req.Kinds[i-1] {
 			return ChangesRequest{}, changesCursor{}, ErrInvalidRequest
 		}
 	}

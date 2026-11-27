@@ -47,8 +47,8 @@ func TestChanges_RealHandlers(t *testing.T) {
 		version int
 		sql     string
 	}{
-		{"available", 9, `INSERT INTO release_change_set VALUES (true,1,'vn','20991110_1','20991109',repeat('a',64),false,1,1,0,0,0,0,repeat('a',64)); INSERT INTO release_change(ordinal,kind,key,payload) VALUES (1,'document_added','vn:1','{"cause":"membership","key":"vn:1"}'),(2,'document_removed','vn:old','{"cause":"source","key":"vn:old"}')`},
-		{"baseline", 9, `INSERT INTO release_change_set VALUES (true,1,'vn','20991110_1',NULL,NULL,true,0,0,0,0,0,0,repeat('a',64))`},
+		{"available", 9, `INSERT INTO release_change_set VALUES (true,2,'vn','20991110_1','20991109',repeat('a',64),false,1,1,0,0,0,repeat('a',64)); INSERT INTO release_change(ordinal,kind,key,payload) VALUES (1,'document_added','vn:1','{"cause":"membership","key":"vn:1"}'),(2,'document_removed','vn:old','{"cause":"source","key":"vn:old"}')`},
+		{"baseline", 9, `INSERT INTO release_change_set VALUES (true,2,'vn','20991110_1',NULL,NULL,true,0,0,0,0,0,repeat('a',64))`},
 		{"unavailable", 8, `ALTER TABLE release DROP CONSTRAINT release_schema_version_check`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

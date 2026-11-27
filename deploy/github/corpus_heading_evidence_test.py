@@ -26,10 +26,10 @@ class HeadingEvidenceTest(unittest.TestCase):
     def schema_nine(self, mutate=None):
         record = add_heading_build(self.path, self.row, self.report)
         record['schema_version'] = 9
-        record['changes_projection'] = {'version': 1, 'sha256': hashlib.sha256(
-            b'v1\tvn\t20990102_1\t20990101_1\t\t1\n').hexdigest()}
+        record['changes_projection'] = {'version': 2, 'sha256': hashlib.sha256(
+            b'v2\tvn\t20990102_1\t20990101_1\t\t1\n').hexdigest()}
         record['changes_counts'] = dict.fromkeys(('document_added', 'document_removed', 'document_validity',
-                                                 'provision_validity', 'provision_text', 'document_key'), 0)
+                                                 'provision_text', 'document_key'), 0)
         if mutate:
             mutate(record)
         data = json.dumps(record).encode()
@@ -127,7 +127,9 @@ class HeadingEvidenceTest(unittest.TestCase):
 
     def test_schema_nine_rejects_bad_projection_or_counts(self):
         faults = [lambda r: r.pop('changes_projection'), lambda r: r.pop('changes_counts'),
-                  lambda r: r['changes_projection'].update(version=2),
+                  lambda r: r['changes_projection'].update(version=1),
+                  lambda r: r['changes_projection'].update(version=3),
+                  lambda r: r['changes_counts'].update(provision_validity=0),
                   lambda r: r['changes_projection'].update(version=True),
                   lambda r: r['changes_projection'].update(sha256='a' * 64),
                   lambda r: r['changes_projection'].update(extra=1),
@@ -147,14 +149,14 @@ class HeadingEvidenceTest(unittest.TestCase):
         obj['schema_version'] = 9
         with self.assertRaises(ValueError):
             validate_manifest(obj)
-        for value in (None, {}, {'version': 2, 'sha256': 'a' * 64},
+        for value in (None, {}, {'version': 1, 'sha256': 'a' * 64},
                       {'version': True, 'sha256': 'a' * 64},
-                      {'version': 1, 'sha256': 'A' * 64},
-                      {'version': 1, 'sha256': 'a' * 64, 'extra': 1}):
+                      {'version': 2, 'sha256': 'A' * 64},
+                      {'version': 2, 'sha256': 'a' * 64, 'extra': 1}):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate_manifest(obj | {'changes_projection': value})
         with self.assertRaises(ValueError):
-            validate_manifest(obj | {'schema_version': 8, 'changes_projection': {'version': 1, 'sha256': 'a' * 64}})
+            validate_manifest(obj | {'schema_version': 8, 'changes_projection': {'version': 2, 'sha256': 'a' * 64}})
 
     def test_schema_eight_copies_verified_build_values(self):
         record = add_heading_build(self.path, self.row, self.report)

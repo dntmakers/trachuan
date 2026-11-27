@@ -17,6 +17,7 @@ from corpus_fixture_history import FixtureHistory
 from corpus_floors import check_floors
 from corpus_old_product import check_rejection_records
 from corpus_period import check_partition, check_period, check_record_fields, no_historical_policy
+from corpus_projection import VERSION as PROJECTION_VERSION
 from corpus_report_contract import check_comparisons, no_research_override, non_regression_contract
 from corpus_revision import validate_version_three
 from corpus_rules import DECISION_FIELDS, has_decision, older_shape_allowed, require_status_country
@@ -266,7 +267,7 @@ def validate_manifest(obj):
     if obj['schema_version'] == 9:
         projection = obj.get('changes_projection')
         if (not isinstance(projection, dict) or set(projection) != {'version', 'sha256'} or
-                type(projection['version']) is not int or projection['version'] != 1):
+                type(projection['version']) is not int or projection['version'] != PROJECTION_VERSION):
             raise ValueError('invalid changes projection')
         require_match(r'[0-9a-f]{64}', projection['sha256'], 'changes projection hash')
     elif 'changes_projection' in obj:

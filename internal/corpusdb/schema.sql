@@ -183,19 +183,18 @@ CREATE TABLE release_change_set (
  document_added bigint NOT NULL CHECK (document_added >= 0),
  document_removed bigint NOT NULL CHECK (document_removed >= 0),
  document_validity bigint NOT NULL CHECK (document_validity >= 0),
- provision_validity bigint NOT NULL CHECK (provision_validity >= 0),
  provision_text bigint NOT NULL CHECK (provision_text >= 0),
  document_key bigint NOT NULL CHECK (document_key >= 0),
  digest text COLLATE "C" NOT NULL CHECK (digest ~ '^[0-9a-f]{64}$'),
  CONSTRAINT release_change_set_country_length CHECK (octet_length(country) <= 2),
  CONSTRAINT release_change_set_release_length CHECK (octet_length(release) <= 11),
  CONSTRAINT release_change_set_predecessor_length CHECK (octet_length(predecessor) <= 11),
- CHECK (NOT baseline OR (document_added = 0 AND document_removed = 0 AND document_validity = 0 AND provision_validity = 0 AND provision_text = 0 AND document_key = 0))
+ CHECK (NOT baseline OR (document_added = 0 AND document_removed = 0 AND document_validity = 0 AND provision_text = 0 AND document_key = 0))
 );
 
 CREATE TABLE release_change (
  ordinal bigint PRIMARY KEY CHECK (ordinal > 0),
- kind text COLLATE "C" NOT NULL CHECK (kind IN ('document_added','document_removed','document_validity','provision_validity','provision_text','document_key')),
+ kind text COLLATE "C" NOT NULL CHECK (kind IN ('document_added','document_removed','document_validity','provision_text','document_key')),
  key text COLLATE "C" CHECK (key <> '' AND key !~ E'[\t\n]'),
  key2 text COLLATE "C" CHECK (key2 <> '' AND key2 !~ E'[\t\n]'),
  payload text NOT NULL CHECK (payload IS JSON OBJECT WITH UNIQUE KEYS AND payload !~ E'[\t\n]')

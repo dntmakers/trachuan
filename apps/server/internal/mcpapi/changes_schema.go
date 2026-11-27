@@ -3,6 +3,7 @@ package mcpapi
 import (
 	"sort"
 
+	"danny.vn/trachuan/internal/releasechanges"
 	"danny.vn/trachuan/internal/retrieval"
 	"github.com/google/jsonschema-go/jsonschema"
 )
@@ -25,7 +26,10 @@ func configureChangesInput(s *jsonschema.Schema) {
 	kinds.Type = "array"
 	kinds.MinItems = ptrInt(1)
 	kinds.UniqueItems = true
-	kinds.Items.Enum = []any{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"}
+	kinds.Items.Enum = make([]any, 0, releasechanges.KindCount)
+	for _, kind := range releasechanges.Kinds() {
+		kinds.Items.Enum = append(kinds.Items.Enum, kind)
+	}
 	limit := s.Properties["limit"]
 	limit.Types = nil
 	limit.Type = "integer"

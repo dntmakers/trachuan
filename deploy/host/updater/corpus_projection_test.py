@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import unittest
 
 from updater import deploy_corpus_verify as verify
@@ -10,18 +11,18 @@ from updater.world_test import LawCase
 
 
 EVIDENCE = dict(projection=1, scan_sha256='a' * 64, exclusions_sha256='b' * 64)
-KINDS = ('document_added', 'document_removed', 'document_validity', 'provision_validity', 'provision_text', 'document_key')
+REPORT_FIXTURE = Path(__file__).parent / 'fixtures' / 'release-check-report.json'
 
 
 def schema9():
     return dict(manifest(), schema_version=9, heading_evidence=EVIDENCE,
-                changes_projection=dict(version=1, sha256='c' * 64))
+                changes_projection=dict(version=2, sha256='c' * 64))
 
 
 def report(obj):
-    return dict(changes_projection=dict(version=1, sha256=obj['changes_projection']['sha256'],
+    return dict(changes_projection=dict(version=2, sha256=obj['changes_projection']['sha256'],
                                         release=obj['rel'], previous=obj['previous'], baseline=False,
-                                        counts={kind: 0 for kind in KINDS}))
+                                        counts={kind: 0 for kind in verify.PROJECTION_KINDS}))
 
 
 class ProjectionManifestTest(unittest.TestCase):
@@ -29,8 +30,8 @@ class ProjectionManifestTest(unittest.TestCase):
         obj = schema9()
         self.assertEqual(verify.manifest(canonical(obj), FIXTURE_POLICY), obj)
         invalid = [dict(obj, schema_version=8), dict(obj, schema_version=10), {k: v for k, v in obj.items() if k != 'changes_projection'}]
-        for value in (None, {}, dict(version=True, sha256='c'*64), dict(version=2, sha256='c'*64),
-                      dict(version=1, sha256='C'*64), dict(version=1, sha256='c'*64, extra=1)):
+        for value in (None, {}, dict(version=True, sha256='c'*64), dict(version=1, sha256='c'*64), dict(version=3, sha256='c'*64),
+                      dict(version=2, sha256='C'*64), dict(version=2, sha256='c'*64, extra=1)):
             invalid.append(dict(obj, changes_projection=value))
         for value in invalid:
             with self.subTest(value=value), self.assertRaises(ValueError):
@@ -42,11 +43,12 @@ class ProjectionManifestTest(unittest.TestCase):
         self.assertEqual(verify.projection(obj, good), good['changes_projection']['counts'])
         for bad in ({}, dict(good, changes_projection=None),
                     *[dict(good, changes_projection=dict(good['changes_projection'], **change)) for change in (
-                        dict(version=2), dict(version=True), dict(sha256='d'*64), dict(release='20990101'),
+                        dict(version=1), dict(version=3), dict(version=True), dict(sha256='d'*64), dict(release='20990101'),
                         dict(previous='20990103'), dict(baseline=0), dict(counts={}),
                         dict(counts=dict(good['changes_projection']['counts'], document_added=True)),
                         dict(counts=dict(good['changes_projection']['counts'], document_added=-1)),
                         dict(baseline=True, counts=dict(good['changes_projection']['counts'], document_added=1)),
+                        dict(counts=dict(good['changes_projection']['counts'], provision_validity=0)),
                         dict(extra=1))]):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 verify.projection(obj, bad)
@@ -54,6 +56,43 @@ class ProjectionManifestTest(unittest.TestCase):
         self.assertIsNone(verify.projection(old, {}))
         with self.assertRaises(ValueError):
             verify.projection(old, good)
+
+    def test_version_one_manifest_and_report_are_refused(self):
+        obj = schema9()
+        old = dict(obj, changes_projection=dict(obj['changes_projection'], version=1))
+        with self.assertRaises(ValueError):
+            verify.manifest(canonical(old), FIXTURE_POLICY)
+        good = report(obj)
+        stale = dict(good, changes_projection=dict(good['changes_projection'], version=1))
+        with self.assertRaises(ValueError):
+            verify.projection(old, stale)
+        with self.assertRaises(ValueError):
+            verify.projection(old, good)
+
+
+class ReleaseCheckFixtureTest(unittest.TestCase):
+    def fixture(self):
+        return json.loads(REPORT_FIXTURE.read_bytes())
+
+    def manifest_for(self, value):
+        return dict(schema9(), rel=value['release'], previous=value['previous'],
+                    changes_projection=dict(version=value['version'], sha256=value['sha256']))
+
+    def test_go_report_passes_the_projection_check(self):
+        report_value = self.fixture()
+        value = report_value['changes_projection']
+        self.assertEqual(value['version'], verify.PROJECTION_VERSION)
+        self.assertEqual(set(value['counts']), set(verify.PROJECTION_KINDS))
+        self.assertEqual(verify.projection(self.manifest_for(value), report_value), value['counts'])
+
+    def test_go_report_is_refused_for_other_versions_and_kinds(self):
+        report_value = self.fixture()
+        value = report_value['changes_projection']
+        for change in (dict(version=1), dict(counts=dict(value['counts'], provision_validity=0)),
+                       dict(counts={k: v for k, v in value['counts'].items() if k != 'document_key'})):
+            changed = dict(report_value, changes_projection=dict(value, **change))
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                verify.projection(self.manifest_for(dict(value, **change)), changed)
 
 
 class ProjectionRecoveryTest(LawCase, unittest.TestCase):
@@ -113,10 +152,22 @@ class ProjectionSmokeTest(LawFixture, unittest.TestCase):
         self.db.host.paths.log.parent.mkdir(parents=True)
         self.db.smoke(dict(self.row, mode='retained'), 'server-image')
         args, _ = self.call('release-check')
-        for key, value in (('--projection-version', '1'), ('--projection-sha256', 'c'*64),
+        for key, value in (('--projection-version', '2'), ('--projection-sha256', 'c'*64),
                            ('--projection-release', obj['rel']), ('--projection-previous', obj['previous'])):
             self.assertEqual(args[args.index(key) + 1], value)
         self.assertIn('document_added', self.db.host.paths.log.read_text())
+
+    def test_go_report_fixture_passes_the_updater_smoke(self):
+        value = json.loads(REPORT_FIXTURE.read_bytes())
+        projection = value['changes_projection']
+        obj = dict(schema9(), rel=projection['release'], previous=projection['previous'],
+                   changes_projection=dict(version=projection['version'], sha256=projection['sha256']))
+        self.row['manifest'] = obj
+        self.responses['release-check'] = REPORT_FIXTURE.read_bytes()
+        self.db.host.paths.log.parent.mkdir(parents=True)
+        self.db.smoke(dict(self.row, mode='retained'), 'server-image')
+        args, _ = self.call('release-check')
+        self.assertEqual(args[args.index('--projection-version') + 1], '2')
 
     def test_duplicate_projection_keys_in_release_check_are_refused(self):
         obj = schema9()
@@ -124,7 +175,7 @@ class ProjectionSmokeTest(LawFixture, unittest.TestCase):
         self.responses['release-check'] = ('{"changes_projection":{},' + good[1:]).encode()
         with self.assertRaises(ValueError):
             self.db.describe('server-image', self.name, manifest=obj)
-        nested = json.dumps(report(obj)).replace('"version": 1', '"version": 1, "version": 1')
+        nested = json.dumps(report(obj)).replace('"version": 2', '"version": 2, "version": 2')
         self.responses['release-check'] = nested.encode()
         with self.assertRaises(ValueError):
             self.db.describe('server-image', self.name, manifest=obj)

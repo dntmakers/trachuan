@@ -117,14 +117,13 @@ name a replacement. Dates and booleans are stored values from the two releases.
 A changed field is a `{before, after}` pair, with an explicit null for an absent
 date.
 
-| `kind`               | Selection                                                               | Item fields                                                                                                                                                                      |
-| -------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `document_added`     | Default                                                                 | `key`, `cause`, `handle` when readable                                                                                                                                           |
-| `document_removed`   | Default                                                                 | `key`, `cause`, optional `replaced_by`                                                                                                                                           |
-| `document_validity`  | Default                                                                 | `key`, optional `handle` and `source_change`, and changed pairs from `status_class`, `eff_from`, `eff_to`, `is_current`, `validity_conflict`                                     |
-| `provision_validity` | Default when both evidence flags `provenance` and `ambiguous` are false | `key`, `anchor`, `change` (`added` or `removed`), one `validity` tuple (`status_class`, nullable `eff_from`, nullable `eff_to`, `method`), optional `handle` and `source_change` |
-| `provision_text`     | Explicit                                                                | `key`, `anchor`, `change` (`added`, `removed` or `changed`), `provenance`, `ambiguous`, optional `handle`                                                                        |
-| `document_key`       | Explicit                                                                | `before_key`, `key`, optional `handle` to the new key                                                                                                                            |
+| `kind`              | Selection | Item fields                                                                                                                                  |
+| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `document_added`    | Default   | `key`, `cause`, `handle` when readable                                                                                                       |
+| `document_removed`  | Default   | `key`, `cause`, optional `replaced_by`                                                                                                       |
+| `document_validity` | Default   | `key`, optional `handle` and `source_change`, and changed pairs from `status_class`, `eff_from`, `eff_to`, `is_current`, `validity_conflict` |
+| `provision_text`    | Explicit  | `key`, `anchor`, `change` (`added`, `removed` or `changed`), `provenance`, `ambiguous`, optional `handle`                                    |
+| `document_key`      | Explicit  | `before_key`, `key`, optional `handle` to the new key                                                                                        |
 
 Project the sidecar's `document_legal` as `document_validity`. Gather
 `document_key` and `document_provenance` by current document key before forming
@@ -134,12 +133,14 @@ a hand-over and the changed pairs for `text_source`, `text_complete` and
 `baseline` from the provenance record when present. Omit `source_change` only
 when neither record applies.
 
-Project each eligible provision validity tuple as a row, added tuples first,
-then removed, in sidecar order within each group. The full evidence keeps the
+Provision validity is not served: no build path writes the corpus
+`provision_validity` table yet, so the kind would always count zero. Projection
+version 2 has no row kind, count, filter or `build.json` count for it; see
+[version 2](release-changes-encoding.md#version-2). The full evidence keeps the
 standalone document provenance, metadata and taxonomy records, provision
-validity rows flagged as provenance or ambiguous, and text hashes.
-`provision_text` reports a corpus text difference with its extraction and
-ambiguity flags, even when both flags are false.
+validity records, and text hashes. `provision_text` reports a corpus text
+difference with its extraction and ambiguity flags, even when both flags are
+false.
 
 Derive handles during serving from the same release, using the usual
 [read handles](mcp-results.md#handles) and their length bounds. Return a
@@ -184,14 +185,13 @@ limits as `invalid_request`.
 
 ### Ordering and paging
 
-Use source record order, preserving the tuple order above. Assign ordinals once
-at build. Query strictly after the last returned ordinal. Use B-tree paths for
-kind and ordinal, and for each document key position with kind and ordinal. Seek
-each selected kind and key position for up to the page limit plus one ordinals.
-Merge and deduplicate them in ordinal order, then load payloads for at most the
-page limit plus one unique rows. This keeps rare kinds and exact keys from
-requiring a scan across earlier pages. Verify the plans with PostgreSQL on a
-representative release.
+Use source record order. Assign ordinals once at build. Query strictly after the
+last returned ordinal. Use B-tree paths for kind and ordinal, and for each
+document key position with kind and ordinal. Seek each selected kind and key
+position for up to the page limit plus one ordinals. Merge and deduplicate them
+in ordinal order, then load payloads for at most the page limit plus one unique
+rows. This keeps rare kinds and exact keys from requiring a scan across earlier
+pages. Verify the plans with PostgreSQL on a representative release.
 [PostgreSQL 18 index ordering](https://www.postgresql.org/docs/18/indexes-ordering.html)
 
 [Budgets](budgets.md#request-limits) cap page size, item size, cursor size and
@@ -257,17 +257,18 @@ first compatible image includes the updater that validates the signed schema-9
 field and the server that reads the new projection. The new server supports
 prior schemas and serves `state: "unavailable"` for changes on them. The
 existing server refuses the new schema in `release-check` and when opening an
-unsupported database. Raise the image release floor before publishing the new
-corpus. Older dumps remain valid rollback targets under the compatible image.
-Rebuild from frozen inputs under a new `rel`; retain the old dump and sidecars
-as published.
+unsupported database ([version 2](release-changes-encoding.md#version-2) is
+refused only before the swap). Raise the image release floor before publishing.
+Older dumps remain valid rollback targets under the compatible image. Rebuild
+from frozen inputs under a new `rel`; retain the old dump and sidecars.
 
 - Prove both sides of the binding. Build, dump and restore a fixture, run `eval`
   and `evidence`, and match the restored projection to the signed digest. Alter
   just a stored `eff_to` while leaving `build.json`, the signed digest and the
   set row intact. Both `new` and `retained` must refuse before moving the
   pointer. Cover wrong predecessor, missing or extra rows, altered counts,
-  malformed records, over-budget input, artifact reuse and old-schema rollback.
+  malformed records, over-budget input, artifact reuse and old-schema rollback,
+  and the [version 2 cases](release-changes-encoding.md#version-2).
 - Race `--previous-report` replacement against build item creation. The winner
   determines one predecessor for build, eval and evidence. A different report
   after build creation is refused even before eval. Cover a legitimate baseline,

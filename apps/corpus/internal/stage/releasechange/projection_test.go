@@ -47,7 +47,7 @@ func TestProjectChanges_ContextAndTuples(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 3 || rows[1].Key2 == nil || *rows[1].Key2 != "old" || !strings.Contains(string(rows[1].Payload), `"before_key":"old"`) || !strings.Contains(string(rows[1].Payload), `"baseline"`) || !strings.Contains(string(rows[2].Payload), `"eff_from":null`) {
+	if len(rows) != 2 || rows[1].Key2 == nil || *rows[1].Key2 != "old" || !strings.Contains(string(rows[1].Payload), `"before_key":"old"`) || !strings.Contains(string(rows[1].Payload), `"baseline"`) {
 		t.Fatalf("%+v", rows)
 	}
 	baseline, err := ProjectChanges(strings.NewReader("{\"schema\":1,\"bindings\":{\"rel\":\"r\",\"dump_sha256\":\"d\",\"build_artifact_sha256\":\"b\",\"report_sha256\":\"p\",\"predecessor_rel\":\"none\",\"predecessor_identity_sha256\":\"none\"},\"baseline\":true}\n"))

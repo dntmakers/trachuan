@@ -10,7 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const changesSetSQL = `SELECT version,CASE WHEN ok THEN country END,CASE WHEN ok THEN release END,CASE WHEN ok THEN predecessor END,CASE WHEN ok THEN predecessor_identity_hash END,baseline,document_added,document_removed,document_validity,provision_validity,provision_text,document_key,CASE WHEN ok THEN digest END,count(*) OVER (),ok FROM (SELECT *, (octet_length(country)<=2 AND octet_length(release)<=11 AND coalesce(octet_length(predecessor),0)<=11 AND coalesce(octet_length(predecessor_identity_hash),0)<=64 AND octet_length(digest)<=64 AND 8::bigint+octet_length(version::text)+octet_length(country)+octet_length(release)+coalesce(octet_length(predecessor),0)+coalesce(octet_length(predecessor_identity_hash),0)<=$1) AS ok FROM release_change_set) bounded`
+var changesSetSQL = `SELECT version,CASE WHEN ok THEN country END,CASE WHEN ok THEN release END,CASE WHEN ok THEN predecessor END,CASE WHEN ok THEN predecessor_identity_hash END,baseline,` + releasechanges.CountColumns() + `,CASE WHEN ok THEN digest END,count(*) OVER (),ok FROM (SELECT *, (octet_length(country)<=2 AND octet_length(release)<=11 AND coalesce(octet_length(predecessor),0)<=11 AND coalesce(octet_length(predecessor_identity_hash),0)<=64 AND octet_length(digest)<=64 AND 8::bigint+octet_length(version::text)+octet_length(country)+octet_length(release)+coalesce(octet_length(predecessor),0)+coalesce(octet_length(predecessor_identity_hash),0)<=$1) AS ok FROM release_change_set) bounded`
+
 const changesSeekKind = `SELECT ordinal FROM release_change WHERE kind=$1 AND ordinal>$2 ORDER BY ordinal LIMIT $3`
 const changesSeekKey = `SELECT ordinal FROM release_change WHERE kind=$1 AND key=$2 AND ordinal>$3 ORDER BY ordinal LIMIT $4`
 const changesSeekKey2 = `SELECT ordinal FROM release_change WHERE kind=$1 AND key2=$2 AND ordinal>$3 ORDER BY ordinal LIMIT $4`
@@ -19,10 +20,10 @@ const changesLoad = `SELECT ordinal,CASE WHEN ok THEN kind END,CASE WHEN ok THEN
 func changesSet(ctx context.Context, tx pgx.Tx, result ChangesResult) (ChangesResult, error) {
 	var header releasechanges.Header
 	var digest, country, rel *string
-	var counts [6]int64
+	var counts [releasechanges.KindCount]int64
 	var n int
 	var ok bool
-	err := tx.QueryRow(ctx, changesSetSQL, corpusdb.ReleaseChangeLimits().TotalBytes).Scan(&header.Version, &country, &rel, &header.Predecessor, &header.PredecessorIdentityHash, &header.Baseline, &counts[0], &counts[1], &counts[2], &counts[3], &counts[4], &counts[5], &digest, &n, &ok)
+	err := tx.QueryRow(ctx, changesSetSQL, corpusdb.ReleaseChangeLimits().TotalBytes).Scan(releasechanges.SetDestinations(&header, &country, &rel, &digest, &n, &ok, counts[:])...)
 	if err != nil {
 		return ChangesResult{}, databaseFailure("read changes set", err)
 	}
@@ -33,7 +34,7 @@ func changesSet(ctx context.Context, tx pgx.Tx, result ChangesResult) (ChangesRe
 	if _, err = releasechanges.NewHasher(header); err != nil || n != 1 || header.Country != result.Country || header.Release != result.Release || !validHash(*digest) || header.Predecessor != nil && !validChangesRelease(*header.Predecessor) || !header.Baseline && header.Predecessor == nil || header.Baseline != (header.PredecessorIdentityHash == nil) {
 		return ChangesResult{}, ErrUnavailable
 	}
-	kinds := []string{"document_added", "document_removed", "document_validity", "provision_validity", "provision_text", "document_key"}
+	kinds := releasechanges.Kinds()
 	result.PreviousRelease = header.Predecessor
 	result.State = "available"
 	result.Counts = make(map[string]int64, len(kinds))

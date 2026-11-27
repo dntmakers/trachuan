@@ -77,7 +77,7 @@ func projectionBatchFixture(t *testing.T) (*batchFixture, *pgxpool.Pool) {
 	if projection.Counts["document_added"]+projection.Counts["document_removed"] == 0 {
 		t.Fatal("fixture has no document changes")
 	}
-	record, err := json.Marshal(build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: 1, SHA256: projection.Digest}, ChangesCounts: projection.Counts})
+	record, err := json.Marshal(build.BuildRecord{SchemaVersion: 9, ChangesProjection: build.ProjectionDigest{Version: releasechanges.Version, SHA256: projection.Digest}, ChangesCounts: projection.Counts})
 	if err != nil {
 		t.Fatal(err)
 	}

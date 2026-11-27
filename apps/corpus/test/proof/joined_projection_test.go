@@ -153,7 +153,7 @@ func TestProof_JoinedProjection(t *testing.T) {
 		if stored.Header.Predecessor == nil || *stored.Header.Predecessor != previous {
 			t.Fatalf("wrong predecessor: %+v", stored.Header)
 		}
-		wantCounts := map[string]int{"document_added": 1, "document_removed": 1, "document_validity": 1, "provision_validity": 0, "provision_text": 2, "document_key": 0}
+		wantCounts := map[string]int{"document_added": 1, "document_removed": 1, "document_validity": 1, "provision_text": 2, "document_key": 0}
 		if !maps.Equal(stored.Counts, wantCounts) {
 			t.Fatalf("counts=%v, want %v", stored.Counts, wantCounts)
 		}

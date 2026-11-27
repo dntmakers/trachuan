@@ -20,18 +20,16 @@ func shapeChange(ctx context.Context, tx pgx.Tx, row releasechanges.Row) (json.R
 	_ = json.Unmarshal(fields["key"], &key)
 	fields["kind"], _ = json.Marshal(row.Kind)
 	readable := row.Kind != "document_removed"
-	if row.Kind == "provision_validity" || row.Kind == "provision_text" {
+	if row.Kind == "provision_text" {
 		if json.Unmarshal(fields["anchor"], &anchor) != nil || anchor == "" || json.Unmarshal(fields["change"], &change) != nil {
 			return nil, ErrUnavailable
 		}
-		if row.Kind == "provision_text" {
-			readable = change != "removed"
-			var ambiguous bool
-			if json.Unmarshal(fields["ambiguous"], &ambiguous) != nil {
-				return nil, ErrUnavailable
-			}
-			readable = readable && !ambiguous
+		readable = change != "removed"
+		var ambiguous bool
+		if json.Unmarshal(fields["ambiguous"], &ambiguous) != nil {
+			return nil, ErrUnavailable
 		}
+		readable = readable && !ambiguous
 	}
 	handle := key
 	if anchor != "" {

@@ -12,7 +12,7 @@ const fields = ['status_class', 'eff_from', 'eff_to', 'is_current', 'validity_co
 const sourceFields = ['text_source', 'text_complete', 'baseline'] as const
 const validityPairs = computed(() => props.item.kind === 'document_validity' ? fields.flatMap(field => { const value = props.item.kind === 'document_validity' ? props.item[field] : undefined; return value ? [{ field, value }] : [] }) : [])
 const sourcePairs = computed(() => {
-  const source = (props.item.kind === 'document_validity' || props.item.kind === 'provision_validity') ? props.item.source_change : undefined
+  const source = props.item.kind === 'document_validity' ? props.item.source_change : undefined
   return source ? sourceFields.flatMap(field => { const value = source[field]; return value ? [{ field, value }] : [] }) : []
 })
 function fieldLabel(field: string): string {
@@ -44,11 +44,7 @@ function pair(value: { before: unknown, after: unknown }, field: string): string
       <h4>{{ labels.validity }}</h4>
       <p v-for="entry in validityPairs" :key="entry.field">{{ fieldLabel(entry.field) }}: {{ pair(entry.value, entry.field) }}</p>
     </template>
-    <template v-if="item.kind === 'provision_validity'">
-      <h4>{{ labels.validity }}</h4>
-      <p v-for="(value, field) in item.validity" :key="field">{{ fieldLabel(field) }}: {{ valueLabel(value, field) }}</p>
-    </template>
-    <template v-if="(item.kind === 'document_validity' || item.kind === 'provision_validity') && item.source_change">
+    <template v-if="item.kind === 'document_validity' && item.source_change">
       <h4>{{ labels.sourceChange }}</h4>
       <p v-if="item.source_change.before_key">{{ labels.beforeKey }}: {{ item.source_change.before_key }}</p>
       <p v-for="entry in sourcePairs" :key="entry.field">{{ fieldLabel(entry.field) }}: {{ pair(entry.value, entry.field) }}</p>

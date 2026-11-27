@@ -205,12 +205,12 @@ class SigningTraceTest(unittest.TestCase):
             self.signable(missing, current, existing=signed)
 
     def test_signed_changes_projection_cannot_change_or_disappear(self):
-        projection = dict(version=1, sha256='a' * 64)
+        projection = dict(version=2, sha256='a' * 64)
         signed = manifest(sequence=10, schema_version=9, changes_projection=projection)
         current = self.production(rel=REL, sequence=10)
         self.assertIs(self.signable(manifest(schema_version=9, changes_projection=dict(projection)),
                                     current, existing=signed, resign=True), current)
-        for value in (dict(version=1, sha256='b' * 64), None):
+        for value in (dict(version=2, sha256='b' * 64), None):
             rebuilt = manifest(schema_version=9)
             if value is not None:
                 rebuilt['changes_projection'] = value

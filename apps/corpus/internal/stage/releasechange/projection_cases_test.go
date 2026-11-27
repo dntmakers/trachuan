@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -34,7 +33,7 @@ func projectionCaseResult(name string, input []byte) projectionCase {
 	if previous == "" || (header.Baseline && hash != "none") || (!header.Baseline && (previous == "none" || !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(hash))) {
 		return result
 	}
-	h := releasechanges.Header{Version: 1, Country: "vn", Release: header.Bindings.Rel, Baseline: header.Baseline}
+	h := releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: header.Bindings.Rel, Baseline: header.Baseline}
 	if previous != "none" {
 		h.Predecessor = &previous
 	}
@@ -77,6 +76,11 @@ func TestProjection_DifferentialCases(t *testing.T) {
 	add("relation_html_reverse", input(relation("A"), relation("<")))
 	add("relation_html_ampersand", input(relation("&"), relation(">")))
 	add("relation_unicode_separators", input(relation(" "), relation(" ")))
+	validity := func(flags string) string {
+		return `{"type":"provision_validity","key":"a","anchor":"p","added":[{"status_class":"in_force","eff_from":null,"eff_to":null,"method":"text"}],"removed":[]` + flags + `}`
+	}
+	add("provision_validity_flags_absent", input(doc("a"), validity("")))
+	add("provision_validity_flags_false", input(doc("a"), validity(`,"provenance":false,"ambiguous":false`)))
 	add("astral_key", input(doc("😀")))
 	escapedAstral := string(rune(92)) + "ud83d" + string(rune(92)) + "ude00"
 	add("escaped_astral_key", input(doc(escapedAstral)))
@@ -103,8 +107,5 @@ func TestProjection_DifferentialCases(t *testing.T) {
 		t.Fatal(err)
 	}
 	encoded = append(encoded, '\n')
-	golden, err := os.ReadFile("testdata/projection_cases.json")
-	if err != nil || !bytes.Equal(encoded, golden) {
-		t.Fatalf("projection cases expected %s", encoded)
-	}
+	golden(t, "projection_cases.json", encoded)
 }

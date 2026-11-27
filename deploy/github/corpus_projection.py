@@ -3,8 +3,9 @@ import json
 import re
 
 
+VERSION = 2
 KINDS = ('document_added', 'document_removed', 'document_validity',
-         'provision_validity', 'provision_text', 'document_key')
+         'provision_text', 'document_key')
 
 
 class _Integer(str):
@@ -89,7 +90,7 @@ def _field(value, optional=False):
 class Hasher:
     def __init__(self, version, country, release, predecessor=None,
                  predecessor_identity_hash=None, baseline=False, output=None):
-        if type(version) is not int or version != 1:
+        if type(version) is not int or version != VERSION:
             raise ValueError('unknown projection version')
         if type(baseline) is not bool:
             raise ValueError('invalid baseline')
@@ -104,7 +105,7 @@ class Hasher:
         self.counts = dict.fromkeys(KINDS, 0)
         self._hash = hashlib.sha256()
         self._output = output
-        self._write('\t'.join(('v1', country, release, predecessor, identity,
+        self._write('\t'.join(('v%d' % VERSION, country, release, predecessor, identity,
                                '1' if baseline else '0')) + '\n')
 
     def _write(self, line):

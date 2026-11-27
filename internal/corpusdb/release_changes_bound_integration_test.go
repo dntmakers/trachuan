@@ -58,7 +58,7 @@ func TestReleaseChanges_OversizedKindNotSent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: 1, Country: "vn", Release: "r"}, []releasechanges.Row{{Ordinal: 1, Kind: "document_added", Payload: `{}`}}); err != nil {
+	if err = WriteReleaseChanges(ctx, tx, releasechanges.Header{Version: releasechanges.Version, Country: "vn", Release: "r"}, []releasechanges.Row{{Ordinal: 1, Kind: "document_added", Payload: `{}`}}); err != nil {
 		t.Fatal(err)
 	}
 	if err = tx.Commit(ctx); err != nil {

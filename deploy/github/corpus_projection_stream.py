@@ -3,7 +3,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from corpus_projection import Hasher, canonical_payload
+from corpus_projection import VERSION, Hasher, canonical_payload
 from corpus_projection_schema import RANKS, header, parse, record
 
 
@@ -142,19 +142,6 @@ def _raw_object(fields):
             .replace('\u2029', '\\u2029'))
 
 
-def _raw_array(value):
-    decoder = json.JSONDecoder()
-    position = 1
-    result = []
-    while value[position] != ']':
-        start = position
-        _, position = decoder.raw_decode(value, position)
-        result.append(value[start:position])
-        if value[position] == ',':
-            position += 1
-    return result
-
-
 def _context(value, raw, contexts, raw_contexts):
     kind, key = value['type'], value.get('key')
     if kind not in ('document_key', 'document_provenance'):
@@ -193,25 +180,17 @@ def _row_data(value, contexts):
         payload = _fields(value, ('key', 'anchor', 'change'))
         payload.update(provenance=value.get('provenance', False), ambiguous=value.get('ambiguous', False))
         yield 'provision_text', key, None, payload
-    elif kind == 'provision_validity' and not value.get('provenance', False) and not value.get('ambiguous', False):
-        for change in ('added', 'removed'):
-            for item in value[change]:
-                payload = {'key': key, 'anchor': value['anchor'], 'change': change, 'validity': item}
-                if context is not None:
-                    payload['source_change'] = context
-                yield kind, key, key2, payload
 
 
-def _make_row(ordinal, kind, key, key2, payload, raw, raw_contexts, tuple_raw):
+def _make_row(ordinal, kind, key, key2, payload, raw, raw_contexts):
     item = {name: (raw['before'] if name == 'before_key' else
                    _raw_object(raw_contexts[key]) if name == 'source_change' else
-                   tuple_raw if name == 'validity' else
                    raw[name] if name in raw else _json(value))
             for name, value in payload.items()}
     item['kind'] = _json(kind)
     if kind != 'document_removed' and (kind != 'provision_text' or (payload['change'] != 'removed' and not payload['ambiguous'])):
         handle = key
-        if kind in ('provision_text', 'provision_validity'):
+        if kind == 'provision_text':
             handle += '#' + payload['anchor']
         if len(handle) <= 512:
             item['handle'] = _json(handle)
@@ -242,20 +221,17 @@ def project_stream(source, country, row_limit):
         identity = None
     else:
         identity = identity[7:]
-    hasher = Hasher(1, country, bindings['rel'], previous, identity, first['baseline'])
+    hasher = Hasher(VERSION, country, bindings['rel'], previous, identity, first['baseline'])
     rows = []
-    total = len(('\t'.join(('v1', country, bindings['rel'], previous or '', identity or '',
+    total = len(('\t'.join(('v%d' % VERSION, country, bindings['rel'], previous or '', identity or '',
                             '1' if first['baseline'] else '0')) + '\n').encode())
     if total > row_limit:
         raise ValueError('projection size limit')
     def collect(value, raw):
         nonlocal total
         fields = _raw_fields(raw)
-        tuples = {name: iter(_raw_array(fields[name])) for name in ('added', 'removed')
-                  if value['type'] == 'provision_validity'}
         for kind, key, key2, payload in _row_data(value, contexts):
-            tuple_raw = next(tuples[payload['change']]) if kind == 'provision_validity' else None
-            row = _make_row(len(rows) + 1, kind, key, key2, payload, fields, raw_contexts, tuple_raw)
+            row = _make_row(len(rows) + 1, kind, key, key2, payload, fields, raw_contexts)
             line = '\t'.join((str(row.ordinal), row.kind, row.key or '', row.key2 or '', row.payload)) + '\n'
             total += len(line.encode())
             if total > row_limit:

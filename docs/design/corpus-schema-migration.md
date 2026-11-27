@@ -43,3 +43,7 @@ target: it lacks the summary capability, so summaries are unavailable while it
 is active and the reader is unaffected.
 
 Version 9 is proposed for [serving release changes](release-changes-serving.md).
+Schema 9 changed in place before its first published release for
+[projection version 2](release-changes-encoding.md#version-2), which was safe
+only because every image that lists schema 9 refuses the changed form through
+the signed `changes_projection.version`.

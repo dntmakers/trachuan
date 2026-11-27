@@ -4195,7 +4195,7 @@ export interface components {
             /** @enum {string} */
             country: "vn";
             release?: string;
-            kinds?: ("document_added" | "document_removed" | "document_validity" | "provision_validity" | "provision_text" | "document_key")[];
+            kinds?: ("document_added" | "document_removed" | "document_validity" | "provision_text" | "document_key")[];
             document?: string;
             limit?: number;
             cursor?: string;
@@ -4211,11 +4211,10 @@ export interface components {
                 document_added: number;
                 document_removed: number;
                 document_validity: number;
-                provision_validity: number;
                 provision_text: number;
                 document_key: number;
             };
-            items: (components["schemas"]["ChangeDocumentAdded"] | components["schemas"]["ChangeDocumentRemoved"] | components["schemas"]["ChangeDocumentValidity"] | components["schemas"]["ChangeProvisionValidity"] | components["schemas"]["ChangeProvisionText"] | components["schemas"]["ChangeDocumentKey"])[];
+            items: (components["schemas"]["ChangeDocumentAdded"] | components["schemas"]["ChangeDocumentRemoved"] | components["schemas"]["ChangeDocumentValidity"] | components["schemas"]["ChangeProvisionText"] | components["schemas"]["ChangeDocumentKey"])[];
             next_cursor?: string;
         } & (unknown & unknown & unknown);
         ChangeDocumentAdded: {
@@ -4300,44 +4299,6 @@ export interface components {
             validity_conflict?: {
                 before: boolean;
                 after: boolean;
-            };
-        };
-        ChangeProvisionValidity: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            kind: "provision_validity";
-            key: string;
-            anchor: string;
-            /** @enum {string} */
-            change: "added" | "removed";
-            handle?: string;
-            source_change?: {
-                before_key?: string;
-                text_source?: {
-                    /** @enum {string} */
-                    before: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
-                    /** @enum {string} */
-                    after: "source_tree" | "html_transcription" | "pdf_text" | "ocr" | "none";
-                };
-                text_complete?: {
-                    before: boolean;
-                    after: boolean;
-                };
-                baseline?: {
-                    before: boolean;
-                    after: boolean;
-                };
-            };
-            validity: {
-                /** @enum {string} */
-                status_class: "in_force" | "partial" | "expired" | "not_yet" | "suspended" | "unknown";
-                /** Format: date */
-                eff_from: string | null;
-                /** Format: date */
-                eff_to: string | null;
-                method: string;
             };
         };
         ChangeProvisionText: {

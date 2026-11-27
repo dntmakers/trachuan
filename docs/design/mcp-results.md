@@ -17,9 +17,9 @@ null and empty fields except for the
 [required nullable source file fields](mcp-read.md#source-files) and the
 [release changes fields](release-changes-serving.md#request-and-response) below.
 In `changes` results, keep `items: []` when empty. Keep explicit null dates in
-`before` and `after` pairs and in provision validity tuples. Apply the same
-exceptions to `structuredContent`, the text copy and the web API response. The
-web API returns the same objects through the OpenAPI document.
+`before` and `after` pairs. Apply the same exceptions to `structuredContent`,
+the text copy and the web API response. The web API returns the same objects
+through the OpenAPI document.
 
 ## Handles
 
