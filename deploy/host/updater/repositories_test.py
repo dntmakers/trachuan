@@ -78,7 +78,7 @@ class PolicyRepositoriesTest(unittest.TestCase):
             path.write_bytes(canonical(value))
             return v.policy(path)
 
-    def test_shipped_policy_trusts_only_new_owner_at_release_c_floor(self):
+    def test_shipped_policy_trusts_only_new_owner_at_current_floor(self):
         value = v.policy(HOST / 'deploy-policy.json')
         self.assertEqual(value['repositories'], [NEW])
         self.assertEqual(value['release_floor'], 76)
