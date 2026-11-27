@@ -56,12 +56,13 @@ export CORPUS_PHAPDIEN_PACKAGE=work/phapdien/BoPhapDienDienTu.zip
 export CORPUS_OCR_STORE="$PWD/work/ocr"
 export CORPUS_FILE_CACHE="$PWD/work/cache/banhmi-vn"
 go run ./apps/corpus/cmd/corpus migrate
-go run ./apps/corpus/cmd/corpus start vn 20261109 --until relate --no-previous-report
+go run ./apps/corpus/cmd/corpus start vn 20261109 --until relate --no-previous-report --no-classification-set
 go run ./apps/corpus/cmd/corpus status vn 20261109
 ```
 
 Creating a run takes exactly one of `--previous-report <report.json>` and
-`--no-previous-report`. A run started with `--no-previous-report` is compared
+`--no-previous-report`, and exactly one of `--classification-set SHA256` and
+`--no-classification-set`. A run started with `--no-previous-report` is compared
 with nothing and cannot publish. A run meant for release follows
 [release a corpus](release-restore.md#release-a-corpus). Restart the worker on
 code that has these flags before the first such start. Later starts of the same

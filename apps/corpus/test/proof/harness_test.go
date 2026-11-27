@@ -147,6 +147,7 @@ func (h *harness) env(fault string) []string {
 func (h *harness) command(args ...string) {
 	h.t.Helper()
 	if len(args) > 0 && args[0] == "start" {
+		args = append(args, "--no-classification-set")
 		if h.previousReport == "" {
 			args = append(args, "--no-previous-report")
 		} else {

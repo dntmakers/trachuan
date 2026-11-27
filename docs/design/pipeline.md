@@ -51,7 +51,11 @@ signed dump to OCI Object Storage. Decision and alternatives:
   `corpus cancel` or `corpus recover`.
 - Creating a run requires `--previous-report <file>` or `--no-previous-report`,
   frozen in the snapshot
-  ([selected report](release-evidence.md#selected-report)).
+  ([selected report](release-evidence.md#selected-report)), and
+  `--classification-set <sha256>` or `--no-classification-set`
+  ([classification set](classification-publish.md#build-and-match)). The set is
+  locked when the run is created and needs `build` among the stages; a snapshot
+  without a digest has no set. Omitting either choice refuses the start.
 - A start with a later or no `--until` appends missing stages and freezes their
   recipes at that moment, in one update recorded in the run message. A restart
   from `cancelled` or `failed` extends exactly like one from `paused`. Stages

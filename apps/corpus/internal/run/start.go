@@ -14,10 +14,13 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/store"
+	"github.com/jackc/pgx/v5"
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
 )
+
+const runStartLockClass = 1920298593
 
 func workflowOpen(ctx context.Context, d Deps, id string) (bool, error) {
 	desc, err := d.Temporal.DescribeWorkflowExecution(ctx, id, "")
@@ -62,13 +65,35 @@ func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string)
 		return fmt.Errorf("begin start: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	q := store.New(tx)
-	if err = q.CreateRun(ctx, store.CreateRunParams{Country: cc, Rel: rel, Snapshot: raw}); err != nil {
-		return fmt.Errorf("create run: %w", err)
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1, hashtext($2))`, runStartLockClass, cc+":"+rel); err != nil {
+		return fmt.Errorf("lock run creation: %w", err)
 	}
+	q := store.New(tx)
 	row, err := q.GetRunForUpdate(ctx, store.GetRunForUpdateParams{Country: cc, Rel: rel})
-	if err != nil {
+	missing := errors.Is(err, pgx.ErrNoRows)
+	if err != nil && !missing {
 		return fmt.Errorf("lock run: %w", err)
+	}
+	existing := !missing && row.Generation > 0
+	oldStageCount := 0
+	if existing {
+		snap = stage.Snapshot{}
+		if err = json.Unmarshal(row.Snapshot, &snap); err != nil {
+			return fmt.Errorf("decode snapshot: %w", err)
+		}
+		oldStageCount = len(snap.Stages)
+	}
+	if err = freezeClassificationSet(ctx, d, cc, &snap, existing); err != nil {
+		return err
+	}
+	if missing {
+		if err = q.CreateRun(ctx, store.CreateRunParams{Country: cc, Rel: rel, Snapshot: raw}); err != nil {
+			return fmt.Errorf("create run: %w", err)
+		}
+		row, err = q.GetRunForUpdate(ctx, store.GetRunForUpdateParams{Country: cc, Rel: rel})
+		if err != nil {
+			return fmt.Errorf("lock run: %w", err)
+		}
 	}
 	codes, err := q.ListBlockingRunFailureCodes(ctx, store.ListBlockingRunFailureCodesParams{RunID: row.ID, Codes: stage.BlockingFailureCodes()})
 	if err != nil {
@@ -94,18 +119,6 @@ func Start(ctx context.Context, d Deps, cc, rel, until, previousManifest string)
 	}
 	if open {
 		return errors.New("workflow is open; use corpus cancel or corpus recover")
-	}
-	oldStageCount := 0
-	existing := row.Generation > 0
-	if existing {
-		snap = stage.Snapshot{}
-		if err = json.Unmarshal(row.Snapshot, &snap); err != nil {
-			return fmt.Errorf("decode snapshot: %w", err)
-		}
-		oldStageCount = len(snap.Stages)
-	}
-	if err = freezeClassificationSet(ctx, d, cc, &snap, existing); err != nil {
-		return err
 	}
 	decisionNote, err := decide(ctx, decisionInput{Choice: d.PreviousReport, Existing: existing, Country: cc, Rel: rel, Snapshot: &snap, Artifacts: d.Artifacts, HasEvalItem: func(ctx context.Context) (bool, error) {
 		return hasEvalItem(ctx, q, row.ID)

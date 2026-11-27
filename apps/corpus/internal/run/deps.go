@@ -23,6 +23,7 @@ type Deps struct {
 	SourceList                               json.RawMessage
 	PreviousReport                           ReportChoice
 	ClassificationSetSHA256, TaxonomyVersion string
+	NoClassificationSet                      bool
 	Notice                                   func(string)
 	Now                                      func() time.Time
 }

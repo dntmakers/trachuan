@@ -10,7 +10,16 @@ import (
 
 func freezeClassificationSet(ctx context.Context, d Deps, country string, snapshot *stage.Snapshot, existing bool) error {
 	selection := d.ClassificationSetSHA256
+	if selection != "" && d.NoClassificationSet {
+		return fmt.Errorf("use only one of --classification-set and --no-classification-set")
+	}
+	if !existing && selection == "" && !d.NoClassificationSet {
+		return fmt.Errorf("a new run requires --classification-set <sha256> or --no-classification-set")
+	}
 	if existing {
+		if d.NoClassificationSet && snapshot.ClassificationSetSHA256 != "" {
+			return fmt.Errorf("cannot replace the frozen classification set; start a new release")
+		}
 		if selection != "" && selection != snapshot.ClassificationSetSHA256 {
 			return fmt.Errorf("cannot replace the frozen classification set; start a new release")
 		}

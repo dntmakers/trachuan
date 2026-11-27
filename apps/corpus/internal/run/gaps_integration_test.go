@@ -96,7 +96,7 @@ func TestPublishable_RejectsRunFailure(t *testing.T) {
 func TestStart_RejectsScopeChanged(t *testing.T) {
 	db, id := gapDB(t)
 	insertScopeFailure(t, db, id)
-	d := Deps{DB: db, Stages: []string{"fetch"}, SourceList: []byte(`[]`), RecipesFor: func(stage.Snapshot) map[string]string { return map[string]string{"fetch": "recipe"} }}
+	d := Deps{DB: db, NoClassificationSet: true, Stages: []string{"fetch"}, SourceList: []byte(`[]`), RecipesFor: func(stage.Snapshot) map[string]string { return map[string]string{"fetch": "recipe"} }}
 	err := Start(context.Background(), d, "vn", "20990109", "", "")
 	if err == nil || !strings.Contains(err.Error(), "scope_changed") {
 		t.Fatalf("err=%v", err)

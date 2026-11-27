@@ -107,6 +107,7 @@ func lifecycle(ctx context.Context, name string, args []string, stdout, stderr i
 		allowed["--previous-manifest"] = true
 		allowed["--previous-report"] = true
 		allowed["--classification-set"] = true
+		allowed["--no-classification-set"] = false
 		allowed["--no-previous-report"] = false
 	case "recover":
 		allowed["--terminate"] = false
@@ -145,6 +146,7 @@ func lifecycle(ctx context.Context, name string, args []string, stdout, stderr i
 	switch name {
 	case "start":
 		d.ClassificationSetSHA256 = opts["--classification-set"]
+		d.NoClassificationSet = opts["--no-classification-set"] == "true"
 		applyStartFlags(&d, choice, stdout)
 		err = run.Start(ctx, d, cc, rel, opts["--until"], opts["--previous-manifest"])
 	case "status":
