@@ -87,7 +87,7 @@ elif name == 'cosign':
     if os.getenv('FAKE_BAD_SIGNATURE'):
         sys.exit(1)
 elif '--version' in args:
-    print('aws-cli/' + os.getenv('FAKE_AWS_VERSION', '2.31.0'))
+    print('aws-cli/' + os.getenv('FAKE_AWS_VERSION', '2.40.0'))
 elif 'list-objects-v2' in args:
     count = sum(path.is_file() for path in remote.iterdir()) if remote.exists() else 0
     print(os.getenv('FAKE_KEY_COUNT', str(count)))
@@ -490,7 +490,7 @@ class CorpusUploadTest(unittest.TestCase):
 
     def test_existing_prefix_bad_size_and_old_cli_never_dispatch(self):
         for setting, value in [('FAKE_KEY_COUNT', '1'), ('FAKE_BAD_SIZE', 'report.json'),
-                               ('FAKE_AWS_VERSION', '1.44.0'), ('FAKE_FAIL_UPLOAD', '1')]:
+                               ('FAKE_AWS_VERSION', '1.44.0'), ('FAKE_AWS_VERSION', '2.33.99'), ('FAKE_FAIL_UPLOAD', '1')]:
             with self.subTest(setting=setting):
                 self.log.unlink(missing_ok=True)
                 shutil.rmtree(self.remote)
@@ -499,6 +499,9 @@ class CorpusUploadTest(unittest.TestCase):
                 result = self.run_upload()
                 self.env.pop(setting)
                 self.assertNotEqual(result.returncode, 0)
+                if setting == 'FAKE_FAIL_UPLOAD':
+                    self.assertNotIn('Traceback', result.stderr)
+                    self.assertIn('aws put-object', result.stderr)
                 self.assertFalse(any(call['name'] == 'gh' for call in self.calls()))
                 if setting in {'FAKE_KEY_COUNT', 'FAKE_AWS_VERSION'}:
                     self.assertFalse(any('put-object' in call['args'] for call in self.calls()))
@@ -734,7 +737,7 @@ class CorpusUploadTest(unittest.TestCase):
         self.assertEqual(lock_dir.stat().st_mode & 0o777, 0o700)
 
     def test_logs_exact_aws_version(self):
-        self.env['FAKE_AWS_VERSION'] = '2.31.0 Python/synthetic synthetic-os'
+        self.env['FAKE_AWS_VERSION'] = '2.34.0 Python/synthetic synthetic-os'
         result = self.run_upload()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('aws-cli/' + self.env['FAKE_AWS_VERSION'], result.stdout)

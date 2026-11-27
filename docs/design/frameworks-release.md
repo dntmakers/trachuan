@@ -22,11 +22,14 @@ Three principals reach it. The upload group `trachuan-release-upload` may
 create, overwrite, inspect and read objects, as for law: multipart uploads need
 both create and overwrite
 ([OCI multipart uploads](https://docs.oracle.com/en-us/iaas/Content/Object/Tasks/usingmultipartuploads.htm)),
-and the uploader never overwrites an existing prefix. A new user and group,
-`trachuan-frameworks-verify`, with a customer secret key, may read it and
-nothing else; the law verify key cannot read it, so a leaked law key exposes no
-licensed dump. The host's dynamic group may read it. No other statement names
-the bucket.
+and the uploader never overwrites an existing prefix. The group cannot abort a
+multipart upload, so this bucket carries the same lifecycle rule as law
+([corpus release](corpus-release.md)): `ABORT` for `multipart-uploads` older
+than two days. A new user and group, `trachuan-frameworks-verify`, with a
+customer secret key, may read it and nothing else; the law verify key cannot
+read it, so a leaked law key exposes no licensed dump. The host's dynamic group
+may read it. The only other statement lets Object Storage run that lifecycle
+rule on the bucket.
 
 ## Upload
 

@@ -4,17 +4,18 @@ On the [production host](host.md), after first start.
 
 ## Release a corpus
 
-On the MacBook, configure AWS CLI v2 profile `trachuan-release-upload` with the
-OCI IAM user `trachuan-release-upload` customer secret key. Run
-`aws configure --profile trachuan-release-upload` yourself; the credential
-fields are `aws_access_key_id` and `aws_secret_access_key`. Region is
-`ap-singapore-1`. The uploader uses that named shared-credentials profile and
-supplies a temporary configuration with path-style S3 addressing. It never reads
-or prints the keys. Set `OCI_S3_ENDPOINT` to the releases bucket's HTTPS S3
-compatibility endpoint. Python 3.11 or later, `flock`, `curl`, `oras`, signed-in
-`gh` and `cosign` v3.1.4 are also required. The uploader runs
-`cosign verify-blob` to verify the production and previous releases' signed
-manifests. On macOS, install `flock` with `brew install flock` if absent
+On the MacBook, with AWS CLI 2.34.0 or later, configure the profile
+`trachuan-release-upload` with the OCI IAM user `trachuan-release-upload`
+customer secret key. Run `aws configure --profile trachuan-release-upload`
+yourself; the credential fields are `aws_access_key_id` and
+`aws_secret_access_key`. Region is `ap-singapore-1`. The uploader uses that
+named shared-credentials profile and supplies a temporary configuration with
+path-style S3 addressing. It never reads or prints the keys. Set
+`OCI_S3_ENDPOINT` to the releases bucket's HTTPS S3 compatibility endpoint.
+Python 3.11 or later, `flock`, `curl`, `oras`, signed-in `gh` and `cosign`
+v3.1.4 are also required. The uploader runs `cosign verify-blob` to verify the
+production and previous releases' signed manifests. On macOS, install `flock`
+with `brew install flock` if absent
 ([Homebrew](https://formulae.brew.sh/formula/flock)). The uploader prints its
 AWS CLI version. The workflow installs and requires AWS CLI 2.40.0 and prints
 its version.

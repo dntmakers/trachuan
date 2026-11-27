@@ -1,10 +1,9 @@
 import argparse
-import json
 import os
 import subprocess
 import tempfile
 
-from corpus_upload import upload_file, verify_receipts
+from corpus_upload import AWSError, aws_call, require_cli, require_empty_prefix, upload_file, verify_receipts
 from frameworks_cli import guarded
 from frameworks_manifest import document
 from frameworks_paths import private_directory, release_directory, source_file
@@ -44,23 +43,8 @@ def confine(directory):
     os.environ['AWS_REQUEST_CHECKSUM_CALCULATION'] = 'when_required'
 
 
-def require_cli():
-    version = subprocess.run(['aws', '--version'], check=True, capture_output=True, text=True).stdout.strip()
-    if not version.startswith('aws-cli/2.'):
-        raise ValueError('AWS CLI v2 is required')
-    print(version, flush=True)
-
-
 def s3_command(endpoint):
     return ['aws', '--profile', PROFILE, '--endpoint-url', endpoint, '--no-cli-pager', 's3api']
-
-
-def require_empty_prefix(command, rel):
-    result = subprocess.run([*command, 'list-objects-v2', '--bucket', BUCKET, '--prefix', f'frameworks/{rel}/',
-                             '--max-keys', '1', '--query', 'KeyCount', '--output', 'text'],
-                            check=True, stdout=subprocess.PIPE, text=True)
-    if result.stdout.strip() != '0':
-        raise ValueError('Release prefix already holds objects; choose a new rel')
 
 
 def upload(rel, base, paths, facts, endpoint, repository):
@@ -72,10 +56,9 @@ def upload(rel, base, paths, facts, endpoint, repository):
         command = s3_command(endpoint)
 
         def client(args):
-            result = subprocess.run([*command, '--output', 'json', *args], check=True, capture_output=True, text=True)
-            return json.loads(result.stdout)
+            return aws_call(command, args)
 
-        require_empty_prefix(command, rel)
+        require_empty_prefix(command, BUCKET, f'frameworks/{rel}/')
         require_active(facts.report, directory / 'previous', client, repository)
         receipts = {object_key(rel, name): upload_file(path, object_key(rel, name), client, bucket=BUCKET,
                                                        expected=facts.files[name])
@@ -104,7 +87,13 @@ def main():
     parser.add_argument('--repository')
     parser.add_argument('rel')
     args = parser.parse_args()
-    guarded(lambda: run(args.rel, args.dry_run, write_repository(args.repository)))
+    def upload_guarded():
+        try:
+            run(args.rel, args.dry_run, write_repository(args.repository))
+        except AWSError as error:
+            raise ValueError(str(error)) from None
+
+    guarded(upload_guarded)
 
 
 if __name__ == '__main__':

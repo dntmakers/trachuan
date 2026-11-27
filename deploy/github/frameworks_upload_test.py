@@ -82,6 +82,17 @@ class UploadCase(unittest.TestCase):
 
 
 class FrameworksUploadTest(UploadCase):
+    def test_aws_failure_reports_filtered_operation(self):
+        result = self.upload(FAKE_FAIL_ON='list-objects-v2')
+        self.assert_refused(result)
+        self.assertIn('aws list-objects-v2 failed:', result.stderr)
+        self.assertIn('request failed', result.stderr)
+
+    def test_minimum_aws_cli_version_is_accepted(self):
+        result = self.upload(FAKE_AWS_VERSION='2.34.0')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('aws-cli/2.34.0', result.stdout)
+
     def test_first_release_uploads_verifies_and_dispatches(self):
         result = self.upload()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -118,9 +129,9 @@ class FrameworksUploadTest(UploadCase):
         self.assertEqual(self.upload().returncode, 0)
         log = self.calls()
         query = next(i for i, call in enumerate(log) if 'list-objects-v2' in call['args'])
-        self.assertEqual(log[query]['args'][5:], ['s3api', 'list-objects-v2', '--bucket', BUCKET, '--prefix',
-                                                  f'frameworks/{REL}/', '--max-keys', '1', '--query', 'KeyCount',
-                                                  '--output', 'text'])
+        self.assertEqual(log[query]['args'][5:], ['s3api', '--output', 'json', 'list-objects-v2', '--bucket', BUCKET,
+                                                  '--prefix', f'frameworks/{REL}/', '--max-keys', '1',
+                                                  '--query', 'KeyCount'])
         self.assertLess(query, min(i for i, call in enumerate(log) if 'put-object' in call['args']))
 
     def test_next_release_checks_the_active_signed_report(self):
@@ -218,6 +229,7 @@ class FrameworksUploadTest(UploadCase):
 
     def test_existing_prefix_and_old_cli_upload_nothing(self):
         self.assert_refused(self.upload(FAKE_AWS_VERSION='1.44.0'))
+        self.assert_refused(self.upload(FAKE_AWS_VERSION='2.33.99'))
         self.assert_nothing_uploaded()
         self.stored('frameworks.dump').parent.mkdir(parents=True)
         self.stored('frameworks.dump').write_bytes(b'existing')

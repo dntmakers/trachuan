@@ -69,9 +69,6 @@ if [[ $dry_run == true ]]; then
   exec python3 "$root/deploy/github/corpus_upload.py" --dry-run --repository "$repository" "$country" "$rel" "$build_dir" "$report"
 fi
 
-version=$(aws --version)
-[[ $version == aws-cli/2.* ]] || { echo 'AWS CLI v2 is required' >&2; exit 1; }
-printf '%s\n' "$version"
 umask 077
 directory=$(mktemp -d)
 trap 'rm -rf "$directory"' EXIT
@@ -79,12 +76,5 @@ export AWS_CONFIG_FILE="$directory/config"
 export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
 printf '%s\n' '[profile trachuan-release-upload]' 'region = ap-singapore-1' \
   's3 =' '    addressing_style = path' '    signature_version = s3v4' > "$AWS_CONFIG_FILE"
-aws_release() {
-  aws --profile trachuan-release-upload --endpoint-url "$endpoint" --no-cli-pager "$@"
-}
-count=$(aws_release s3api list-objects-v2 --bucket trachuan-releases --prefix "$prefix" \
-  --max-keys 1 --query KeyCount --output text)
-[[ $count == 0 ]] || { echo 'Release prefix already holds objects; choose a new rel' >&2; exit 1; }
-
 cp "$report" "$directory/report.json"
 python3 "$root/deploy/github/corpus_upload.py" --repository "$repository" "$country" "$rel" "$build_dir" "$directory/report.json"

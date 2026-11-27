@@ -78,6 +78,13 @@ resource "oci_identity_policy" "releases" {
   statements     = ["Allow group trachuan-release-upload to read buckets in compartment trachuan where target.bucket.name = 'trachuan-releases'", "Allow group trachuan-release-upload to manage objects in compartment trachuan where all {target.bucket.name = 'trachuan-releases', any {request.permission = 'OBJECT_CREATE', request.permission = 'OBJECT_OVERWRITE', request.permission = 'OBJECT_INSPECT', request.permission = 'OBJECT_READ'}}", "Allow group trachuan-release-verify to read buckets in compartment trachuan where target.bucket.name = 'trachuan-releases'", "Allow group trachuan-release-verify to read objects in compartment trachuan where target.bucket.name = 'trachuan-releases'"]
 }
 
+resource "oci_identity_policy" "release_lifecycle" {
+  compartment_id = var.tenancy_ocid
+  description    = "Object Storage aborts stale release uploads"
+  name           = "trachuan-release-lifecycle"
+  statements     = ["Allow service objectstorage-${var.region} to manage object-family in compartment trachuan where all {any {target.bucket.name = 'trachuan-releases', target.bucket.name = 'trachuan-frameworks-releases'}, any {request.permission = 'BUCKET_INSPECT', request.permission = 'BUCKET_READ', request.permission = 'OBJECT_INSPECT', request.permission = 'OBJECT_DELETE'}}"]
+}
+
 resource "oci_identity_group" "backup" {
   compartment_id = var.tenancy_ocid
   description    = "trachuan pgBackRest repository access"

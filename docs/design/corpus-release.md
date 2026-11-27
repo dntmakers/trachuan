@@ -81,9 +81,21 @@ or
 [multipart uploads](https://docs.aws.amazon.com/cli/latest/reference/s3api/complete-multipart-upload.html)
 with 64 MiB parts, retaining each returned ETag and the local byte count. After
 all uploads, every object's HEAD size and ETag must still match that receipt
-before dispatch. ETags are opaque identifiers, not content hashes. The uploader
-logs its AWS CLI version. The workflow installs and requires AWS CLI 2.40.0 and
-logs its version.
+before dispatch. ETags are opaque identifiers, not content hashes. A part upload
+that fails is retried up to three times with backoff, with the same upload ID,
+part number and retained bytes; the bytes count once and the ETag of the
+successful attempt is kept. A failed AWS CLI call reports its operation, its
+error code or network error class and a bounded message filtered of headers and
+signatures, never raw debug output. The upload user cannot abort a multipart
+upload, so OpenTofu grants Object Storage the lifecycle permission on the
+releases bucket, and the bucket's lifecycle policy has one rule, `ABORT` for
+`multipart-uploads` older than two days. Lifecycle runs on its own schedule, so
+the uploader completes or gives up well inside two days of opening an upload,
+and a `NoSuchUpload` stops it before dispatch. The uploader requires AWS CLI
+2.34.0 or later, the first with JSON error output, and logs its version. Each
+`upload-part` call runs with `AWS_MAX_ATTEMPTS=1`, so the uploader's own retries
+are the only ones. The workflow installs and requires AWS CLI 2.40.0 and logs
+its version.
 
 ## Signing
 
