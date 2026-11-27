@@ -1,10 +1,14 @@
 import argparse
+import contextvars
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
+import time
 
 from corpus_dispatch import dispatch_command
 from corpus_manifest import identity, release_files, validated_inputs
@@ -12,6 +16,79 @@ from corpus_previous import verified_previous
 from corpus_production import require_settled
 from manifest import positive
 from repositories import require_listed, write_repository
+
+
+ATTEMPT = contextvars.ContextVar('aws_attempt', default=1)
+TRANSIENT = frozenset({'429', '500', '502', '503', '504', 'InternalError', 'InternalFailure', 'InternalServerError',
+                       'ServiceUnavailable', 'SlowDown', 'Throttling', 'ThrottlingException',
+                       'TooManyRequestsException', 'RequestTimeout', 'RequestTimeoutException'})
+PERMANENT = frozenset({'401', '403', 'AccessDenied', 'InvalidAccessKeyId', 'SignatureDoesNotMatch',
+                       'BadDigest', 'EntityTooLarge', 'InvalidPart', 'NoSuchUpload',
+                       'NoCredentials', 'Configuration', 'NoRegion', 'ParamValidation'})
+NETWORK_PREFIXES = ('Could not connect to the endpoint URL:', 'Connection was closed before we received a valid response',
+                    'Read timeout on endpoint URL:', 'Connect timeout on endpoint URL:')
+
+
+class AWSError(ValueError):
+    def __init__(self, operation, code, retryable=False):
+        self.code = code
+        self.retryable = retryable
+        super().__init__(f'aws {operation} failed: {code}: request failed')
+
+
+def aws_run(command, operation):
+    env = dict(os.environ, AWS_CLI_ERROR_FORMAT='json')
+    if operation == 'upload-part':
+        env.update(AWS_MAX_ATTEMPTS='1', AWS_RETRY_MODE='standard')
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=3600, env=env)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as error:
+        code = 'UnknownError'
+        if isinstance(error, subprocess.TimeoutExpired):
+            code = 'NetworkTimeout'
+        elif isinstance(error, OSError):
+            code = 'CommandStartError'
+        else:
+            stderr = error.stderr or ''
+            try:
+                parsed = json.loads(stderr)
+                candidate = parsed.get('Code') if isinstance(parsed, dict) else None
+                if isinstance(candidate, str) and candidate in TRANSIENT | PERMANENT:
+                    code = candidate
+            except (ValueError, TypeError):
+                if any(stderr.strip().startswith(prefix) for prefix in NETWORK_PREFIXES):
+                    code = 'NetworkError'
+        failure = AWSError(operation, code, code in TRANSIENT or code in {'NetworkError', 'NetworkTimeout'})
+        print(f'aws {operation} attempt {ATTEMPT.get()}: {code}: request failed', file=sys.stderr, flush=True)
+        raise failure from None
+    return result.stdout
+
+
+def elapsed_clock():
+    if sys.platform == 'darwin':
+        return time.clock_gettime(time.CLOCK_MONOTONIC_RAW)
+    if hasattr(time, 'CLOCK_BOOTTIME'):
+        return time.clock_gettime(time.CLOCK_BOOTTIME)
+    raise ValueError('sleep-aware clock unavailable')
+
+
+def aws_call(command, args):
+    return json.loads(aws_run([*command, '--output', 'json', *args], args[0]))
+
+
+def require_cli():
+    version = aws_run(['aws', '--version'], 'version').strip()
+    match = re.match(r'^aws-cli/2\.(\d+)\.(\d+)(?:\s|$)', version)
+    if match is None or tuple(map(int, match.groups())) < (34, 0):
+        raise ValueError('AWS CLI v2.34.0 or later is required')
+    print(version, flush=True)
+
+
+def require_empty_prefix(command, bucket, prefix):
+    count = aws_call(command, ['list-objects-v2', '--bucket', bucket, '--prefix', prefix,
+                               '--max-keys', '1', '--query', 'KeyCount'])
+    if type(count) is not int or count != 0:
+        raise ValueError('Release prefix already holds objects; choose a new rel')
 
 
 def etag(result):
@@ -46,6 +123,7 @@ def upload_file(path, key, client, part_size=64 * 1024**2, bucket='trachuan-rele
             body = Path(temporary) / 'body'
             body.write_bytes(data)
             return put(body)
+    deadline = elapsed_clock() + 12 * 60 * 60
     upload_id = client(['create-multipart-upload', *common]).get('UploadId')
     if not isinstance(upload_id, str) or not upload_id:
         raise ValueError('multipart upload did not return an upload id')
@@ -58,21 +136,37 @@ def upload_file(path, key, client, part_size=64 * 1024**2, bucket='trachuan-rele
                 stream.update(chunk)
                 body.write_bytes(chunk)
                 number = len(parts) + 1
-                result = client(['upload-part', *multipart, '--part-number', str(number),
-                                 '--body', str(body), '--content-length', str(len(chunk))])
+                for attempt in range(4):
+                    token = ATTEMPT.set(attempt + 1)
+                    try:
+                        if elapsed_clock() >= deadline:
+                            raise ValueError('multipart upload deadline exceeded')
+                        result = client(['upload-part', *multipart, '--part-number', str(number),
+                                         '--body', str(body), '--content-length', str(len(chunk))])
+                        break
+                    except AWSError as error:
+                        if attempt == 3 or not error.retryable:
+                            raise
+                        time.sleep(2 ** attempt)
+                    finally:
+                        ATTEMPT.reset(token)
                 parts.append(dict(PartNumber=number, ETag=etag(result)))
                 transferred += len(chunk)
         if transferred != size:
             raise ValueError('local upload size changed')
         if expected is not None:
             require_validated(stream.hexdigest(), transferred, expected, key)
+        if elapsed_clock() >= deadline:
+            raise ValueError('multipart upload deadline exceeded')
         result = client(['complete-multipart-upload', *multipart,
                          '--multipart-upload', json.dumps(dict(Parts=parts))])
+        if elapsed_clock() >= deadline:
+            raise ValueError('multipart upload deadline exceeded')
         return dict(ContentLength=size, ETag=etag(result))
     except BaseException:
         try:
             client(['abort-multipart-upload', *multipart])
-        except (subprocess.CalledProcessError, ValueError):
+        except Exception:
             pass
         raise
 
@@ -91,11 +185,11 @@ def upload(country, rel, directory, report, repository):
                os.environ['OCI_S3_ENDPOINT'], '--no-cli-pager', 's3api']
 
     def client(args):
-        result = subprocess.run([*command, '--output', 'json', *args],
-                                check=True, capture_output=True, text=True)
-        return json.loads(result.stdout)
+        return aws_call(command, args)
 
     inputs = validated_inputs(country, rel, directory, report)
+    require_cli()
+    require_empty_prefix(command, 'trachuan-releases', f'{country}/{rel}/')
     row, candidate, sidecars = inputs.row, inputs.report, inputs.sidecars
     if sidecars is not None:
         print('Open findings allowed: review {review}, info {info}'.format(**sidecars['open']))
@@ -142,4 +236,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except AWSError as error:
+        print(error, file=sys.stderr)
+        raise SystemExit(1) from None
