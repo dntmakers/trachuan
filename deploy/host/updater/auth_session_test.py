@@ -21,7 +21,7 @@ from updater.frameworks_sql_test import frameworks_row, law_row
 SCRIPT = ('set +x; set -eu; export PGPASSWORD PGREQUIREAUTH; PGREQUIREAUTH=scram-sha-256; '
           'PGPASSWORD=$(cat /run/secrets/auth_db_password); [ -n "$PGPASSWORD" ]; exec "$@"')
 KINDS = (('law', LAW, law, law_row), ('frameworks', FRAMEWORKS, frameworks, frameworks_row))
-UNQUALIFIED_TABLE = re.compile(r'\b(?:FROM|INTO|UPDATE|JOIN)\s+(?!public\.|pg_catalog\.|\()([a-z_]+)')
+UNQUALIFIED_TABLE = re.compile(r'\b(?:FROM|INTO|UPDATE|JOIN)\s+(?!public\.|pg_catalog\.|inserted\b|\()([a-z_]+)')
 
 
 def options(mode):
@@ -199,6 +199,20 @@ class SwapStatementTest(unittest.TestCase):
                 self.assertIn("'" + retire[0] + "',now(),now()+interval '7 days',NULL,'" + 'b' * 64 + "'", text)
                 self.assertIn('INSERT INTO public.release_journal', text)
                 self.assertEqual(text.count('BEGIN;'), 1)
+
+    def test_a_recorded_activation_skips_every_write_and_returns_the_recorded_row(self):
+        for name, sql, row in (('law', law, law_row), ('frameworks', frameworks, frameworks_row)):
+            text = sql.activate(row(), retire=self.RETIRE if name == 'law' else ('frameworks_20990101', 'b' * 64))
+            with self.subTest(kind=name):
+                prelude = text.split('DO $activation$')[0]
+                for column in law.ROW_FIELDS + ('step', 'state', 'message', 'corpus_kind'):
+                    self.assertIn(column + ' IS NOT DISTINCT FROM', prelude)
+                self.assertIn("step IS NOT DISTINCT FROM 'activated'", prelude)
+                self.assertIn('IF NOT settled THEN', text)
+                self.assertNotIn('\\gset', text)
+                self.assertNotIn('\\if', text)
+                self.assertEqual(text.count('INSERT INTO public.release_journal'), 1)
+                self.assertIn('WHERE NOT pg_catalog.current_setting', text)
 
     def test_the_summary_fields_are_written_on_every_swap(self):
         text = law.activate(law_row(), 1, self.RETIRE)

@@ -107,28 +107,32 @@ def activate(row, retire=None):
                 ' AND db_name=' + target + ';' if row['mode'] == 'retained' else '')
     retirement = law.retirement(country, retire, database, ',corpus_kind', ",'frameworks'")
     return f"""BEGIN;
+{law.recorded_prelude(row, KIND, KIND)}
 DO $activation$
-DECLARE current_db text; changed bigint;
+DECLARE current_db text; changed bigint; settled boolean;
 BEGIN
   SELECT active_db INTO current_db FROM public.frameworks_release WHERE country={country} FOR UPDATE;
   IF current_db IS DISTINCT FROM {target} AND current_db IS DISTINCT FROM {expected} THEN
     RAISE EXCEPTION 'active frameworks changed';
   END IF;
-  IF current_db IS NULL THEN
-    INSERT INTO public.frameworks_release (country,active_db,activated_at,activated_by)
-      VALUES ({country},{target},now(),'activator') ON CONFLICT (country) DO NOTHING;
-  ELSE
-    UPDATE public.frameworks_release SET active_db={target},activated_at=now(),activated_by='activator'
-      WHERE country={country} AND (active_db={target} OR active_db IS NOT DISTINCT FROM {expected});
+  {law.settled_check(target)}
+  IF NOT settled THEN
+    IF current_db IS NULL THEN
+      INSERT INTO public.frameworks_release (country,active_db,activated_at,activated_by)
+        VALUES ({country},{target},now(),'activator') ON CONFLICT (country) DO NOTHING;
+    ELSE
+      UPDATE public.frameworks_release SET active_db={target},activated_at=now(),activated_by='activator'
+        WHERE country={country} AND (active_db={target} OR active_db IS NOT DISTINCT FROM {expected});
+    END IF;
+    GET DIAGNOSTICS changed = ROW_COUNT;
+    IF changed <> 1 THEN
+      RAISE EXCEPTION 'active frameworks update must affect exactly one row';
+    END IF;
+    {retirement}
+    {retained}
   END IF;
-  GET DIAGNOSTICS changed = ROW_COUNT;
-  IF changed <> 1 THEN
-    RAISE EXCEPTION 'active frameworks update must affect exactly one row';
-  END IF;
-  {retirement}
-  {retained}
 END;
 $activation$;
-{journal(row, 'activated')}
+{law.finish_journal(row, KIND, KIND)}
 COMMIT;
 """

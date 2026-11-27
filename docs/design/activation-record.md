@@ -136,13 +136,16 @@ pointer names, and no row spends the manifest on what a table says.
 **Finishing** is one idempotent routine. Step 4's transaction accepts a pointer
 already at the target and still writes everything else: the retirement of the
 previous database, the removal of a `retained` target from `retired_release`,
-the summary fields and the `activated` row. The previous database is the
-record's `active`, never the pointer's value; with no `active`, the table row
-names `expected` with a NULL digest, as for a database restored by hand, and the
-host records nothing. When `active` is already the target, as for a re-signed
-active release, nothing is retired. One atomic write of the file then moves
-`active` to `retired`, sets the new `active` and sets step `activated`; the
-updater settles `state.json` and clears the operation.
+the summary fields and the `activated` row. When the journal already holds this
+operation's `activated` row and the pointer is at the target, the transaction
+writes nothing and returns that row, so a repeated finish leaves every stored
+value as it was. The previous database is the record's `active`, never the
+pointer's value; with no `active`, the table row names `expected` with a NULL
+digest, as for a database restored by hand, and the host records nothing. When
+`active` is already the target, as for a re-signed active release, nothing is
+retired. One atomic write of the file then moves `active` to `retired`, sets the
+new `active` and sets step `activated`; the updater settles `state.json` and
+clears the operation.
 
 **Adopting** covers a pointer that reached the target without a completed
 record: a re-signed active release, a crash combined with a lost file, or a
@@ -217,8 +220,10 @@ updater appends the row for each step and any row the record is ahead of. An
 open row with no matching operation is closed with `aborted`, by a table-only
 statement, before any re-creation, because it would otherwise protect the
 target. No row resumes, finishes or aborts an operation, names a database or
-spends a manifest. An older updater running after a rollback trusts the journal
-as it always did; the release floor ends that window.
+spends a manifest; an `activated` row that matches every field of this
+operation's finish only lets a repeated finish skip its writes. An older updater
+running after a rollback trusts the journal as it always did; the release floor
+ends that window.
 
 An operation open when this change ships has no record, so it is closed and its
 release restarts as a new operation.
