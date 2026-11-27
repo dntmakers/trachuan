@@ -23,7 +23,7 @@ func TestMergeSiblings_DefaultSerialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "003d0df8ada528a92814d2fbf82c8fa984d9e26d8d6c9c254141361a9eb336bc"
+	const want = "c66ab6f7544a352e8ff8e47c9de2257d2334605978a4db8b3836bdc56ec75549"
 	if got := fmt.Sprintf("%x", sha256.Sum256(b)); got != want {
 		t.Fatalf("default report sha256 = %s", got)
 	}

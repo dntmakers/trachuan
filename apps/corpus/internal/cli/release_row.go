@@ -14,6 +14,7 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/config"
+	"danny.vn/trachuan/apps/corpus/internal/evaluation"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
 	"danny.vn/trachuan/apps/corpus/internal/store"
@@ -239,6 +240,9 @@ func applyReleaseDecision(summary *releaseRun, cc, rel string, rawSnapshot json.
 			data, err := os.ReadFile(filepath.Join(dir, "report.json"))
 			if err != nil {
 				return false, fmt.Errorf("read evaluation report: %w", err)
+			}
+			if _, err = evaluation.DecodeReport(data); err != nil {
+				return false, fmt.Errorf("evaluation report: %w", err)
 			}
 			summary.EvalReportSHA256 = sha256Hex(data)
 			reportFound = true

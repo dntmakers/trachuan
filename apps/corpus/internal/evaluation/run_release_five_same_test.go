@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"danny.vn/trachuan/internal/retrieval"
@@ -55,6 +56,24 @@ func TestReleaseValidator_RejectsInvalidGoVersionFivePrevious(t *testing.T) {
 			t.Fatalf("Go accepted %s", tc.name)
 		}
 	}
+	encoded, err := json.Marshal(previous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, tc := range releaseReportDuplicateKeyCases() {
+		path := filepath.Join(dir, fmt.Sprintf("invalid-bytes-%d", i), "report.json")
+		if err = os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(path, []byte(tc.mutate(string(encoded))), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, runErr := Run(ctx, currentEngine, suite, Options{EvaluationDate: date, PreviousReport: path}); runErr == nil || !strings.Contains(runErr.Error(), "duplicate JSON field") {
+			t.Fatalf("Go accepted a previous report with a duplicate key in %s: %v", tc.name, runErr)
+		}
+	}
+	writePreviousShapeTampers(t, ctx, dir, previous, currentEngine, suite, date)
+	writePreviousWarningRecords(t, ctx, dir, previous, currentEngine, suite, date)
 	legacy, old := releaseLegacyFixtures(t, suite)
 	for name, data := range map[string][]byte{"fixture.json": fixture, "legacy.json": legacy, "old-product.json": old} {
 		if err = os.WriteFile(filepath.Join(dir, name), data, 0600); err != nil {

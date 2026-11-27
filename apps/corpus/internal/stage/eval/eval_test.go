@@ -83,6 +83,22 @@ func TestResolve_RejectsInvalidReport(t *testing.T) {
 	}
 }
 
+func TestResolve_RefusesDuplicateReportKeys(t *testing.T) {
+	artifacts := artifact.Store{Root: t.TempDir()}
+	hash := strings.Repeat("a", 64)
+	report := `{"status":"incomplete","status":"complete","country":"vn","rel":"20261109","release_eligible":false}`
+	art, err := artifacts.Publish(context.Background(), "eval", hash, hash, func(dir string) error {
+		return os.WriteFile(filepath.Join(dir, "report.json"), []byte(report), 0600)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = New(Config{}).Resolve(context.Background(), stage.Env{Artifacts: artifacts}, stage.Run{Country: "vn", Rel: "20261109"}, stage.Item{Key: "vn/20261109", InputHash: hash}, art)
+	if err == nil || !strings.Contains(err.Error(), "duplicate JSON field") {
+		t.Fatalf("error = %v, want duplicate JSON field", err)
+	}
+}
+
 func TestCheckInputHash_DistinguishesErrorsAndMismatch(t *testing.T) {
 	s := New(Config{})
 	err := s.checkInputHash(artifact.Result{}, stage.Run{Rel: "bad"}, "x")

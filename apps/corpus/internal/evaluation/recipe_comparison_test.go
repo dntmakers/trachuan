@@ -102,6 +102,12 @@ func TestPreviousRecipe_LegacyReportMetadata(t *testing.T) {
 			previous := withComparisonRecipe(t, toleranceReport(t, .7247), before)
 			previous.Version, previous.Scorer, previous.Country, previous.Rel = 1, "agent-eval/4", "vn", "20990101_1"
 			previous.RetrievalRecipe = nil
+			record := NonRegression{Mode: "exact", Arms: "hybrid", Limit: 20, Name: "recall", Gating: true, Status: "pass"}
+			for name, cohort := range previous.Cohorts {
+				cohort.NonRegression = []NonRegression{record}
+				previous.Cohorts[name] = cohort
+			}
+			previous.NonRegression = []NonRegression{record}
 			data, err := json.Marshal(previous)
 			if err != nil {
 				t.Fatal(err)

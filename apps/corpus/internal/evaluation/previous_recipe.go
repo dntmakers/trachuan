@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 
 	"danny.vn/trachuan/internal/retrieval"
 )
@@ -63,14 +62,15 @@ func validatePreviousRecipeFields(raw json.RawMessage, recipe retrieval.Recipe) 
 	if err != nil {
 		return fmt.Errorf("encode previous retrieval recipe: %w", err)
 	}
-	var supplied, known any
-	if err = json.Unmarshal(raw, &supplied); err != nil {
+	supplied, err := decodeNumbers(raw)
+	if err != nil {
 		return fmt.Errorf("decode supplied retrieval recipe: %w", err)
 	}
-	if err = json.Unmarshal(encoded, &known); err != nil {
+	known, err := decodeNumbers(encoded)
+	if err != nil {
 		return fmt.Errorf("decode known retrieval recipe: %w", err)
 	}
-	if !reflect.DeepEqual(supplied, known) {
+	if !jsonEqual(supplied, known, true) {
 		return fmt.Errorf("previous retrieval recipe has unknown or missing fields")
 	}
 	return nil
@@ -121,7 +121,7 @@ func readPreviousRecipe(previous *Report, path string) error {
 		RetrievalRecipe json.RawMessage            `json:"retrieval_recipe"`
 		Recipes         map[string]json.RawMessage `json:"recipes"`
 	}
-	if err = json.Unmarshal(data, &metadata); err != nil {
+	if err = UnmarshalStrict(data, &metadata); err != nil {
 		return fmt.Errorf("decode previous release metadata: %w", err)
 	}
 	if metadata.Country != previous.Country || metadata.Rel != previous.Rel {
@@ -146,18 +146,6 @@ func readPreviousRecipe(previous *Report, path string) error {
 	}
 	if err = validatePreviousRecipeFields(raw, recipe); err != nil {
 		return err
-	}
-	var supplied, reported any
-	if err = json.Unmarshal(raw, &supplied); err != nil {
-		return fmt.Errorf("decode supplied retrieval recipe: %w", err)
-	}
-	if len(previous.RetrievalRecipe) > 0 {
-		if err = json.Unmarshal(previous.RetrievalRecipe, &reported); err != nil {
-			return fmt.Errorf("decode reported retrieval recipe: %w", err)
-		}
-		if !reflect.DeepEqual(supplied, reported) {
-			return fmt.Errorf("previous release recipe differs from report object")
-		}
 	}
 	previous.RetrievalRecipe = raw
 	return nil

@@ -144,6 +144,11 @@ func previousRound3TamperCases() []previousTamper {
 			c.Floors[0].ArticleCapOverride = &value
 			r.Cohorts["development"] = c
 		}},
+		{"empty development reason", func(r *Report) {
+			c := r.Cohorts["development"]
+			c.Floors[0].Reason = "no cases"
+			r.Cohorts["development"] = c
+		}},
 		{"empty development confusion", func(r *Report) {
 			c := r.Cohorts["development"]
 			c.Floors[0].Confusion = &Confusion{}

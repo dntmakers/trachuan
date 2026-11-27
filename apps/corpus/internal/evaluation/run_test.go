@@ -145,7 +145,7 @@ func (f *fakeEngine) Release() retrieval.Release {
 	threshold := 0.0
 	recipe := retrieval.Recipe2()
 	recipe.Abstention.Threshold = &threshold
-	return retrieval.Release{Country: "vn", Rel: "test", RetrievalRecipe: recipe}
+	return retrieval.Release{Country: "vn", Rel: "20990101_9", RetrievalRecipe: recipe}
 }
 func (f *fakeEngine) Prepare(_ context.Context, r retrieval.Request) (retrieval.Prepared, error) {
 	f.mu.Lock()
@@ -985,7 +985,7 @@ func TestReport_DefaultArticleCapOmitted(t *testing.T) {
 func TestPreviousDiff_ProductComparableScorer(t *testing.T) {
 	date := retrieval.Date{Year: 2026, Month: 11, Day: 9}
 	opts := Options{EvaluationDate: date, Modes: []retrieval.Mode{"exact"}}
-	prior, _, err := Run(context.Background(), &fakeEngine{date: date}, developmentSuite(), opts)
+	prior, _, err := Run(context.Background(), &fakeEngine{date: date}, developmentSuite(), Options{EvaluationDate: date})
 	if err != nil {
 		t.Fatal(err)
 	}

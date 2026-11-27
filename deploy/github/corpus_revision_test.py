@@ -33,6 +33,14 @@ class RevisionTest(unittest.TestCase):
         base_revision_records(candidate)
         self.validate(candidate, previous, before, after)
 
+    def test_previous_warning_records_are_not_read(self):
+        previous, candidate, before, after = revision_pair()
+        base_revision_records(candidate)
+        previous['warning_cases'] = [dict(name='mrr', gating=True, historical_policy='agent')]
+        self.validate(candidate, previous, before, after)
+        previous['unrelated'] = [dict(name='mrr', gating=True)]
+        self.refused(candidate, previous, before, after, message='MRR')
+
     def test_comparable_set_and_reasons_follow_the_evaluator(self):
         from corpus_revision import compare_fixtures
         previous = [fixture_case('a', question='qa'), fixture_case('b', question='qb'), fixture_case('c', question='qc'),

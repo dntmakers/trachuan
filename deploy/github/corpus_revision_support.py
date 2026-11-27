@@ -213,7 +213,7 @@ def refuses(report, previous, row, history):
     return False
 
 
-def validate_go_report_five(directory):
+def validate_go_report_five(directory, candidate_version=5):
     from corpus_fixture_history import FixtureHistory
     from corpus_manifest import decode, validate_report
     from corpus_previous import bind_previous_recipe
@@ -224,18 +224,21 @@ def validate_go_report_five(directory):
     row = decode((directory / 'release.json').read_bytes())
     current = decode((directory / 'current' / 'report.json').read_bytes())
     previous = decode((directory / 'previous' / 'report.json').read_bytes())
-    if current['version'] != 5 or previous['version'] not in (4, 5):
-        raise AssertionError('expected a version 4 or 5 predecessor and a version 5 candidate')
+    if current['version'] != candidate_version or previous['version'] not in (4, 5):
+        raise AssertionError(f'expected a version 4 or 5 predecessor and a version {candidate_version} candidate')
     signed = {'recipes': {'retrieval': copy.deepcopy(previous['retrieval_recipe'])}}
     previous = bind_previous_recipe(previous, signed)
     validate_report(current, 'vn', current['rel'], previous_report=previous, release_row=row, history=history)
+    for path in sorted(directory.glob('valid-*/report.json')):
+        valid = bind_previous_recipe(decode(path.read_bytes()), signed)
+        if refuses(current, valid, row, history):
+            raise AssertionError(f'Python refused valid previous report {path.parent.name}')
     invalid_paths = sorted(directory.glob('invalid-*/report.json'))
     if not invalid_paths:
         raise AssertionError('missing invalid previous reports')
     for path in invalid_paths:
-        invalid = decode(path.read_bytes())
         try:
-            invalid = bind_previous_recipe(invalid, signed)
+            invalid = bind_previous_recipe(decode(path.read_bytes()), signed)
         except ValueError:
             continue
         if not refuses(current, invalid, row, history):

@@ -26,7 +26,7 @@ func TestDecodePreviousReport_RejectsInvalidRejectionFields(t *testing.T) {
 
 func TestRun_RejectsLegacySiblingMergePreviousReport(t *testing.T) {
 	date := retrieval.Date{Year: 2026, Month: 11, Day: 9}
-	baseline, _, err := Run(context.Background(), &fakeEngine{date: date}, recordedSuite(), Options{EvaluationDate: date, Modes: []retrieval.Mode{"exact"}})
+	baseline, _, err := Run(context.Background(), &fakeEngine{date: date}, recordedSuite(), Options{EvaluationDate: date})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestRun_RejectsLegacySiblingMergePreviousReport(t *testing.T) {
 				target := root
 				for i, key := range path {
 					if i == len(path)-1 {
-						if key == "cases" && len(path) == 1 || key == "metrics" && len(path) == 3 {
+						if key == "cases" && len(path) == 1 || key == "metrics" && len(path) == 3 || key == "floors" {
 							target[key].([]any)[0].(map[string]any)["merge_siblings"] = enabled
 						} else {
 							target[key] = []any{map[string]any{"merge_siblings": enabled}}
@@ -83,6 +83,12 @@ func TestRun_RejectsLegacySiblingMergePreviousReport(t *testing.T) {
 				if enabled {
 					if err == nil || !strings.Contains(err.Error(), "incompatible previous sibling merge override") {
 						t.Fatalf("previous report error %v", err)
+					}
+					return
+				}
+				if len(path) > 0 && path[len(path)-1] == "floors" || len(path) == 1 && path[0] == "non_regression" {
+					if err == nil {
+						t.Fatal("accepted a report whose floor or comparison records are replaced by a marker")
 					}
 					return
 				}

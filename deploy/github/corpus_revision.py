@@ -175,8 +175,9 @@ def validate_version_three(report, previous, history, fixture):
     fixture_hash(previous)
     if any(previous['fixture_hashes'].get(key) != report['fixture_hashes'].get(key) for key in ('Legacy', 'OldProduct')):
         raise ValueError('incompatible previous legacy or old product fixture')
-    no_historical_policy(previous)
-    validate_previous_mrr(previous)
+    read = {key: value for key, value in previous.items() if key != 'warning_cases'}
+    no_historical_policy(read)
+    validate_previous_mrr(read)
     revision = resolve_revision(report, previous, history, fixture)
     cohort_counts(previous)
     check_old_product(previous, history.root)
