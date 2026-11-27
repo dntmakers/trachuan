@@ -9,7 +9,7 @@
 - Probe and fixture-recording scripts record what the source returns and stop only on real errors (transport failure, non-2xx), never on valid but unexpected shapes such as nullable fields or an HTTP 200 with an error envelope.
 - When a reviewer keeps finding variants of one edge case, close the class with one fail-closed rule in the design and enforce it in one function; collapse parallel code paths rather than patching each.
 - Low-risk slices (read-only paths, decode fixes, docs) get one review round, and low findings are fixed without a separate confirmation; writes, security and release paths keep the full process.
-- Keep briefs, reports and temporary source files in the scratchpad, outside the checkout. Go tools can scan `.go` files under gitignored `work/`. Findings not fixed at once become lines in `docs/plans/backlog.md`.
+- Keep briefs, reports and temporary source files in the scratchpad, outside the checkout. Go tools can scan `.go` files under gitignored `work/`. Fix every finding inside the slice's scope before merge, including Go-versus-Python parity gaps in the same validator; only a finding outside the scope, or blocked by a missing decision, missing access or a separate rollout, becomes a line in `docs/plans/backlog.md` that names which.
 - Capture a check's exit status before filtering its log; `make pre-push | tail -1` can hide a failure.
 - Run `make pre-push` before every push and the checks the brief names from `instructions/testing.md` on this MacBook. Run long jobs with `run_in_background`.
 - Discuss with the owner in Vietnamese; write every file in English.
