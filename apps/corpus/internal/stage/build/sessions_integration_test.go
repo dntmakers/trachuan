@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"danny.vn/trachuan/apps/corpus/internal/testactivity"
 	"danny.vn/trachuan/internal/testpg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -177,5 +178,28 @@ func TestRecoveryDrop_ClientConnectsAfterCheck(t *testing.T) {
 	}
 	if err = tracer.client.Ping(ctx); err != nil {
 		t.Fatalf("client disconnected: %v", err)
+	}
+}
+
+func TestResolve_TemporarySessionClosingWithinGraceIsAwaited(t *testing.T) {
+	f := recoverySetup(t)
+	ctx := context.Background()
+	temp := "corpus_tmp_vn_" + f.item.InputHash[:24]
+	if _, err := f.admin.Exec(ctx, "COMMENT ON DATABASE "+pgx.Identifier{temp}.Sanitize()+" IS NULL"); err != nil {
+		t.Fatal(err)
+	}
+	clientCfg := f.admin.Config().Copy()
+	clientCfg.Database = temp
+	client, err := pgx.ConnectConfig(ctx, clientCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		_ = client.Close(context.Background())
+	}()
+	if _, err = EnsureDatabase(ctx, f.cfg, f.env.Artifacts, f.art, f.run); err != nil {
+		testactivity.Log(t, f.admin, temp)
+		t.Fatalf("session closing during the grace was not awaited: %v", err)
 	}
 }

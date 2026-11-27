@@ -7,12 +7,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"danny.vn/trachuan/apps/server/internal/migrate"
 	"danny.vn/trachuan/internal/testpg"
@@ -339,6 +341,43 @@ func TestLawRestore_CreateEndsBackendsDropsStraysAndPinsTheTarget(t *testing.T) 
 	})
 }
 
+func awaitNoSessions(t *testing.T, admin *pgx.Conn, name string) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var busy bool
+		if err := admin.QueryRow(t.Context(), `SELECT EXISTS(SELECT FROM pg_catalog.pg_stat_activity WHERE datname=$1 AND usesysid IS NOT NULL)`, name).Scan(&busy); err != nil {
+			t.Fatal(err)
+		}
+		if !busy {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("sessions on %s did not end: %s", name, sessionHolders(t, admin, name))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func sessionHolders(t *testing.T, admin *pgx.Conn, name string) string {
+	t.Helper()
+	rows, err := admin.Query(t.Context(), `SELECT pid, COALESCE(usename,''), COALESCE(backend_type,''), COALESCE(application_name,'') FROM pg_catalog.pg_stat_activity WHERE datname=$1`, name)
+	if err != nil {
+		return "holders unreadable: " + err.Error()
+	}
+	defer rows.Close()
+	var held []string
+	for rows.Next() {
+		var pid int32
+		var user, kind, app string
+		if err = rows.Scan(&pid, &user, &kind, &app); err != nil {
+			return "holders unreadable: " + err.Error()
+		}
+		held = append(held, fmt.Sprintf("pid=%d usename=%q backend_type=%q application_name=%q", pid, user, kind, app))
+	}
+	return strings.Join(held, "; ")
+}
+
 func TestLawRestore_TargetOwnedByAnotherRoleIsRefusedAndKept(t *testing.T) {
 	_, _, psqlPath := frameworksClients(t)
 	for _, tc := range []struct{ kind, label, prefix, previous, active string }{
@@ -404,6 +443,7 @@ func TestLawRestore_TargetOwnedByAnotherRoleIsRefusedAndKept(t *testing.T) {
 				t.Fatalf("refused target lost its table: %q", kept)
 			}
 
+			awaitNoSessions(t, admin, name)
 			if _, err = admin.Exec(ctx, "ALTER DATABASE "+target+" OWNER TO "+role); err != nil {
 				t.Fatal(err)
 			}

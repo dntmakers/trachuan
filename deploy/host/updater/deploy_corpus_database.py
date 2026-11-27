@@ -122,7 +122,7 @@ class Database:
 
     def connections(self, name):
         self.sql.database(name)
-        return self.query('SELECT EXISTS(SELECT FROM pg_catalog.pg_stat_activity WHERE datname=' + sql.literal(name) + ');') == 't'
+        return self.query('SELECT EXISTS(SELECT FROM pg_catalog.pg_stat_activity WHERE datname=' + sql.literal(name) + ' AND usesysid IS NOT NULL);') == 't'
 
     def owned(self, name):
         self.sql.database(name)
