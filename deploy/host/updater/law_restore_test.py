@@ -243,6 +243,10 @@ class LawCreateTest(LawFixture, unittest.TestCase):
             self.db.create(self.row)
         self.assertNotIn('drop', self.names())
 
+    def test_only_client_sessions_count_as_connections(self):
+        self.db.drop_target(self.row)
+        self.assertIn('usesysid IS NOT NULL', self.sql('connections'))
+
     def test_a_target_that_survives_its_drop_waits(self):
         self.responses['exists'] = b't\n'
         with self.assertRaisesRegex(target.Waiting, 'leftover database in use'):

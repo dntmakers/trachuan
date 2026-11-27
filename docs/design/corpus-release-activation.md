@@ -152,8 +152,9 @@ role existed.
    - As `activator`: create the database. A target that already exists when this
      step starts is dropped and created again if `activator` owns it and the
      [drop rule](activation-record.md#drops) allows it, so nothing dump SQL made
-     earlier survives (a target with open connections waits); a target with
-     another owner is refused and left alone.
+     earlier survives (a target with open client connections waits; background
+     workers such as autovacuum do not count, and the drop ends them); a target
+     with another owner is refused and left alone.
    - As `postgres`, before any byte of the dump: refuse when a role other than
      `postgres` is a superuser or a member of one, create `vector`, `ltree` and
      `pg_prewarm` in `public`, and revoke `PUBLIC`'s rights on the database.

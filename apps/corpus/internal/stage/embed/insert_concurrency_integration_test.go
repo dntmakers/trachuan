@@ -49,9 +49,10 @@ func (tx *gatedTx) Exec(ctx context.Context, sql string, args ...interface{}) (p
 }
 
 func TestWriteRows_ConcurrentOppositeOrdersCommit(t *testing.T) {
+	url := testdb.New(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := pgxpool.New(ctx, testdb.New(t))
+	db, err := pgxpool.New(ctx, url)
 	if err != nil {
 		t.Fatal(err)
 	}

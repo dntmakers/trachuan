@@ -94,12 +94,8 @@ func EnsureDatabase(ctx context.Context, cfg Config, artifacts artifact.Store, a
 				if err = cfg.checkDisks(artifacts.Root, cfg.beforeBytes()); err != nil {
 					return Database{}, err
 				}
-				var active bool
-				if err = admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=$1 AND usesysid IS NOT NULL)`, temporary).Scan(&active); err != nil {
-					return Database{}, fmt.Errorf("inspect database sessions: %w", err)
-				}
-				if active {
-					return Database{}, fmt.Errorf("temporary database has active sessions")
+				if err = waitSessions(ctx, admin, temporary, sessionGrace); err != nil {
+					return Database{}, err
 				}
 				if err = pgdrop.DropOnly(ctx, admin, temporary); err != nil {
 					return Database{}, fmt.Errorf("drop temporary database: %w", err)

@@ -243,9 +243,9 @@ func TestCommitItem_RecheckPausedSourceFailsItem(t *testing.T) {
 }
 
 func TestCommitItem_RunLockPrecedesItemLock(t *testing.T) {
+	pool, id := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	pool, id := setup(t)
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
