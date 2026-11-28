@@ -53,11 +53,23 @@ with a missing or shifted merge.
 
 ## ISO/IEC 27002:2022: `iso27002-2022-pdf`
 
-Start at the first thematic heading in the body, not its contents entry. Stop
-before annexes. The flush-left `5`–`8` headings give `domain` roots; `N.N`
-headings give `control` children. Keep control statements, narrative guidance
-and references in their own section, not the separate attribute/tag matrix or
-annex tables. A dotted citation in a paragraph is not a heading.
+Drop page furniture first: the running header as a page's first nonblank line,
+the copyright footer line with or without its page number, and lines of only
+whitespace and U+FEFF. Start at the first flush-left `5` domain heading that is
+not a contents entry (contents entries carry dot leaders). Stop before the
+centered `Annex A` heading. A flush-left `N` heading (`5` to `8`) whose next
+nonblank line is an `N.1` heading opens a `domain` root. A flush-left `N.N`
+heading opens a `control` child only when its attribute table header
+(`Control type`) follows within five nonblank lines; otherwise it is body text.
+Exclude the attribute table up to the flush-left `Control` label. The labels
+`Control`, `Purpose`, `Guidance` and `Other information` open the sections of
+the body, kept in order, each label on its own line and sections separated by a
+blank line. Tables inside guidance stay as text lines. Exclude the annex tables.
+
+The extracted text has no blank lines between paragraphs. Collapse runs of
+spaces and trim each line. A list marker (`a)`, `1)`, `—`, `•`) starts a line;
+otherwise a line joins the previous one with a space unless that one ends with
+`.`, `:` or `;`. A page break alone never starts a paragraph.
 
 ## ISO/IEC 27017:2015: `iso27017-2015-pdf`
 
