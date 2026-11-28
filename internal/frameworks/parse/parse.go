@@ -56,6 +56,9 @@ func Parse(name string, data []byte, code, version string, expected *int) (*Resu
 }
 
 func ParsePages(name string, pages []string, code, version, sourceSHA string, expected *int) (*Result, error) {
+	if name == "aicpa-tsc-2017-pdf" {
+		return parseAICPAPages(pages, sourceSHA, expected)
+	}
 	if name != "iso27002-2022-pdf" {
 		return nil, fmt.Errorf("unknown parser")
 	}
