@@ -21,12 +21,18 @@ import (
 
 type slowBodyAuth struct {
 	drainStore
-	calls atomic.Int64
+	calls         atomic.Int64
+	authenticated chan struct{}
 }
 
 func (s *slowBodyAuth) GetCredential(ctx context.Context, hash string) (store.GetCredentialRow, error) {
 	s.calls.Add(1)
-	return s.drainStore.GetCredential(ctx, hash)
+	row, err := s.drainStore.GetCredential(ctx, hash)
+	select {
+	case s.authenticated <- struct{}{}:
+	default:
+	}
+	return row, err
 }
 
 type slowBodyResolver struct{ calls atomic.Int64 }
@@ -44,13 +50,12 @@ func TestHTTPServer_UsesHostileClientBudgets(t *testing.T) {
 }
 
 func TestHTTPServer_PartialAuthenticatedBodyClosesBeforeTool(t *testing.T) {
-	auth := &slowBodyAuth{}
+	auth := &slowBodyAuth{authenticated: make(chan struct{}, 1)}
 	resolver := &slowBodyResolver{}
 	handler := credential.Middleware(&credential.Verifier{Store: auth, Audience: "http://localhost/mcp"}, mcpapi.New(mcpapi.Config{Resolver: resolver, Limiter: limits.New(time.Now)}))
 	server := newHTTPServer("127.0.0.1:0", handler)
-	// Shrink the production budgets while preserving a missing timeout as zero.
-	server.ReadHeaderTimeout /= 500
-	server.ReadTimeout /= 500
+	server.ReadHeaderTimeout /= 50
+	server.ReadTimeout /= 100
 	server.WriteTimeout /= 500
 	server.IdleTimeout /= 500
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -76,6 +81,11 @@ func TestHTTPServer_PartialAuthenticatedBodyClosesBeforeTool(t *testing.T) {
 	request := "POST /mcp HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer trc_" + strings.Repeat("A", 43) + "\r\nContent-Type: application/json\r\nAccept: application/json, text/event-stream\r\nContent-Length: 1000\r\n\r\n{\"jsonrpc\":"
 	if _, err = io.WriteString(conn, request); err != nil {
 		t.Fatal(err)
+	}
+	select {
+	case <-auth.authenticated:
+	case <-time.After(5 * time.Second):
+		t.Fatal("authentication did not run")
 	}
 	if _, err = io.ReadAll(conn); err != nil && !errors.Is(err, syscall.ECONNRESET) {
 		t.Fatal("server did not close the stalled body connection", err)
