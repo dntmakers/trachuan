@@ -107,3 +107,7 @@ credentials; published image layers and release metadata are public.
   removed from the host, and the owner keeps the only break-glass key outside
   agent reach. Agents still act through the owner's signed-in `gh` CLI on the
   MacBook, so GitHub, not the host, is the remaining trust boundary.
+- 2026-11-28: client-side pgBackRest repository encryption designed in
+  [backup encryption](../design/backups-encryption.md), with one restore ingress
+  hold in [backups](../design/backups.md); rollout waits for the owner's
+  approval of the key custody, overlap and deletion steps.
