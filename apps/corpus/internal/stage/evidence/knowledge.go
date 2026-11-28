@@ -56,7 +56,7 @@ func reviewDecisions(country string, data []byte) ([]ReviewDecision, error) {
 	if data == nil {
 		return nil, nil
 	}
-	file, err := knowledge.Parse(country, data)
+	file, err := knowledge.ParseRelease(country, data)
 	if err != nil {
 		return nil, &IncompleteError{Reason: "knowledge: " + err.Error()}
 	}

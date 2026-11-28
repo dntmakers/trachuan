@@ -29,6 +29,9 @@ func ReadKnowledge(country, path string) (KnowledgeInput, error) {
 	if err != nil {
 		return KnowledgeInput{}, err
 	}
+	if err = file.ValidateForRelease(); err != nil {
+		return KnowledgeInput{}, err
+	}
 	if file.Len() == 0 {
 		return KnowledgeInput{}, nil
 	}
@@ -118,7 +121,7 @@ func writeKnowledgeArtifact(dir string, input KnowledgeInput, report knowledge.R
 	return nil
 }
 
-func knowledgeArtifactHash(dir string) (string, error) {
+func knowledgeArtifactHash(country, dir string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(dir, knowledgeFileName))
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("read knowledge: %w", err)
@@ -133,6 +136,9 @@ func knowledgeArtifactHash(dir string) (string, error) {
 	}
 	if !present {
 		return "", nil
+	}
+	if _, err = knowledge.ParseRelease(country, data); err != nil {
+		return "", fmt.Errorf("validate knowledge artifact: %w", err)
 	}
 	return hashBytes(data), nil
 }

@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"danny.vn/trachuan/internal/lawkey"
-	"danny.vn/trachuan/internal/retrieval"
 )
 
 type LawKey struct {
@@ -57,5 +56,5 @@ func (k PublicKey) Less(other PublicKey) bool {
 }
 
 func validLawKey(k LawKey) bool {
-	return k.Country == "vn" && retrieval.ValidDocumentKey(k.Key) && !strings.Contains(k.Anchor, "~") && lawkey.PlainAnchor(k.Anchor)
+	return k.Country == "vn" && lawkey.DocumentKey(k.Key) && !strings.Contains(k.Anchor, "~") && lawkey.PlainAnchor(k.Anchor)
 }

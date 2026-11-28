@@ -12,17 +12,18 @@ type decisionIdentity struct {
 type batchUse struct{ read, of, count int }
 
 type structure struct {
-	p         *parser
-	lastID    string
-	seen      map[string]bool
-	effects   map[effectPair]string
-	relations map[relationIdentity]bool
-	decisions map[decisionIdentity]bool
-	batches   map[string]*batchUse
+	p           *parser
+	lastID      string
+	seen        map[string]bool
+	effects     map[effectPair]string
+	relations   map[relationIdentity]bool
+	decisions   map[decisionIdentity]bool
+	batches     map[string]*batchUse
+	controlLaws map[controlLawIdentity]bool
 }
 
 func newStructure(p *parser) *structure {
-	return &structure{p: p, seen: map[string]bool{}, effects: map[effectPair]string{}, relations: map[relationIdentity]bool{}, decisions: map[decisionIdentity]bool{}, batches: map[string]*batchUse{}}
+	return &structure{p: p, seen: map[string]bool{}, effects: map[effectPair]string{}, relations: map[relationIdentity]bool{}, decisions: map[decisionIdentity]bool{}, batches: map[string]*batchUse{}, controlLaws: map[controlLawIdentity]bool{}}
 }
 
 func (s *structure) id(at, id string) {

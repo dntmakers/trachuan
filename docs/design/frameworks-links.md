@@ -141,12 +141,17 @@ and `anchor`. `claim` holds `control: {code, version, citation}` and
 `target` with the existing law provision dependency block, `target_own_sha256`
 over the exact reconstructed own-text bytes, and `control_sha256` with a hash of
 the approved control record. Hash the canonical identity, kind, parent key,
-path, ordinal, approved title, status and lineage. Use the existing knowledge
-hash format and the canonical JSON encoding of
-[release changes](release-changes-encoding.md#lines). The input excludes
-publisher text, private fingerprints and incident edges. Changing the encoding
-requires a contract version change. The entry id records review history. The
-public edge identity remains stable if that id changes.
+path, ordinal, approved title, status and lineage. The hashed value is one
+object: `id`, `control_kind`, `parent`, `path`, `ordinal`, `title`, `status`,
+`supersedes` and `amends`. `id`, `parent` and the two lineage fields are control
+keys `{code, version, citation}`; `parent`, `supersedes` and `amends` are null
+when absent. `path` is the array of ancestor citations from the root to the
+parent, empty for a root. `title` is the approved display title, the empty
+string when there is none. Use the existing knowledge hash format and the
+canonical JSON encoding of [release changes](release-changes-encoding.md#lines).
+The input excludes publisher text, private fingerprints and incident edges.
+Changing the encoding requires a contract version change. The entry id records
+review history. The public edge identity remains stable if that id changes.
 
 The reviewer approves a public association using the public control record and
 the anchored law text. Use no control quote, paraphrase, private digest or free

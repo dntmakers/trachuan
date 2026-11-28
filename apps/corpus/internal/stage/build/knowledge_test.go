@@ -49,6 +49,29 @@ func TestReadKnowledge_RequiresFileAndRefusesInvalid(t *testing.T) {
 	}
 }
 
+func TestReadKnowledge_RefusesControlLawLinks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "vn-knowledge.yaml")
+	data := `- id: law-link
+  kind: control_law_link
+  target: {key: "vn:vbpl:1", anchor: "dieu-1"}
+  claim: {control: {code: nist, version: "1", citation: AC-1}, relation_kind: related}
+  evidence: {quote: "exact law provision text"}
+  depends:
+    contract: 1
+    target: {number_norm: "1", text_source: source_tree, text_sha256: "sha256:1111111111111111111111111111111111111111111111111111111111111111", heading_sha256: "sha256:2222222222222222222222222222222222222222222222222222222222222222", ancestors: []}
+    target_own_sha256: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    control_sha256: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  reviewed: {date: "2099-11-18", by: owner, method: human}
+`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := ReadKnowledge("vn", path)
+	if err == nil || !strings.Contains(err.Error(), "control_law_link entries cannot be validated against a law release yet") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestReadKnowledge_HoldsBytesReadOnce(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "vn-knowledge.yaml")
 	if err := os.WriteFile(path, []byte(knowledgeDecision), 0o600); err != nil {
@@ -114,7 +137,7 @@ func TestKnowledgeArtifact_NoEntriesWritesNothing(t *testing.T) {
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("entries = %v, %v", entries, err)
 	}
-	hash, err := knowledgeArtifactHash(dir)
+	hash, err := knowledgeArtifactHash("vn", dir)
 	if err != nil || hash != "" {
 		t.Fatalf("hash = %q, %v", hash, err)
 	}
@@ -139,7 +162,7 @@ func TestKnowledgeArtifact_EntriesWriteBytesAndReport(t *testing.T) {
 	if err = json.Unmarshal(raw, &records); err != nil || len(records) != 1 || records[0] != report.Records[0] {
 		t.Fatalf("records = %+v, %v", records, err)
 	}
-	hash, err := knowledgeArtifactHash(dir)
+	hash, err := knowledgeArtifactHash("vn", dir)
 	if err != nil || hash != input.hash {
 		t.Fatalf("hash = %q, %v", hash, err)
 	}
@@ -162,7 +185,7 @@ func TestKnowledgeArtifact_RefusesHalf(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("[]"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := knowledgeArtifactHash(dir); err == nil {
+		if _, err := knowledgeArtifactHash("vn", dir); err == nil {
 			t.Fatalf("%s alone accepted", name)
 		}
 	}

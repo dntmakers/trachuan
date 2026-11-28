@@ -19,7 +19,7 @@ func BindWarningCases(cases []WarningCase, country string, source, report []byte
 	var rows map[string]knowledge.Record
 	var err error
 	if source != nil {
-		file, err = knowledge.Parse(country, source)
+		file, err = knowledge.ParseRelease(country, source)
 		if err != nil {
 			return nil, fmt.Errorf("parse knowledge: %w", err)
 		}

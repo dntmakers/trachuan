@@ -77,11 +77,12 @@ type Claim struct {
 }
 
 type File struct {
-	Decisions []ReviewDecision
-	Claims    []Claim
+	Decisions       []ReviewDecision
+	Claims          []Claim
+	ControlLawLinks []ControlLawLink
 }
 
-func (f File) Len() int { return len(f.Decisions) + len(f.Claims) }
+func (f File) Len() int { return len(f.Decisions) + len(f.Claims) + len(f.ControlLawLinks) }
 
 type ValidationError struct{ Problems []string }
 
