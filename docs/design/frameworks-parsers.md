@@ -119,6 +119,19 @@ a citation. If a required region, anchor, row or continuation is ambiguous, fail
 rather than emitting a partial catalog. A count match alone cannot prove that a
 body was assigned to the right control.
 
+Recognise each structural element (table and section headers, footers, captions,
+field and margin labels) in one classifier per edition, as its complete printed
+label inside its measured band and window. A single word or the presence of
+separate words never identifies one. Assign text to a node line by line, and
+fail when a line's owner is ambiguous.
+
+Code and tests hold a label only as the edition's profile writes it: in full
+where the profile names it, otherwise by its shape (word count, first and last
+word, band and window), which the profile then states. They never hold a title,
+other publisher wording or a hash of any of these. A hash of short text is as
+readable as the text, and the only published hashes are whole-file SHA-256
+values ([access](frameworks-access.md#licensed-material-and-where-it-may-be)).
+
 Use printed citation spelling except for the indicated namespace and derived
 keys. Use the existing case/space normalization and exact count check
 ([parse/parse.go:56–74, 103–113](../../internal/frameworks/parse/parse.go#L56-L74)).

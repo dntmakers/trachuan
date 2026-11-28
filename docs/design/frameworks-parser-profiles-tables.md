@@ -194,9 +194,13 @@ row. An explicit ID followed by `(continued)` is a caption. Require an earlier
 row with that ID under the current root. If the caption's left segment contains
 text, the ID must match the active row. Append the left text after removing the
 caption. Drop a caption with an empty left segment even when its ID differs from
-the current row. Only excluded columns continue in that case. Neither a repeated
-outer header nor a caption creates a node. Fail on unowned left text, unknown
-captions and duplicate openers.
+the current row. Only excluded columns continue in that case. A left-band block
+whose only word is `(continued)` is dropped exactly twice in this edition, once
+on physical page 96 and once on page 98. Each page must lack a paired subheader,
+the row active at the top of the page must still be open with no opener before
+the marker, and left text continuing that row must follow it. A missing, extra
+or misplaced marker fails. Neither a repeated outer header nor a caption creates
+a node. Fail on unowned left text, unknown captions and duplicate openers.
 
 In row bodies keep the text after the ID and the local objective and
 applicability sections when present. Start each section on its own line. Within
@@ -205,3 +209,22 @@ glyph to the adjacent line to its right when their tops differ by at most 2
 points. Keep list items and paragraph breaks between blocks, joining wraps with
 spaces. Page breaks alone leave the paragraph open. Roots and spanning groups
 keep their headings as titles and have empty bodies.
+
+The parser recognises each label only by this shape: in word boxes each word is
+one box, the word count is the box count, only the first and last words are
+compared exactly as printed, and the source fingerprint binds the words between
+them. x is the first word's left edge in points, rounded to 0.1 where stated;
+the left band for section labels is x 54–295.
+
+| Label                   | Words    | First to last word                                                                                              | Position                                            |
+| ----------------------- | -------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Outer requirements      | 4        | `Requirements` to `Procedures`                                                                                  | x 185–205, y 79–123                                 |
+| Outer guidance          | 1        | `Guidance`                                                                                                      | x 580–605, y 79–123                                 |
+| Requirements subheader  | 3        | `Defined` to `Requirements`                                                                                     | x `L`, y 79 to below 530                            |
+| Testing subheader       | 4        | `Defined` to `Procedures`                                                                                       | x `T`, y 79 to below 530                            |
+| Footer identification   | 11       | `Payment` to `v4.0.1`                                                                                           | x 72 ± 0.1, y 530 or more                           |
+| Footer copyright        | 11 or 12 | 11 words from `©` joined to a four-digit year, or 12 words from a standalone `©`; to `Reserved.` or `reserved.` | x 72 ± 0.1, y 530 or more                           |
+| Footer date             | 2        | `June` to a four-digit year                                                                                     | x 600 or more, y 530 or more                        |
+| Footer page number      | 2        | `Page` to a positive integer without leading zeros                                                              | x 600 or more, y 530 or more                        |
+| Objective section label | 3        | `Customized` to `Objective`                                                                                     | left band, y 79 to below 530; body words may follow |
+| Applicability label     | 2        | `Applicability` to `Notes`                                                                                      | left band, y 79 to below 530; body words may follow |

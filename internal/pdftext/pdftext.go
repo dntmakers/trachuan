@@ -17,6 +17,7 @@ type Page struct {
 	Width  string `xml:"width,attr"`
 	Height string `xml:"height,attr"`
 	Words  []Word `xml:"flow>block>line>word"`
+	Blocks []Block
 }
 
 type Word struct {
@@ -127,6 +128,13 @@ func parseBBoxDecode(ctx context.Context, data []byte) ([]Page, error) {
 					return nil, ErrFile
 				}
 				pages = append(pages, page)
+			case "block":
+				p := &pages[len(pages)-1]
+				p.Blocks = append(p.Blocks, Block{XMin: attrValue(value.Attr, "xMin"), YMin: attrValue(value.Attr, "yMin"), XMax: attrValue(value.Attr, "xMax"), YMax: attrValue(value.Attr, "yMax")})
+			case "line":
+				p := &pages[len(pages)-1]
+				b := &p.Blocks[len(p.Blocks)-1]
+				b.Lines = append(b.Lines, Line{XMin: attrValue(value.Attr, "xMin"), YMin: attrValue(value.Attr, "yMin"), XMax: attrValue(value.Attr, "xMax"), YMax: attrValue(value.Attr, "yMax")})
 			case "word":
 				wordText.Reset()
 				word = Word{XMin: attrValue(value.Attr, "xMin"), YMin: attrValue(value.Attr, "yMin"), XMax: attrValue(value.Attr, "xMax"), YMax: attrValue(value.Attr, "yMax")}
@@ -145,7 +153,11 @@ func parseBBoxDecode(ctx context.Context, data []byte) ([]Page, error) {
 			}
 			if value.Name.Local == "word" {
 				word.Text = wordText.String()
-				pages[len(pages)-1].Words = append(pages[len(pages)-1].Words, word)
+				p := &pages[len(pages)-1]
+				p.Words = append(p.Words, word)
+				b := &p.Blocks[len(p.Blocks)-1]
+				line := &b.Lines[len(b.Lines)-1]
+				line.Words = append(line.Words, word)
 			}
 			stack = stack[:len(stack)-1]
 		case xml.CharData:
