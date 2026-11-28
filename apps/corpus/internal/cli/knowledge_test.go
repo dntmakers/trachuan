@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/internal/corpusdb"
+	"danny.vn/trachuan/internal/knowledge"
 )
 
 const cliKnowledgeDecision = `- id: "decision-mau"

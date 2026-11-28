@@ -7,10 +7,10 @@ import (
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
 	"danny.vn/trachuan/apps/corpus/internal/classify"
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/apps/corpus/internal/source"
 	"danny.vn/trachuan/apps/corpus/internal/stage/membership"
 	"danny.vn/trachuan/internal/embedding"
+	"danny.vn/trachuan/internal/knowledge"
 	"danny.vn/trachuan/internal/retrieval/lexical"
 	"github.com/jackc/pgx/v5"
 )

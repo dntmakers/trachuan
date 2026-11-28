@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/apps/corpus/internal/stage"
+	"danny.vn/trachuan/internal/knowledge"
 )
 
 const (

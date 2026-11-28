@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/apps/corpus/internal/source"
 	"danny.vn/trachuan/apps/corpus/internal/stage/chunk"
+	"danny.vn/trachuan/internal/knowledge"
 	"danny.vn/trachuan/internal/retrieval"
 )
 

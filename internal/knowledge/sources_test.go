@@ -7,7 +7,7 @@ import (
 )
 
 func TestSources_EveryKnowledgeFileParses(t *testing.T) {
-	root := filepath.Join("..", "..", "..", "..", "sources")
+	root := filepath.Join("..", "..", "sources")
 	paths, err := filepath.Glob(filepath.Join(root, "*-knowledge.yaml"))
 	if err != nil {
 		t.Fatal(err)

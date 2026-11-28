@@ -7,7 +7,7 @@ import (
 	"io"
 	"slices"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
+	"danny.vn/trachuan/internal/knowledge"
 	"danny.vn/trachuan/internal/retrieval"
 )
 

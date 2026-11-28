@@ -67,7 +67,7 @@ whose entry is absent has outcome `missing`, not `not_run`.
   ([build/knowledge.go](../../apps/corpus/internal/stage/build/knowledge.go#L74-L85)).
 - `redundant`: require the same assertions. Build returns this outcome for a
   matching existing row without inserting a reviewed row
-  ([knowledge/check.go](../../apps/corpus/internal/knowledge/check.go#L330-L347)).
+  ([knowledge/check.go](../../internal/knowledge/check.go#L330-L347)).
 - `stale` or `missing`: fail the case without search or read. Another row must
   not hide a stale entry. An accepted `knowledge_stale` gap does not pass this
   case. Repair the dependency or retire the case with the entry in a reviewed
