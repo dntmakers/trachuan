@@ -201,7 +201,7 @@ registered source through the same reader and adapter as build. Check the
 citation openings, order and parentage. For AICPA, confirm the table region,
 bullet nesting level and owning criterion for each point of focus. For TCVN,
 verify both duplicate pairs satisfy the
-[ordered neighbor rule](frameworks-parser-profiles.md#tcvn-119302017-tcvn11930-2017-pdf).
+[ordered neighbor rule](frameworks-parser-profiles-tables.md#tcvn-119302017-tcvn11930-2017-pdf).
 Only after this check put the verified positive total in `expected_controls` in
 that parser PR. Never derive the expected total during a build.
 
