@@ -82,9 +82,12 @@ connection to `auth`, makes the phase wait and raises an
 `activator` session only makes it wait. A refused or lost `activator` session to
 `postgres` or `auth` also waits; a failed session to the target database or a
 failed `pg_restore` aborts, because a signed dump can limit connections to its
-own database and would otherwise stall the phase forever. Its table, sequence
-and schema rights are revoked as well, so an honest missed path fails at once,
-but `auth_owner` can grant them back and nothing relies on the revoke.
+own database and would otherwise stall the phase forever. A failed step records
+only the program and its exit code as the cause in `release.json`, the same form
+as [frameworks](frameworks-release-restore.md#smoke), never its stderr, which a
+signed dump controls. Its table, sequence and schema rights are revoked as well,
+so an honest missed path fails at once, but `auth_owner` can grant them back and
+nothing relies on the revoke.
 
 **The host holds the operation.** Commands are built from the
 [activation record](activation-record.md) and the manifest verified on the host.

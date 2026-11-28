@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import unittest
 from unittest import mock
 
@@ -10,6 +11,7 @@ from updater.deploy_release_target import Leftover
 from updater.deploy_run import Updater
 from updater.frameworks_run_test import missing_tag
 from updater.frameworks_verify_test import NESTED
+from updater.io_test import METRICS
 from updater.world_test import Crash, LawCase, NOW
 
 
@@ -54,8 +56,7 @@ class CorpusRunTest(LawCase, unittest.TestCase):
         self.phase.registry = Registry(self.rules, missing_tag)
         self.assertFalse(self.run_phase())
         self.assertEqual(self.result()['status'], 'failed')
-        self.assertTrue(self.result()['message'].startswith(
-            'corpus command failed or run interrupted: oras resolve: exit 1: Error response from registry: '))
+        self.assertEqual(self.result()['message'], 'corpus command failed or run interrupted: oras resolve: exit 1')
 
     def test_database_client_output_never_reaches_the_law_result_or_log(self):
         marker = 'invented dump marker'
@@ -68,6 +69,16 @@ class CorpusRunTest(LawCase, unittest.TestCase):
                 self.assertEqual(self.result()['message'], 'corpus command failed or run interrupted: ' + message)
                 self.assertNotIn(marker, self.phase.result.path.read_text())
                 self.assertNotIn(marker, self.phase.result.log.read_text())
+
+    def test_restore_error_detail_never_reaches_result_log_or_metrics(self):
+        marker = 'hostile dump sentinel'
+        self.db.failures['restore'] = CommandError('command failed', detail='pg_restore: exit 1: ' + marker)
+        self.assertFalse(self.run_phase())
+        self.assertEqual(self.result()['message'], 'corpus command failed or run interrupted: pg_restore: exit 1')
+        self.assertNotIn(marker, self.phase.result.path.read_text())
+        self.assertNotIn(marker, self.phase.result.log.read_text())
+        metrics = METRICS.release(self.phase.result.path, datetime(2026, 1, 2, tzinfo=timezone.utc))
+        self.assertNotIn(marker, str(metrics))
 
     def test_nested_law_manifest_ends_as_failed_result(self):
         self.directory.joinpath('manifest.json').write_bytes(NESTED)

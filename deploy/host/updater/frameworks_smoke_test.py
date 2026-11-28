@@ -147,15 +147,15 @@ class FrameworksCauseTest(unittest.TestCase):
         self.assertIsNone(FRAMEWORKS.cause(CommandError('command failed')))
         self.assertIsNone(LAW.cause(CommandError('command failed')))
 
-    def test_law_cause_keeps_only_the_tails_the_command_layer_allows(self):
+    def test_law_cause_keeps_only_program_and_exit(self):
         wrapper = ['podman', 'exec', 'trachuan-postgres']
         for program, stderr, cause in (
                 (['pg_restore', '--no-password'], b'pg_restore: error: invented dump text', 'pg_restore: exit 1'),
                 (['psql', '-XqAt'], b'ERROR: invented row text', 'psql: exit 1'),
                 (['createdb', 'corpus_vn_20990101'], b'invented', 'createdb: exit 1'),
-                (['oras', 'resolve', 'ghcr.io/x:1'], b'Error: not found', 'oras resolve: exit 1: Error: not found'),
-                (['cosign', 'verify-blob', '/tmp/x.json'], b'Error: no match', 'cosign verify-blob: exit 1: Error: no match'),
-                (['oras', 'resolve', 'ghcr.io/x:1'], b'password=invented', 'oras resolve: exit 1: error output withheld')):
+                (['oras', 'resolve', 'ghcr.io/x:1'], b'Error: not found', 'oras resolve: exit 1'),
+                (['cosign', 'verify-blob', '/tmp/x.json'], b'Error: no match', 'cosign verify-blob: exit 1'),
+                (['oras', 'resolve', 'ghcr.io/x:1'], b'password=invented', 'oras resolve: exit 1')):
             with self.subTest(program=program[0], stderr=stderr):
                 detail = describe(wrapper + program, stderr, 1)
                 self.assertEqual(LAW.cause(CommandError('command failed', detail=detail)), cause)
