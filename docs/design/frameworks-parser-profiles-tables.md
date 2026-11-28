@@ -57,8 +57,9 @@ Use the flush-left `Description` and `Purpose` labels as boundaries. Stop the
 purpose at the flush-left introductory line for the goals alignment table. That
 line starts with `The`, ends with `:` and occupies 101 character columns. Take
 only text inside those fields. Drop the running chapter and volume lines at the
-top edge, standalone domain margin labels and the last bare page number. Skip
-the alignment, responsibility, information-flow and other component tables.
+top edge and the last bare page number. The pinned edition prints no domain
+margin label inside these fields; a field line that is only a domain code fails.
+Skip the alignment, responsibility, information-flow and other component tables.
 
 Use `-bbox-layout` for practices because `-layout` can separate the description
 and metrics cells by a single space. Only when the verified source SHA-256
@@ -87,6 +88,30 @@ the activity header moves to the next page, require the repeated component A
 header followed by the activity header there. Exclude activities, capability
 levels, related guidance and the metrics column. Join wraps with spaces.
 Preserve field breaks and explicit lists.
+
+The parser recognises each label only by this shape. In `-layout` a word is a
+whitespace-separated token; lines are one-based and include blank lines, and
+columns are one-based runes. In word boxes each word is one box, so the word
+count is the box count; x and y are points. Only the first and last words are
+compared, exactly as printed except the objective opener label, which is
+compared without regard to case. The source fingerprint binds the words between
+them.
+
+| Label                    | Words | First to last word                          | Position                                                               |
+| ------------------------ | ----- | ------------------------------------------- | ---------------------------------------------------------------------- |
+| Objective opener         | 2     | `Governance` or `Management` to `Objective` | flush left, line 6 or 9                                                |
+| Focus-area field         | 2     | `Focus` to `Area:`                          | columns 114–125, two or more spaces before, a space then a value after |
+| Description, Purpose     | 1     | the label                                   | flush left, alone on the line after trailing spaces                    |
+| Purpose stop line        | 15    | `The` to `goals:`                           | flush left, 101 columns, ends with `:` after trailing spaces           |
+| Component A              | 3     | `A.` to `Process`                           | boxes in x 39 to below 590, first at x 39–60                           |
+| Component A continuation | 4     | `A.` to `(cont.)`                           | as component A                                                         |
+| Component B              | 4     | `B.` to `Structures`                        | as component A                                                         |
+| Component B continuation | 5     | `B.` to `(cont.)`                           | as component A                                                         |
+| Practice header          | 2     | `Governance` or `Management` to `Practice`  | boxes in x 39 to below 300, first at x 39–60                           |
+| Metrics header           | 2     | `Example` to `Metrics`                      | boxes in x 300 to below 590, first at x 300–320                        |
+| Activity header          | 1     | `Activities`                                | boxes in x 39 to below 496, first at x 39–60                           |
+| Capability header        | 2     | `Capability` to `Level`                     | boxes in x 496 to below 590, first at x 496–516                        |
+| Page number              | 1     | an unsigned decimal                         | y 742–744, x 36–60 or 550–565; nothing else at y 735 or below          |
 
 ## TCVN 11930:2017: `tcvn11930-2017-pdf`
 
