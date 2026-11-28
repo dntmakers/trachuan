@@ -73,14 +73,45 @@ otherwise a line joins the previous one with a space unless that one ends with
 
 ## ISO/IEC 27017:2015: `iso27017-2015-pdf`
 
-Start at the first numbered control-guidance section after front matter and stop
-before bibliography/back matter. Reject page-footer numbers before heading
-detection. Keep numbered sections `5`–`18` and their printed subsections as
-`control` nodes, parented by the immediate dotted prefix. In the cloud annex
-also keep `CLD.N.N` roots and their `CLD.N.N.N` children as `control`. Keep
-direct narrative guidance and explicit reference-only text as printed; never
-pull in ISO 27002 text to fill a reference. Omit standalone comparison or
-guidance tables.
+Remove the first nonblank line when it is the edition identifier with its `(E)`
+suffix. Remove the last nonblank line when it is the ITU-T running footer with
+identifier `X.1631 (07/2015)` and a page number on either side. Strip that whole
+line before testing headings because its left-side page number can look like a
+section number.
+
+Enter the main region at a flush-left `5` heading followed by a `5.1` heading on
+the next nonblank line. Switch at the indented standalone `Annex A` marker and
+stop at the corresponding `Annex B` marker. Skip front matter, contents, the
+annex preamble and all material after that stop.
+
+A main heading starts at column zero after a blank line or at the first content
+line of its page. It has a citation with one to three numeric components
+starting at `5` through `18`, at least three spaces and a title starting with
+`A`–`Z`. A title with a terminal period or a line with dot leaders fails the
+heading test. Open a `control` with its immediate dotted prefix as parent, or a
+root for a single number. In Annex A, use the same line boundaries and title
+checks with at least one separating space. Open `CLD.N.N` as a `control` root
+and `CLD.N.N.N` as its `control` child. Require a flush-left standalone
+`Control` label on the next nonblank line after each child heading.
+
+Keep direct text, including reference-only sentences, the annex `Control` label
+and the cloud-qualified other information section. Keep each retained section
+label on its own line. Exclude the comparison and guidance tables. A flush-left,
+five-word `Implementation guidance` label ending in `services` opens a table
+when the next nonblank line has the two indented three-word cloud role headers.
+Require `customer` and `provider` as their respective last words and at least
+two spaces between the headers. Skip both columns, including a repeat of the
+paired header at the start of a continuation page. Resume at the flush-left,
+five-word `Other information` label ending in `services` or at the next heading
+or region boundary. A missing paired header or a flush-left line within the
+table that matches none of these stops fails the parse.
+
+Trim lines and collapse horizontal whitespace after classifying them. Keep
+internal blank lines as paragraph breaks. A list marker such as an en dash
+starts a new line. A `NOTE` label starts a new paragraph. Join other wraps with
+a space. Ignore page edge blanks. When retained prose continues on the next
+page, start a new paragraph after `.`, `:` or `;` unless the next line is a list
+item.
 
 ## AICPA criteria: `aicpa-tsc-2017-pdf`
 
@@ -110,14 +141,43 @@ reference outside its primary process table never opens a node.
 
 ## ISO/IEC 27001:2022: `iso27001-2022-pdf`
 
-Use the base PDF only. Read normative clauses `4`–`10` after front matter and
-before Annex A. Flush-left headings open `clause` nodes, split by their printed
-dotted prefix. Keep direct clause text; skip page numbers, references in prose
-and contents entries. In the Annex A control table, open `domain` roots `A.N`
-and `annex-control` children `A.N.N` from the identifier column; add `A.` to the
-number printed in the table. Read the adjacent heading and statement cells
-across wraps and page breaks. Table labels and bibliography are not text of a
-control.
+Use the base PDF. Remove the first nonblank line when it ends with the edition
+identifier and `(E)`, including the left-side label on the first content page.
+Remove the final copyright line with its page number on either side. Treat
+whitespace, U+FEFF, U+0008 and U+200B alone as blank. Keep raw spacing until
+after heading and table detection.
+
+Enter the main body at the flush-left `4` heading followed by `4.1` on the next
+nonblank line. Stop at the indented standalone `Annex A` marker. A clause
+heading is flush left after a blank line or at the first content line of a page.
+Require one to three numeric components starting at `4` through `10`, then a tab
+followed by U+200B or three to six spaces, then a title starting with `A`–`Z`.
+Reject dot leaders and titles ending in a period in the heading test. A matching
+line opens a `clause`, using the immediate dotted prefix as parent and a single
+number as a root. Prose references stay with their clause. Keep direct body text
+and strip U+200B during normalization. Use the
+[ISO/IEC 27017 prose joining rules](#isoiec-270172015-iso27017-2015-pdf). List
+markers include `a)`, `1)` and an em dash. Keep each `NOTE` marker and its text.
+
+In the annex, skip the introduction and enter the table after the indented
+`Table A.1` caption with its dash and title. Skip its parenthesized continuation
+caption when it is the first content line of a later page. End the table before
+the indented standalone `Bibliography` marker.
+
+An Annex A row opens with a flush-left `5` through `8` identifier, optionally
+followed by a dot and a positive integer. The title cell starts at zero-based
+column 7 or 10 on that line. Add `A.` to the identifier. A single number opens a
+`domain` root with a title and empty body. A dotted number opens an
+`annex-control` under its matching domain. The child opener ends in the
+standalone `Control` label, separated from the title by at least one space.
+Require the label to start in columns 35 through 45. Drop it from the title.
+
+After the opener, a line starting at the opener's title column continues the
+title. A line starting in columns 35 through 45 supplies statement text. The
+statement column can differ from the label's column on the opener. Carry the row
+across a page break until the next opener or end of the table. Join each cell's
+lines with spaces. Reject a line outside either column band, a continuation
+without an open child row, or a child with an empty title or statement.
 
 ## ISO/IEC 27001:2022 Amd 1: `iso27001-2022-amd1-pdf`
 
@@ -125,11 +185,25 @@ The first ISO 27001 PR splits the amendment file currently registered with the
 base ([registry:32–43](../../sources/frameworks.yaml#L32-L43)) into a separate
 licensed `iso27001:2022-amd1-2024` entry with `amends: '2022'`. Register the
 base parser with its own total; enable the amendment parser with its own total
-in its PR. Do not overlay the base. A standalone target citation followed by its
-insertion instruction opens an `amendment` root with the same citation in the
-amendment edition. Body is the verbatim insertion text, not the editorial
-instruction or a rewritten clause. Unknown operations, missing insertion text or
-repeated or unresolved targets fail.
+in its PR. Keep the base edition intact.
+
+Select the page starting with the full amendment identifier and `(en)` whose
+content includes the flush-left standalone `4.1` target. Require the final
+copyright line and its separate decimal page number, ignoring blank lines
+between them. Start at `4.1`, skipping the page preamble. Read two blocks in
+order, for `4.1` and `4.2`. Each block starts with the bare target citation. The
+next nonblank line is a flush-left instruction starting with `Add`, containing
+`sentence` for `4.1` or `note` for `4.2`, then `end`, and ending in a colon.
+Compare instruction words without regard to case.
+
+The next nonblank line in each block is the full insertion. Require one
+flush-left line ending in a period. Require the `NOTE` marker for `4.2` and keep
+it as part of the insertion. Emit an `amendment` root with the printed citation,
+an empty original title and the insertion text as its body. Trim and collapse
+horizontal whitespace while keeping wording and punctuation. End at the footer
+after the second insertion. Skip the instructions, covers and other pages.
+Reject a missing or extra block or insertion line, any other operation, or a
+repeated or unresolved target.
 
 Persist version `amends` in registry metadata and resolve it to the same-code
 base version on insert, in dependency order without updating sealed versions.
@@ -143,13 +217,34 @@ there is no self-link, cycle or inferred `supersedes` link.
 
 ## ISO/IEC 27018:2019: `iso27018-2019-pdf`
 
-Read the `5`–`18` guidance sections and children as in 27017, without CLD. Keep
-every printed numbered heading in the normative body, even if the text only
-points to another edition. Enter the data-protection annex separately: its `A.N`
-headings open `domain` roots and `A.N.N` headings open `annex-control` children.
-Keep direct narrative text; exclude framework comparison tables, introductory
-figures and bibliography. Do not synthesize missing parents or replace printed
-headings with the prior catalog's selection.
+Strip the first nonblank edition identifier with its `(E)` suffix and the last
+nonblank copyright line with its page number on either side. Ignore U+0008 and
+U+FEFF when checking for furniture and blank lines. Start at the flush-left `5`
+heading followed by a `5.1` heading on the next nonblank line. Switch at the
+indented standalone `Annex A` marker and stop before the indented standalone
+`Bibliography` marker. This excludes the front matter, introductory figures and
+the framework comparison table before section `5`. Skip the annex preamble
+before the first annex heading.
+
+In the main region, a heading starts flush left after a blank line or at the
+first content line of a page. Require one to three numeric components starting
+at `5` through `18`, one or more spaces, and a title starting with `A`–`Z`.
+Reject dot leaders and titles ending in a period in the heading test. Open a
+`control` with its immediate dotted prefix as parent, or a root for a single
+number. Retain headings with reference-only bodies, including single numbers
+with no descendants.
+
+In the annex, apply the same line and title checks to `A.N` and `A.N.N`. An
+`A.N` heading opens a `domain` root. An `A.N.N` heading can also immediately
+follow its domain heading without a blank line. It opens an `annex-control` only
+if the next nonblank line is the flush-left standalone `Control` label. Use the
+immediate `A.N` prefix as its parent. Keep domain introductions and direct
+control text.
+
+Keep the standalone `Control` label and flush-left `Other information` labels
+qualified by both `cloud` and `PII` on their own lines. Use the
+[ISO/IEC 27017 prose joining rules](#isoiec-270172015-iso27017-2015-pdf),
+recognizing lettered and em-dash list items and `NOTE` and `EXAMPLE` markers.
 
 ## TCVN 11930:2017: `tcvn11930-2017-pdf`
 
