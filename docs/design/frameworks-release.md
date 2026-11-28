@@ -78,13 +78,16 @@ from `main` only), which holds `FRAMEWORKS_READ_KEY_ID`,
 dispatches with the hash of the report it validated, and the job refuses a
 downloaded report with any other hash; the report binds the dump and
 `build.json`, so a holder of the upload key cannot swap the objects between
-upload and signing. It does not bind `release.json` or `evaluate.json`: a forged
-recipe, count, schema version or extension version there can be signed, but it
-never activates. The host compares the first three with the restored database
-and the extension versions with the image, and a schema or query hash the server
-does not support ends in `waiting`. Signing a released `rel` again uses
-`report.sha256` from its signed manifest. A workflow of its own gives the kind
-its own certificate identity and its own `run_number` sequence. The job:
+upload and signing. It does not bind `release.json` or `evaluate.json`, so the
+job compares the release row's schema version and dense, lexical and retrieval
+recipes with the report-bound `build.json` and refuses any difference, and
+applies the closed recipe shapes the host verifier also applies. A forged count
+or extension version can still be signed, but it never activates: the host
+compares counts with the restored database and the extension versions with the
+image, and a schema or query hash the server does not support ends in `waiting`.
+Signing a released `rel` again uses `report.sha256` from its signed manifest. A
+workflow of its own gives the kind its own certificate identity and its own
+`run_number` sequence. The job:
 
 1. HEADs and downloads the seven objects into `$RUNNER_TEMP` with the law job's
    size bounds and range checks.

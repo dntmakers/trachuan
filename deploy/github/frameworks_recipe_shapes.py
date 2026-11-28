@@ -1,5 +1,6 @@
 import math
 import re
+import sys
 
 
 def text(value):
@@ -19,7 +20,9 @@ def integer(value):
 
 
 def number(value):
-    return type(value) in (int, float) and math.isfinite(value)
+    if type(value) is int:
+        return abs(value) <= sys.float_info.max
+    return type(value) is float and math.isfinite(value)
 
 
 def boolean(value):
