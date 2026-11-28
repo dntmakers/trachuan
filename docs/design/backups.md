@@ -4,12 +4,14 @@ Proposed. How the [backup rules](deployment.md#backups) run on the host:
 pgBackRest to the private backup bucket over the
 [Object Storage](deployment.md#object-storage) S3 endpoint, continuous WAL,
 weekly full, daily differential, weekly verify, 30-day retention, a monthly auth
-restore check, health results and a production restore procedure.
+restore check, health results and a production restore procedure. See the
+[client-side encryption proposal](backups-encryption.md) for the repository
+migration and recovery changes.
 
 ## Version and image
 
-pgBackRest 2.60.0 (released 2026-10-18), the current stable release; PostgreSQL
-18 support arrived in 2.55.0
+The current image pins pgBackRest 2.60.0 (released 2026-10-18). PostgreSQL 18
+support arrived in 2.55.0
 ([release notes](https://pgbackrest.org/release.html)). The project announced
 the end of maintenance on 2026-04-27 and its continuation with sponsors on
 2026-05-18 ([news](https://pgbackrest.org/news.html)); that risk was weighed and
@@ -63,10 +65,11 @@ PostgreSQL runs with `archive_mode=on`,
 the bucket or credentials fail, WAL accumulates in `pg_wal` on the data volume
 rather than being dropped, and PostgreSQL stops only if that volume fills. The
 hourly check reads `pg_stat_archiver` and the size of `pg_wal`: archiving
-failing for more than 30 minutes, or `pg_wal` above 10 GB, is unhealthy. The
-runbook's outage response is to restore bucket access first; when the volume
-nears full, the owner may set a no-op `archive_command` (losing point-in-time
-recovery for the gap) and must take a full backup once archiving returns.
+failing for more than 30 minutes, or `pg_wal` above 10 GB, is unhealthy. Restore
+bucket access first. The Quadlet passes `archive_command` with `postgres -c`.
+The existing runbook's `ALTER SYSTEM` example cannot override that setting. The
+[encryption proposal](backups-encryption.md#archiving-outage) specifies the
+effective override and recovery checks.
 
 ## Schedules and results
 
@@ -149,17 +152,42 @@ its socket or archive.
 
 ## Production restore
 
-The runbook restores the whole cluster in this order: stop Caddy, web and
-server; stop PostgreSQL; `pgbackrest restore --delta` to the chosen target;
-start PostgreSQL and wait for recovery to finish and promote; in one committed
-transaction increment every `auth_epoch`, revoke all sessions and tokens
-([auth](auth.md)) and revoke every live framework entitlement with reason
-`restore` ([framework access](frameworks-access.md#classes-and-entitlements));
-start server and web; prewarm the active corpus database
-([runbook](../runbooks/corpus-restore-manual.md#prewarm-a-corpus-database));
-pass readiness; then start Caddy. Before the one-hour RTO is claimed, a timed
-whole-cluster rehearsal of this procedure restores into a scratch directory and
-port on the host and its time is recorded.
+Use the [backup runbook](../runbooks/backups.md#restore-production) to restore
+and promote the chosen target. Run migrations, then commit the auth restore
+fence. The fence increments every `auth_epoch`, revokes sessions and tokens and
+revokes every live framework entitlement with reason `restore`. Start the
+services for loopback checks, prewarm the active corpus database and pass
+readiness before reopening ingress. Record the timed whole-cluster rehearsal
+before claiming the one-hour RTO. [Auth](auth.md) ·
+[Framework entitlements](frameworks-access.md#classes-and-entitlements) ·
+[Corpus prewarm](../runbooks/corpus-restore-manual.md#prewarm-a-corpus-database)
+
+### Restore ingress hold
+
+Before replacing production data, the restore operator takes the backup lock,
+atomically writes `/srv/trachuan/state/restore-hold`, and syncs the file and
+parent directory to disk. The root-owned hold records the restore attempt and
+lives outside the restored data directory. Stop serving listeners and confirm
+in-flight requests have drained before touching data. Only operator-controlled
+loopback recovery and readiness traffic can run while the hold exists.
+
+Caddy and every other listener that can serve restored data or accept restored
+credentials must check the hold before startup, including after reboot. The
+updater defers deploy, secret and corpus activations and leaves this hold in
+place on every path, including rollback and recovery. Its existing `deploy-hold`
+has a separate lifecycle. Require a release with the restore hold guards, and a
+rollback floor that preserves them, before replacing data. If a listener or
+updater cannot check the hold, it keeps ingress closed.
+
+Only the restore operator may clear the hold after confirming the fence
+committed for this restore attempt and loopback readiness passed. A failure,
+interruption or reboot leaves the hold in place. If completion is uncertain,
+rerun the fence and readiness under the hold. On a synthetic deployment, reboot
+immediately after promotion and before the fence commits. Attempt a listener
+start and updater run, and verify a session and entitlement restored from before
+their revocation cannot be served. Complete the fence and readiness under the
+hold, clear it as the operator, and verify ingress opens with both still
+revoked.
 
 ## Size
 
