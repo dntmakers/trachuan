@@ -166,9 +166,12 @@ content includes the flush-left standalone `4.1` target. Require the final
 copyright line and its separate decimal page number, ignoring blank lines
 between them. Start at `4.1`, skipping the page preamble. Read two blocks in
 order, for `4.1` and `4.2`. Each block starts with the bare target citation. The
-next nonblank line is a flush-left instruction starting with `Add`, containing
-`sentence` for `4.1` or `note` for `4.2`, then `end`, and ending in a colon.
-Compare instruction words without regard to case.
+next nonblank line is a flush-left instruction of exactly ten words: `Add` as
+word 1, `sentence` for `4.1` or `note` for `4.2` as word 4, `end` as word 7, and
+word 10 ending in a colon. Any other shape fails. Compare instruction words
+without regard to case. The other six words are publisher wording and stay out
+of code; the source fingerprint binds them, and the shape check guards the
+measurement.
 
 The next nonblank line in each block is the full insertion. Require one
 flush-left line ending in a period. Require the `NOTE` marker for `4.2` and keep
