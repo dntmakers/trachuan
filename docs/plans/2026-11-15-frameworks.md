@@ -48,4 +48,4 @@
 
 ## 15.7 Later
 - [ ] Licence terms review per publisher, the `free` list, then `SERVER_FRAMEWORKS=true` and the titles question of 15.6.
-- [ ] Admin portal behind Cloudflare Access.
+- [ ] Admin portal behind Cloudflare Access (design `docs/design/admin-portal.md`, Astra three rounds; owner approval of the Cloudflare exception pending).

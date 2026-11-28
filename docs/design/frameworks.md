@@ -231,10 +231,8 @@ from the manifest's integrity fields; a test holds this.
 
 ## Admin portal (later)
 
-A separate hostname behind Cloudflare Access. The server accepts admin routes
-only on that listener and only with a valid Access token (audience and team
-domain from configuration). First scope: entitlements list, allow, revoke,
-events.
+The [admin portal design](admin-portal.md) proposes the listener and Access
+boundary for entitlement listing, changes and audit history.
 
 ## Open
 

@@ -111,3 +111,7 @@ credentials; published image layers and release metadata are public.
   [backup encryption](../design/backups-encryption.md), with one restore ingress
   hold in [backups](../design/backups.md); rollout waits for the owner's
   approval of the key custody, overlap and deletion steps.
+- 2026-11-28: an admin hostname, `admin.trachuan.vn`, through a dedicated
+  Cloudflare Tunnel with Access, proposed as the one exception to DNS-only
+  ([admin portal](../design/admin-portal.md)); the apex and `www` stay DNS-only.
+  It waits for the owner's approval.
