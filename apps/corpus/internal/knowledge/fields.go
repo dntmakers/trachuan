@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"danny.vn/trachuan/internal/lawkey"
 	"gopkg.in/yaml.v3"
 )
 
@@ -153,16 +154,5 @@ func (p *parser) anchor(at string, n *yaml.Node) string {
 }
 
 func validAnchor(anchor string) bool {
-	for _, component := range strings.Split(anchor, "/") {
-		kind, token, found := strings.Cut(component, "-")
-		if !found || kind == "" || token == "" || strings.ToLower(component) != component || strings.ContainsFunc(component, unicode.IsSpace) {
-			return false
-		}
-		for _, c := range kind {
-			if c < 'a' || c > 'z' {
-				return false
-			}
-		}
-	}
-	return true
+	return lawkey.PlainAnchor(anchor)
 }
