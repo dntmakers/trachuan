@@ -56,6 +56,9 @@ func Parse(name string, data []byte, code, version string, expected *int) (*Resu
 }
 
 func ParsePages(name string, pages []string, code, version, sourceSHA string, expected *int) (*Result, error) {
+	if name == "iso27018-2019-pdf" {
+		return parseISO27018Pages(pages, sourceSHA, expected)
+	}
 	if name == "aicpa-tsc-2017-pdf" {
 		return parseAICPAPages(pages, sourceSHA, expected)
 	}
