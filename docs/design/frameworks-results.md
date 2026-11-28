@@ -27,8 +27,8 @@ same release get the same value. Every response carries it.
 
 The server key for `access_set_version` and for signing continuations is read
 from `SERVER_FRAMEWORKS_KEY_FILE` (at least 32 random bytes), required when
-`SERVER_FRAMEWORKS` is on and unused otherwise; a new key makes every earlier
-continuation invalid. Law continuations stay as they are.
+`SERVER_FRAMEWORKS` is `true` or `entitled` and unused otherwise; a new key
+makes every earlier continuation invalid. Law continuations stay as they are.
 
 ## Format
 
@@ -281,7 +281,9 @@ public caches. They use the objects above.
 must be a canonical handle of the route's kind, or the request is
 `invalid_handle` before any lookup or access decision. No route carries a second
 identity that could disagree with the handle. With `SERVER_FRAMEWORKS=false`
-every route answers 404 and the tools are absent from `tools/list`.
+every route answers 404 and the tools are absent from `tools/list`; with
+`entitled` the same holds for a caller who is not entitled
+([rollout](frameworks-access.md#rollout)).
 
 ## Invariant
 

@@ -196,8 +196,11 @@ path from upload to activation is [frameworks release](frameworks-release.md):
   the frameworks pointer, or an older image resolve law to the frameworks
   database. A separate table changes none of them.
 
-Until the first release is active the feature is off: `SERVER_FRAMEWORKS=false`
-hides the tools, routes and pages.
+`SERVER_FRAMEWORKS` takes three values: `false` hides the tools, routes and
+pages from everyone; `entitled` shows them only to a caller with a live
+entitlement ([rollout](frameworks-access.md#rollout)); `true` shows them to
+every signed-in account. The flag stays `false` until the first release is
+active, and `entitled` until the licence terms review.
 
 ## Downstream products
 

@@ -74,10 +74,15 @@ and its per-document gate was stored but not enforced when serving
 9. **Admin portal later, on its own boundary.** It will be a separate hostname
    behind Cloudflare Access, the server verifying the Access token; it adds no
    capability to the public site or to `/mcp`.
-10. **Licence terms are deferred, exposure is not.** During development every
-    held document may be ingested. Until the terms review lands, only the
-    owner's email holds an entitlement and no framework is `free` except those
-    whose publisher states public-domain or open terms in the registry.
+10. **Entitled accounts first, licence terms last.** Every held edition with a
+    parser enters releases, whatever its licence. Until the terms review lands,
+    the kind is served only to accounts that hold a live entitlement
+    (`SERVER_FRAMEWORKS=entitled`); every other account sees no framework tool,
+    route or page, as with the flag off, so neither licensed text nor a reduced
+    record reaches it. Only the owner's email holds an entitlement, and no
+    framework is `free` except those whose publisher states public-domain or
+    open terms in the registry. Reduced records for every account
+    (`SERVER_FRAMEWORKS=true`) wait for the review.
 
 ## Consequences
 
@@ -128,3 +133,8 @@ and its per-document gate was stored but not enforced when serving
   in the registry for every version; nothing finer is published.
 - 2026-11-15: reviewed OCR waivers versioned in the owner's private source
   repository beside the licensed files, never in this repository.
+- 2026-11-28: owner decision to finish the features before the licence review.
+  Every edition with a parser enters releases (CIS Controls v8.1 returns), the
+  kind is served only to entitled accounts until the review (decision 10), and
+  the coding agents on the MacBook may read licensed sources for parser
+  acceptance and title drafting (a new row in the access note's list of places).
