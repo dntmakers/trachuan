@@ -1,11 +1,11 @@
 resource "oci_monitoring_alarm" "corpus_release_failed" {
-  body                                          = "Every corpus release attempt for 30 minutes failed; production keeps serving the active corpus. Read release.log in OCI Logging."
+  body                                          = "Every corpus release attempt for 30 minutes failed; production keeps serving the active corpus. Read release.log for law or release-frameworks.log for frameworks in OCI Logging."
   compartment_id                                = var.compartment_ocid
   destinations                                  = [oci_ons_notification_topic.alarms.id]
   display_name                                  = "trachuan corpus release failed"
   evaluation_slack_duration                     = "PT3M"
   is_enabled                                    = true
-  is_notifications_per_metric_dimension_enabled = false
+  is_notifications_per_metric_dimension_enabled = true
   message_format                                = "ONS_OPTIMIZED"
   metric_compartment_id                         = var.compartment_ocid
   metric_compartment_id_in_subtree              = false
@@ -21,13 +21,13 @@ resource "oci_monitoring_alarm" "corpus_release_failed" {
 }
 
 resource "oci_monitoring_alarm" "corpus_release_waiting" {
-  body                                          = "A signed corpus release has waited over a day without activation; check the image's corpus schema support and release.log."
+  body                                          = "A signed corpus release has waited over a day without activation; check the image's corpus schema support and release.log for law or release-frameworks.log for frameworks."
   compartment_id                                = var.compartment_ocid
   destinations                                  = [oci_ons_notification_topic.alarms.id]
   display_name                                  = "trachuan corpus release waiting"
   evaluation_slack_duration                     = "PT3M"
   is_enabled                                    = true
-  is_notifications_per_metric_dimension_enabled = false
+  is_notifications_per_metric_dimension_enabled = true
   message_format                                = "ONS_OPTIMIZED"
   metric_compartment_id                         = var.compartment_ocid
   metric_compartment_id_in_subtree              = false

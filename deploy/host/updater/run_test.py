@@ -218,6 +218,62 @@ class RunTest(fixture.ActivationFixture, unittest.TestCase):
         self.assertEqual(self.paths.mode.read_text(), 'verify\n')
         self.assertEqual(self.paths.mode.stat().st_mode & 0o777, 0o644)
 
+    def test_bootstrap_cleanup_failure_preserves_state_mode_and_timer(self):
+        self.paths.mode.write_text('activate\n')
+        before = self.state.path.read_bytes()
+        self.registry.find.return_value = self.old.directory
+        self.paths.host.joinpath('images.env').write_bytes(pins(self.old.manifest))
+        for name in ('server.env', 'web.env'):
+            self.paths.host.joinpath(name).write_bytes(self.old.files[name])
+        self.calls.clear()
+        with mock.patch('updater.deploy_run.FRAMEWORKS.discard', side_effect=OSError('synthetic')):
+            self.assertEqual(self.app.bootstrap(self.old.hash), 1)
+        self.assertEqual(self.state.path.read_bytes(), before)
+        self.assertEqual(self.paths.mode.read_text(), 'activate\n')
+        self.assertFalse(any('systemctl' in args for args, _ in self.calls))
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['step']), ('failed', 'cleanup'))
+
+    def test_bootstrap_cleanup_failure_preserves_release_floor(self):
+        for state_case, expected in (('valid', 15), ('lower', 9), ('missing', 12), ('invalid', 12)):
+            with self.subTest(state=state_case):
+                if state_case in ('valid', 'lower'):
+                    self.state.data['release_floor'] = 15 if state_case == 'valid' else 9
+                    self.state.save()
+                elif state_case == 'missing':
+                    self.state.path.unlink()
+                else:
+                    self.state.path.write_bytes(b'invalid')
+                self.paths.result.write_bytes(canonical({'release_floor': 12}))
+                with mock.patch('updater.deploy_run.FRAMEWORKS.discard', side_effect=OSError('synthetic')):
+                    self.assertEqual(self.app.bootstrap(self.old.hash), 1)
+                result = json.loads(self.paths.result.read_bytes())
+                self.assertEqual((result['status'], result['step'], result['release_floor']),
+                                 ('failed', 'cleanup', expected))
+                metrics = METRICS.deploy(self.paths.result, datetime(2026, 1, 2, tzinfo=timezone.utc))
+                self.assertIn(('deploy_release_floor', expected), metrics)
+
+    def test_success_reports_enforced_floor_not_prior_receipt(self):
+        self.state.data['release_floor'] = 9
+        self.state.save()
+        self.paths.result.write_bytes(canonical({'release_floor': 12}))
+        self.assertEqual(self.app.run(), 0)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['release_floor']), ('verified', 9))
+        metrics = METRICS.deploy(self.paths.result, datetime(2026, 1, 2, tzinfo=timezone.utc))
+        self.assertIn(('deploy_release_floor', 9), metrics)
+
+    def test_failure_reports_enforced_floor_not_prior_receipt(self):
+        self.state.data['release_floor'] = 9
+        self.state.save()
+        self.paths.result.write_bytes(canonical({'release_floor': 12}))
+        self.images.side_effect = ValueError('synthetic failure')
+        self.assertEqual(self.app.run(), 1)
+        result = json.loads(self.paths.result.read_bytes())
+        self.assertEqual((result['status'], result['release_floor']), ('failed', 9))
+        metrics = METRICS.deploy(self.paths.result, datetime(2026, 1, 2, tzinfo=timezone.utc))
+        self.assertIn(('deploy_release_floor', 9), metrics)
+
     def rollback_artifact(self, current, target, sequence=1):
         directory = self.paths.state / 'rollback-fixture'
         directory.mkdir(exist_ok=True)

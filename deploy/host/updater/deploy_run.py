@@ -278,39 +278,49 @@ class Updater:
         try:
             with Lock(self.paths.lock), Lock(self.paths.backup_lock, create=False):
                 result = Result(self.paths.result, self.paths.log)
-                try:
-                    state_path = self.paths.state / 'state.json'
-                    previous = State(state_path) if state_path.exists() else None
-                    result.state = previous
-                    if release_floor is not None:
-                        positive(release_floor, 'release floor')
-                    floor = max(previous.data.get('release_floor', 0) if previous else 0,
-                                self.rules.get('release_floor', 0), release_floor or 0)
-                    if self.backup_pending(result):
-                        return 1
-                    with tempfile.TemporaryDirectory(prefix='bootstrap-', dir=self.paths.state) as directory:
-                        path = self.registry.find(hash_value, Path(directory))
-                        candidate = Candidate.read(path, self.rules, self.runner)
-                        if candidate.hash != hash_value:
-                            raise ValueError('bootstrap hash mismatch')
-                        check_floor(candidate.manifest['sequence'], floor)
-                        self.verifier.images(candidate.manifest)
-                        self.host.confirm(candidate)
-                        schema = self.host.schema()
-                        self.store.retain(candidate)
-                        atomic(self.paths.mode, b'verify\n', 0o644)
-                        state = State.bootstrap(self.paths.state / 'state.json', hash_value,
-                                        candidate.manifest['sequence'], schema,
-                                        candidate.manifest['host_bundle']['sha256'], release_floor=floor)
-                        result.state = state
-                        self.store.prune(state)
-                        self.runner(['systemctl', 'enable', '--now', 'trachuan-deploy.timer'])
-                        result.write('bootstrapped', 'complete', 'bootstrap verified; mode verify', hash_value, candidate.manifest)
-                        return 0
-                except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
-                    return self.failure(result, None, error)
+                if not self.cleanup(result):
+                    try:
+                        result.state = State(self.paths.state / 'state.json')
+                    except (OSError, ValueError):
+                        pass
+                    result.write('failed', 'cleanup', 'frameworks cleanup failed')
+                    return 1
+                return self.bootstrap_locked(hash_value, release_floor, result)
         except Busy:
             return 1
+
+    def bootstrap_locked(self, hash_value, release_floor, result):
+        try:
+            state_path = self.paths.state / 'state.json'
+            previous = State(state_path) if state_path.exists() else None
+            result.state = previous
+            if release_floor is not None:
+                positive(release_floor, 'release floor')
+            floor = max(previous.data.get('release_floor', 0) if previous else 0,
+                        self.rules.get('release_floor', 0), release_floor or 0)
+            if self.backup_pending(result):
+                return 1
+            with tempfile.TemporaryDirectory(prefix='bootstrap-', dir=self.paths.state) as directory:
+                path = self.registry.find(hash_value, Path(directory))
+                candidate = Candidate.read(path, self.rules, self.runner)
+                if candidate.hash != hash_value:
+                    raise ValueError('bootstrap hash mismatch')
+                check_floor(candidate.manifest['sequence'], floor)
+                self.verifier.images(candidate.manifest)
+                self.host.confirm(candidate)
+                schema = self.host.schema()
+                self.store.retain(candidate)
+                atomic(self.paths.mode, b'verify\n', 0o644)
+                state = State.bootstrap(self.paths.state / 'state.json', hash_value,
+                                candidate.manifest['sequence'], schema,
+                                candidate.manifest['host_bundle']['sha256'], release_floor=floor)
+                result.state = state
+                self.store.prune(state)
+                self.runner(['systemctl', 'enable', '--now', 'trachuan-deploy.timer'])
+                result.write('bootstrapped', 'complete', 'bootstrap verified; mode verify', hash_value, candidate.manifest)
+                return 0
+        except (OSError, ValueError, KeyError, TypeError, CommandError, InterruptedError, StopRequested) as error:
+            return self.failure(result, None, error)
 
     def status(self):
         state = State(self.paths.state / 'state.json')

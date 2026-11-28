@@ -83,13 +83,16 @@ class Result:
         except (OSError, ValueError):
             self.unreadable_previous = True
 
+    def floor(self):
+        return self.state.data.get('release_floor') if self.state else self.previous.get('release_floor')
+
     def write(self, status, step, message, digest=None, manifest=None):
         manifest = manifest or {}
         finished = self.clock()
         success = finished if status in ('ok', 'verified', 'bootstrapped', 'current') else self.previous.get('last_success_at')
         value = dict(status=status, manifest_hash=digest, release=manifest.get('release'),
                      sequence=manifest.get('sequence'), step=step, message=message,
-                     release_floor=self.state.data.get('release_floor') if self.state else None,
+                     release_floor=self.floor(),
                      started_at=self.started, finished_at=finished, last_success_at=success)
         self.publish(value)
 
@@ -109,8 +112,7 @@ class Result:
             raise ResultTooLarge('result too large')
 
     def overflow(self, value=None):
-        floor = self.state.data.get('release_floor') if self.state else self.previous.get('release_floor')
-        return overflow_receipt(self.started, self.clock(), self.previous, floor)
+        return overflow_receipt(self.started, self.clock(), self.previous, self.floor())
 
     def warn_previous(self):
         if self.unreadable_previous:

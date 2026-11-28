@@ -96,6 +96,26 @@ class FrameworksPhaseTest(fixture.ActivationFixture, unittest.TestCase):
             self.assertEqual(self.app().run(), 0)
         self.assertTrue(staging.exists())
 
+    def test_bootstrap_cleans_stale_staging_but_preserves_active_staging(self):
+        staging, law = self.staged()
+        app = self.app()
+        with self.paths.lock.open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.assertEqual(app.bootstrap(self.old.hash), 1)
+            self.assertTrue((staging / 'frameworks.dump').exists())
+        self.paths.backup_lock.with_name('active-job').touch()
+        self.assertEqual(app.bootstrap(self.old.hash), 1)
+        self.assertFalse(staging.exists())
+        self.assertTrue((law / 'corpus.dump').exists())
+
+    def test_bootstrap_cleanup_failure_is_logged(self):
+        app = self.app()
+        with mock.patch.object(app, 'bootstrap_locked', return_value=0), \
+                mock.patch.object(FRAMEWORKS, 'discard', side_effect=OSError('synthetic')):
+            self.assertEqual(app.bootstrap(self.old.hash), 1)
+        lines = [json.loads(line) for line in self.paths.log.read_text().splitlines()]
+        self.assertIn('frameworks cleanup failed', [line.get('message') for line in lines])
+
     def test_discard_never_follows_symlinks(self):
         releases = self.paths.root / 'srv/trachuan/data/releases'
         releases.mkdir(parents=True)
