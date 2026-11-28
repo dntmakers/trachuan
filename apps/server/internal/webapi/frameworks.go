@@ -53,5 +53,18 @@ func newFrameworkRoutes(cfg Config) http.Handler {
 			return operation(r.Context(), p.AccountID, raw, handle)
 		}))
 	}
-	return mcpapi.WithCacheControl("no-store", cfg.Sessions.Middleware(cfg.Sessions.CSRF(mux)))
+	handler := cfg.Sessions.CSRF(mux)
+	if cfg.Tools.FrameworkEntitled == nil {
+		handler = cfg.Sessions.Middleware(handler)
+	} else {
+		csrf := handler
+		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if _, ok := websession.FromContext(r.Context()); !ok {
+				apierror.Write(w, 404, "not_found")
+				return
+			}
+			csrf.ServeHTTP(w, r)
+		})
+	}
+	return mcpapi.WithCacheControl("no-store", handler)
 }

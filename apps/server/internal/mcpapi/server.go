@@ -48,25 +48,40 @@ type Reports interface {
 
 type Config struct {
 	Frameworks         bool
+	FrameworkEntitled  func(context.Context, int64) bool
 	FrameworkResolver  FrameworkResolver
 	FrameworkAccess    func(context.Context, int64, []string) (serve.Caller, error)
 	OmitCompactRelated bool
 	Resolver           Resolver
 	Limiter            Limiter
+	DiscoveryLimiter   Limiter
 	Logger             *slog.Logger
 	Clock              func() time.Time
 	Caches             *Caches
 	Reports            Reports
+	toolDefinitions    map[string]*mcp.Tool
+	collectTools       bool
 }
 
 func New(cfg Config) http.Handler {
 	if cfg.Clock == nil {
 		cfg.Clock = time.Now
 	}
+	if cfg.DiscoveryLimiter == nil {
+		cfg.DiscoveryLimiter = limits.New(cfg.Clock)
+	}
+	offCfg := cfg
+	offCfg.Frameworks = false
+	offCfg.collectTools = true
+	offCfg.toolDefinitions = make(map[string]*mcp.Tool)
+	registerTools(nil, offCfg)
 	s := mcp.NewServer(&mcp.Implementation{Name: "trachuan", Title: "Tra Chuẩn", Version: "1"}, &mcp.ServerOptions{
 		Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
 	})
-	registerTools(s, cfg)
+	registerCfg := cfg
+	registerCfg.Frameworks = true
+	registerTools(s, registerCfg)
+	s.AddReceivingMiddleware(frameworkMiddleware(cfg, offCfg.toolDefinitions))
 	transport := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, &mcp.StreamableHTTPOptions{
 		Stateless: true, JSONResponse: true, MaxRequestBodyBytes: 64 << 10, PropagateRequestCancellation: true, DisableLocalhostProtection: true,
 	})
@@ -78,9 +93,9 @@ type countryInput struct {
 }
 
 func registerTools(s *mcp.Server, cfg Config) {
-	register(s, cfg, "guide", "How to search, read and cite Vietnamese law.", func(_ context.Context, _ countryInput) (guideResult, error) {
+	register(s, cfg, "guide", "How to search, read and cite Vietnamese law.", func(ctx context.Context, _ countryInput) (guideResult, error) {
 		text := guideText
-		if cfg.Frameworks {
+		if cfg.Frameworks && frameworkVisible(ctx) {
 			text += "\n" + frameworkGuideText
 		}
 		return guideResult{Guide: text}, nil
@@ -110,8 +125,12 @@ func registerAnnotated[In, Out any](s *mcp.Server, cfg Config, name, description
 }
 
 func registerHandler(s *mcp.Server, cfg Config, name, description string, input, output *jsonschema.Schema, call func(context.Context, json.RawMessage) (*mcp.CallToolResult, error), annotations *mcp.ToolAnnotations) {
-	s.AddTool(&mcp.Tool{Name: name, Description: description, InputSchema: input, OutputSchema: output,
-		Annotations: annotations}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	tool := &mcp.Tool{Name: name, Description: description, InputSchema: input, OutputSchema: output, Annotations: annotations}
+	if cfg.collectTools {
+		cfg.toolDefinitions[name] = tool
+		return
+	}
+	s.AddTool(tool, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := cfg.Clock()
 		latencyStart := time.Now()
 		ctx = context.WithValue(ctx, requestInstantKey{}, start)
@@ -133,7 +152,12 @@ func registerHandler(s *mcp.Server, cfg Config, name, description string, input,
 		if name == "search" {
 			class = limits.Search
 		}
-		if allowed, retry := cfg.Limiter.Allow(principal.AccountID, class); !allowed {
+		state, admitted := ctx.Value(admissionKey{}).(admission)
+		allowed, retry := state.allowed, state.retry
+		if !admitted || state.method != "tools/call" {
+			allowed, retry = cfg.Limiter.Allow(principal.AccountID, class)
+		}
+		if !allowed {
 			seconds := max(int64(1), int64(math.Ceil(retry.Seconds())))
 			return fail("rate_limited", apierror.RetryMessage(int(seconds)))
 		}

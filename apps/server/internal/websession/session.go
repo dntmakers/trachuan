@@ -36,6 +36,7 @@ type Principal struct {
 	AccountID, SessionID int64
 	CSRFSecret           string
 	AuthEpoch            int32
+	cookieExpires        time.Time
 }
 
 type Store interface {

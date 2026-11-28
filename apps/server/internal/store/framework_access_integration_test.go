@@ -9,6 +9,22 @@ import (
 	"danny.vn/trachuan/apps/server/internal/store"
 )
 
+func TestFrameworkAccess_UnicodeSpaceAndDomainCase(t *testing.T) {
+	ctx, _, q := setup(t)
+	a, err := q.CreateAccount(ctx, store.CreateAccountParams{GoogleSub: "unicode-subject", Email: " Owner@EXAMPLE.test "})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := q.AllowFrameworkEntitlement(ctx, store.FrameworkAllowance{Email: "Owner@example.test", Scope: "fw-alpha", By: "operator"}); err != nil {
+		t.Fatal(err)
+	}
+	service := frameworkaccess.Service{Store: q, Frameworks: []string{"fw-alpha"}}
+	set, err := service.AccessSet(ctx, a.ID)
+	if err != nil || frameworkaccess.Decide("fw-alpha", "licensed", set) != frameworkaccess.Full {
+		t.Fatalf("unicode-trimmed account did not receive its entitlement: %v", err)
+	}
+}
+
 func TestFrameworkAccess_EmailLifecycle(t *testing.T) {
 	ctx, conn, q := setup(t)
 	service := frameworkaccess.Service{Store: q, Frameworks: []string{"fw-alpha", "fw-beta"}}

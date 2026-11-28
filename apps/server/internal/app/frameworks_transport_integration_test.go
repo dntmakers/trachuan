@@ -35,6 +35,15 @@ func (s *frameworkTransportAuth) GetCredential(context.Context, string) (store.G
 
 func (*frameworkTransportAuth) TouchPersonalToken(context.Context, string) error { return nil }
 
+func (s *frameworkTransportAuth) FrameworkAccessSnapshot(ctx context.Context, id int64) (store.FrameworkAccessSnapshot, error) {
+	account, err := s.GetAccount(ctx, id)
+	if err != nil {
+		return store.FrameworkAccessSnapshot{}, err
+	}
+	rows, err := s.ListLiveFrameworkEntitlementsByEmail(ctx, account.Email)
+	return store.FrameworkAccessSnapshot{Account: account, Entitlements: rows}, err
+}
+
 func (*frameworkTransportAuth) GetAccount(context.Context, int64) (store.Account, error) {
 	return store.Account{ID: 7, Email: "invented@example.test"}, nil
 }

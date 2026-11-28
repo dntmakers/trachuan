@@ -20,30 +20,56 @@ func FromContext(ctx context.Context) (Principal, bool) {
 	return p, ok
 }
 
+func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return context.WithValue(ctx, principalKey{}, p)
+}
+
+func (m *Manager) Authenticate(r *http.Request) (Principal, bool, error) {
+	return m.authenticate(r, true)
+}
+
+func (m *Manager) AuthenticateReadOnly(r *http.Request) (Principal, bool, error) {
+	return m.authenticate(r, false)
+}
+
+func (m *Manager) authenticate(r *http.Request, touch bool) (Principal, bool, error) {
+	raw, ok := sessionToken(r)
+	if !ok {
+		return Principal{}, false, errUnauthenticated
+	}
+	row, renew, err := m.lookupWithTouch(r.Context(), raw, touch)
+	if err != nil {
+		return Principal{}, false, err
+	}
+	p := Principal{AccountID: row.AccountID, SessionID: row.ID, CSRFSecret: row.CsrfSecret, AuthEpoch: row.SessionAuthEpoch, cookieExpires: minTime(row.ExpiresAt, row.CreatedAt.Add(absoluteLifetime))}
+	return p, renew, nil
+}
+
+func (m *Manager) Renew(w http.ResponseWriter, r *http.Request, p Principal) {
+	if raw, ok := sessionToken(r); ok {
+		setSessionCookie(w, raw, p.cookieExpires, m.now())
+	}
+}
+
+func WriteAuthenticationError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, errUnavailable) {
+		apierror.Write(w, 503, "unavailable")
+	} else if !sessionProbe(w, r) {
+		apierror.Write(w, 401, "unauthenticated")
+	}
+}
+
 func (m *Manager) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, ok := sessionToken(r)
-		if !ok {
-			if sessionProbe(w, r) {
-				return
-			}
-			apierror.Write(w, 401, "unauthenticated")
-			return
-		}
-		row, renew, err := m.lookup(r.Context(), raw)
+		p, renew, err := m.Authenticate(r)
 		if err != nil {
-			if errors.Is(err, errUnavailable) {
-				apierror.Write(w, 503, "unavailable")
-			} else if !sessionProbe(w, r) {
-				apierror.Write(w, 401, "unauthenticated")
-			}
+			WriteAuthenticationError(w, r, err)
 			return
 		}
 		if renew {
-			setSessionCookie(w, raw, minTime(row.ExpiresAt, row.CreatedAt.Add(absoluteLifetime)), m.now())
+			m.Renew(w, r, p)
 		}
-		p := Principal{AccountID: row.AccountID, SessionID: row.ID, CSRFSecret: row.CsrfSecret, AuthEpoch: row.SessionAuthEpoch}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, p)))
+		next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), p)))
 	})
 }
 
@@ -77,6 +103,10 @@ type cacheEntry struct {
 }
 
 func (m *Manager) lookup(ctx context.Context, raw string) (store.GetSessionRow, bool, error) {
+	return m.lookupWithTouch(ctx, raw, true)
+}
+
+func (m *Manager) lookupWithTouch(ctx context.Context, raw string, touch bool) (store.GetSessionRow, bool, error) {
 	hash := hashToken(raw)
 	started := m.now()
 	m.mu.Lock()
@@ -86,7 +116,9 @@ func (m *Manager) lookup(ctx context.Context, raw string) (store.GetSessionRow, 
 			m.mu.Unlock()
 			return entry.row, false, nil
 		}
-		delete(m.entries, hash)
+		if touch {
+			delete(m.entries, hash)
+		}
 	}
 	fence := &lookupFence{hash: hash, generation: m.generation, revoked: make(map[revocation]struct{})}
 	for rev := range m.revoking {
@@ -130,7 +162,7 @@ func (m *Manager) lookup(ctx context.Context, raw string) (store.GetSessionRow, 
 		return row, false, errUnauthenticated
 	}
 	renew := false
-	if m.now().Sub(row.LastSeenAt) >= time.Hour {
+	if touch && m.now().Sub(row.LastSeenAt) >= time.Hour {
 		count, touchErr := m.Store.TouchSession(ctx, hash)
 		if touchErr != nil || ctx.Err() != nil {
 			return row, false, fmt.Errorf("touch session: %w", errUnavailable)
@@ -174,7 +206,7 @@ func (m *Manager) lookup(ctx context.Context, raw string) (store.GetSessionRow, 
 			return row, false, errUnauthenticated
 		}
 	}
-	if until.After(now) {
+	if touch && until.After(now) {
 		if m.entries == nil {
 			m.entries = make(map[string]cacheEntry)
 		}
