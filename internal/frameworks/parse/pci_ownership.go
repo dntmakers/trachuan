@@ -8,9 +8,9 @@ import (
 )
 
 func pciStructural(role pciLabel) bool {
-	return role == pciOuterRequirements || role == pciOuterGuidance || role == pciSubRequirements || role == pciSubTesting || role == pciFooterLabel || role == pciCopyright || role == pciDate || role == pciPageNumber || role == pciRoot || role == pciMalformed
+	return role == pciPageEndLabel || role == pciOuterRequirements || role == pciOuterGuidance || role == pciSubRequirements || role == pciSubTesting || role == pciFooterLabel || role == pciCopyright || role == pciDate || role == pciPageNumber || role == pciRoot || role == pciMalformed
 }
-func pciClassifyTable(lines []pciLine, h pciHeader, table bool) error {
+func pciClassifyTable(lines []pciLine, h pciHeader, table bool, page int) error {
 	groups, roots := map[int]bool{}, map[int]bool{}
 	for _, line := range lines {
 		if line.role == pciRoot {
@@ -71,55 +71,8 @@ func pciClassifyTable(lines []pciLine, h pciHeader, table bool) error {
 				line.role = pciLineIgnore
 			}
 		}
-		if pciStructural(line.role) && line.role != pciRoot {
-			line.words = nil
-			continue
-		}
-		if line.role == pciLineIgnore {
-			line.words = nil
-			continue
-		}
-		full := line.role == pciRoot || line.role == pciLineHeadingPart || line.role == pciLineGroup || line.role == pciLineGroupPart
-		for wi, w := range line.words {
-			if line.role != pciRoot && line.role != pciLineHeadingPart && (w.box.ymin <= h.bottom || w.box.ymin >= h.footer) {
-				continue
-			}
-			if !full && (w.box.xmin < h.test-3 && w.box.xmax > h.test-3 || w.box.xmin < h.right && w.box.xmax > h.right) {
-				return fmt.Errorf("crossing table band")
-			}
-			if (line.role == pciRoot && wi < 2) || (line.role == pciLineGroup && wi < 1) || (line.role == pciLineRow && wi < 1) || (line.role == pciLineCaption && wi < 2) || (line.role == pciLineStandalone && wi == 0) {
-				w.emit = false
-			}
-			if w.emit && strings.TrimSpace(w.text) == "" {
-				continue
-			}
-			if !full && (w.box.xmin < h.left-5 || w.box.xmax > h.test-3) {
-				continue
-			}
-			if len(line.retained) == 0 || w.box.ymin < line.retainedTop {
-				line.retainedTop = w.box.ymin
-			}
-			line.retained = append(line.retained, w)
-		}
-		sort.SliceStable(line.retained, func(i, j int) bool {
-			return line.retained[i].box.xmin < line.retained[j].box.xmin
-		})
-		line.section = pciIsSection(line.retained)
-		if line.role == pciOther {
-			if pciHasContent(*line) {
-				line.role = pciLineBody
-			} else {
-				line.role = pciLineIgnore
-			}
-		}
-		line.words = nil
 	}
-	for _, line := range lines {
-		if line.role == pciOther {
-			return fmt.Errorf("undecided line role")
-		}
-	}
-	return nil
+	return pciPageEnd(lines, h, page, table)
 }
 func pciRejectCrossingOpeners(lines []pciLine, h pciHeader) error {
 	type opener struct {
@@ -152,6 +105,9 @@ func pciRejectCrossingOpeners(lines []pciLine, h pciHeader) error {
 		}
 	}
 	for _, line := range lines {
+		if pciStructural(line.role) || line.role == pciLineIgnore {
+			continue
+		}
 		key := pciOrderKey(line, -1)
 		if line.role == pciLineBody && len(line.retained) > 0 {
 			at := sort.Search(len(openers), func(i int) bool { return openers[i].key.y >= key.y-0.5 })

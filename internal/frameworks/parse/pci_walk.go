@@ -51,7 +51,13 @@ func walkPCI(pages []pdftext.Page, strict bool) ([]Node, error) {
 		if err != nil {
 			return nil, fmt.Errorf("page %d: %w", pageIndex+42, err)
 		}
-		if err = pciClassifyTable(lines, h, table); err != nil {
+		if strict {
+			table, err = pciPageKind(pageIndex+42, table)
+			if err != nil {
+				return nil, fmt.Errorf("page %d: %w", pageIndex+42, err)
+			}
+		}
+		if err = pciClassifyTable(lines, h, table, pageIndex+42); err != nil {
 			return nil, fmt.Errorf("page %d: %w", pageIndex+42, err)
 		}
 		pciOrderProjectedLines(lines)
