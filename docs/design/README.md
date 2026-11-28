@@ -81,6 +81,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [corpus release](corpus-release.md)                                                    | Upload, signed corpus manifest, host restore and activation                                                      |
 | [corpus activation](corpus-release-activation.md)                                      | What a dump may do on the host, activation steps, recovery and cleanup                                           |
 | [corpus signing](corpus-signing.md)                                                    | The signing workflow and the signed corpus manifest                                                              |
+| [signed release inputs](signed-release-inputs.md)                                      | MacBook input acquisition, offline verification and law restore                                                  |
 | [activation record](activation-record.md)                                              | What the host keeps about each activation; recovery and drops                                                    |
 | [repository move](repository-move.md)                                                  | Moving the repository to dntmakers: owner-neutral code, two accepted owners, the channel switch and cleanup      |
 | [corpus release changes](corpus-release-changes.md)                                    | The order in which schema versions and recipe changes ship                                                       |

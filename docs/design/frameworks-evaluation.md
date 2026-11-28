@@ -179,11 +179,13 @@ when an entry lowers a floor below the one before it with an empty
 
 The previous signed report is a `snapshot` input:
 `FRAMEWORKS_SOURCE_DIR/trachuan/previous-report.json`, the active frameworks
-release's `report.json`, placed by the coordinator. When it is present, paired
-non-regression runs and gates `quality_pass`; when it is absent the report
-records `previous: null` and the comparison as `not_applicable`, and the
-uploader refuses such a report while a frameworks release is active
-([build](frameworks-build.md#gaps-and-signing)).
+release's `report.json`, placed by the coordinator. The
+[predecessor binding](frameworks-downstream.md#build-signing-and-command) checks
+that these bytes belong to the signed release before evaluation uses them. When
+the verified report is present, paired non-regression runs and gates
+`quality_pass`; on bootstrap the report records `previous: null` and the
+comparison as `not_applicable`. The uploader refuses such a report while a
+frameworks release is active ([build](frameworks-build.md#gaps-and-signing)).
 
 Later releases:
 

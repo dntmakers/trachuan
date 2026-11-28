@@ -89,7 +89,13 @@ requested. No MacBook signing key exists.
 ```
 
 `sequence` is `github.run_number` of `corpus-release.yml`. `previous` is
-`previous_diff.previous.rel`. The OCI artifact type is
+`previous_diff.previous.rel`. Manifest readers require both `rel` and `previous`
+to begin with a valid Gregorian date in `YYYYMMDD` form, with a four-digit year
+from `0001` to `9999`. Either field may end there or take an underscore and a
+positive decimal integer with no leading zero. This preserves historical names
+already accepted by the host. New signing inputs keep their own naming checks.
+The four recipe objects must each be nonempty, and `recipes.dense.query_hash`
+must be exactly 64 lowercase hexadecimal digits. The OCI artifact type is
 `application/vnd.trachuan.corpus-release.v1`. Publication moves
 `<cc>-production` only above the current verified sequence. `extensions` comes
 from `release.json`, where `corpus release-row` records the build database's

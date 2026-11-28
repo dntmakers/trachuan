@@ -10,8 +10,10 @@ and what the validator reports.
 one holding only comments, means no entries. Unknown fields, anchors, aliases,
 merge keys and further documents are refused. Entries are in `id` order. The
 file is at most 8 MiB and 20,000 entries. A pull request changes at most 500
-entries, except a `rebind`, and carries the output of
-`corpus knowledge check <cc> <rel>` against the production release.
+entries, except a `rebind`. For law effects, relations and decisions, the pull
+request carries the output of `corpus knowledge check <cc> <rel>` against the
+production release. For `control_law_link`, use the
+[framework link review check](frameworks-links.md#reviewed-control-to-law-entries).
 
 With at least one entry, the build input hash gains the rules version
 `knowledge/1` and the SHA-256 of the file's bytes, read once per build, and the
@@ -108,9 +110,11 @@ author and refuses a provision that is ambiguous or has an ambiguous ancestor.
 
 `corpus knowledge check <cc> [<rel>]` always runs the **structural** checks; the
 CI test runs them over `sources/`. With `<rel>` it reads that release's database
-read-only and runs the **run** checks, as build does over the rows it is
-building. Both read the same columns, and `knowledge_stale` rows never feed
-them.
+read-only and runs the **run** checks for law entries, as build does over the
+rows it is building. Both read the same columns, and `knowledge_stale` rows
+never feed them. Law build, evidence, evaluation and the local database check
+validate the full file's structure and apply only the law kinds. The framework
+check and build own the run checks for `control_law_link`.
 
 Structural errors fail the check and the build: anything refused above, a `~k`
 component in any written anchor (ancestors included), two entries with one

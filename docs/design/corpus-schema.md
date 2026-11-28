@@ -1,4 +1,4 @@
-# Corpus schema version 8
+# Corpus schema version 9
 
 Proposed exact template contract for `internal/corpusdb/schema.sql`, embedded by
 `schema.go` in root module `danny.vn/trachuan`. The workshop keeps goose
@@ -12,7 +12,8 @@ their compatible reader. Version 4 adds the text source columns per
 adds node ordinals and counts per [taxonomy](taxonomy.md). Version 6 adds the
 source-withdrawn columns per [pinned documents](pinned-documents.md). Version 8
 adds `document_summary` per
-[serving public summaries](web-public-documents-serving.md).
+[serving public summaries](web-public-documents-serving.md). Version 9 adds the
+[release change projection](release-changes-serving.md).
 
 ## Conventions and identity
 
@@ -36,7 +37,7 @@ ancestry index, not the public extraction anchor. This avoids interpreting
 slashes or Vietnamese letters as ltree syntax. Taxonomy ltree labels are `n<id>`
 along its parent chain.
 
-`schema.go` exports `SchemaVersion = 8` and
+`schema.go` exports `SchemaVersion = 9` and
 `Apply(ctx context.Context, db DB, dimensions int) error`; DB exposes
 `Exec(context.Context,string,...any)`. Its return values are
 `(pgconn.CommandTag,error)`, matching pgx connections and transactions. The only
@@ -242,7 +243,7 @@ rules.
 ## Release row
 
 `release`: `singleton boolean PRIMARY KEY CHECK(singleton)`, `country text`
-CHECK country='vn', `rel text UNIQUE`, `schema_version integer CHECK(=8)`,
+CHECK country='vn', `rel text UNIQUE`, `schema_version integer CHECK(=9)`,
 `taxonomy_version text`, `dense_recipe jsonb`, `chunk_recipe jsonb`,
 `lexical_recipe jsonb`, `retrieval_recipe jsonb`, `lexical_stats jsonb`,
 `source_manifest_hash text`, `build_input_hash text`, `build_recipe_hash text`,

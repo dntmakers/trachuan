@@ -113,13 +113,24 @@ confirming those limits in [budgets](budgets.md).
 
 ## Build, signing and command
 
-1. During snapshot, freeze the predecessor that evaluation already compares
-   against. Verify the predecessor's signed frameworks manifest, report hash and
-   `identity.jsonl` digest and header. Record the exact predecessor identity and
-   SHA-256 in the snapshot inputs. Bootstrap uses no predecessor. If a
-   predecessor is named and a required file is absent or mismatched, stop the
-   build. A retry uses the frozen bytes. Upload still checks that the selected
-   predecessor of a new release is the production release.
+1. During snapshot, read the coordinator's staged
+   [previous report](frameworks-evaluation.md#floors) once. Validate its `rel`,
+   then use that value to select the signed pair in
+   `FRAMEWORKS_WORK_DIR/release-inputs/frameworks-<rel>/`, prepared with
+   `corpus release-input fetch frameworks <rel> --out <dir>`. The coordinator
+   copies the predecessor's checked `evaluate/identity.jsonl` to
+   `FRAMEWORKS_SOURCE_DIR/trachuan/previous-identity.jsonl`. If the local run is
+   gone, the coordinator can copy `report.json` and `identity.jsonl` from the
+   private frameworks release bucket using the existing upload profile. Verify
+   the pair for the report's `rel` with the
+   [shared verifier](signed-release-inputs.md#trust-and-verification), match the
+   report bytes to `report.sha256`, and require `downstream.identity_sha256` to
+   match the identity bytes. Check the identity schema and header `rel`. Freeze
+   all four checked files and record their hashes in the snapshot. Stop on any
+   missing or mismatched predecessor input. An identity file without a previous
+   report also fails. Bootstrap has neither staged file. Retries use the frozen
+   bytes. Upload still checks that a new release compared with the production
+   release.
 2. Build writes the identity and change list with the frozen inputs. Bind their
    SHA-256 and the predecessor binding in `build.json`. Evaluate independently
    projects the verified restored dump, regenerates the comparison, and checks
@@ -132,26 +143,25 @@ confirming those limits in [budgets](budgets.md).
    verified predecessor manifest. Signing adds
    `downstream: {version: 1, identity_sha256, changes_sha256}` to the closed
    frameworks manifest. Every digest is 64 lower-case hexadecimal digits.
-   Re-signing keeps these digests and the original predecessor. Extend the
-   compatible verifier and its tests before the first release signs. The law
-   manifest stays as specified in
-   [law signing](corpus-signing.md#corpus-manifest).
+   Re-signing keeps these digests and the original predecessor. Extend the host
+   and signing runner's Python verifiers and the shared Go verifier before the
+   first release signs.
 4. Run `corpus frameworks export <rel> --signed-release <dir> --out <dir>` on
-   the MacBook. The signed release directory supplies the exact frameworks
-   manifest and Sigstore bundle. The checked run directory supplies the two JSON
-   Lines files. Validate the signature against the existing trusted frameworks
-   workflow identity and issuer, the release and predecessor headers, schemas
-   and matching signed digests, before publishing.
-   [Sigstore verification](https://docs.sigstore.dev/cosign/verifying/verify/)
+   the MacBook. Use the
+   [prepared frameworks pair](signed-release-inputs.md#prepare-a-release-directory)
+   and the shared Go verifier to bind the exact requested `rel`. Require the
+   signed `downstream` block and carry the verifier's original manifest and
+   bundle bytes into the export. The checked run directory supplies the two JSON
+   Lines files. Validate the release and predecessor headers, schemas and signed
+   digests before publishing.
 
 `--out` must name a new directory. Write the five exact files to a staging
 sibling on the same filesystem, then sync and rename as one unit. Refuse
 symlinks, unsafe inputs and partial delivery. Honor the build's checked work
 paths for inputs. Allow only approved projection bytes and the signed release
 manifest with its signature into staging. On failure clean up staging and report
-the failed check without record values. Verification may use the existing
-signature verifier's trust material. Export reads no source files, corpus dump
-or database and publishes no network resource.
+the failed check without record values. Export reads no source files, corpus
+dump or database and publishes no network resource.
 
 | Bundle file                      | Contents                                                                                                                                                                                                                                       |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

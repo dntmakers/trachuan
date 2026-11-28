@@ -167,11 +167,29 @@ text. A quote present only in a child is invalid for the parent.
 [Law text structure](text-structure.md#what-is-recorded)
 
 The Git check and both build paths use the shared knowledge validator for
-structure. The review check and framework build additionally validate against
-both frozen inputs. For each named law country, verify the law manifest and its
-dump digest, size and restored release identity. Extract from that exact restore
-in one read-only snapshot. Freeze the knowledge file, the manifest's release and
-digest, and the following data for each named document and anchor:
+structure. Run the review check on the MacBook before merging a link change:
+
+```sh
+corpus frameworks check-links --law-release '<cc>/<rel>=<dir>'
+```
+
+Supply one `--law-release` for each country whose knowledge file has reviewed
+control-to-law entries. The [framework snapshot](frameworks-build.md#steps) owns
+selection and binding. Use the same registry, approved titles and parsed control
+records as a build, staged under `FRAMEWORKS_WORK_DIR`. Check entries with the
+same validator as `relate` using the
+[verified restore](signed-release-inputs.md#restore-a-law-input) for each
+selected law release. Read the knowledge files and verified law facts once.
+Write one JSON object to stdout with `law_releases` and `records` sorted by
+country and then entry id where applicable. Each release records `country`,
+`rel`, `sequence`, `manifest_sha256`, `dump_sha256` and `knowledge_sha256`.
+Records use the knowledge report shape and contain no quote, title or parser
+diagnostics. Exit nonzero for stale entries or validation errors. Remove scratch
+data. The report is review evidence, and the build validates its inputs again. A
+pull request carries the report for the changed links.
+
+Review and snapshot use the following data from the same law read transaction
+for each named document and anchor:
 
 - Document presence, `number_norm`, `text_source`, `text_complete`, the
   `baseline_served` gap and the facts needed for law reader eligibility.
