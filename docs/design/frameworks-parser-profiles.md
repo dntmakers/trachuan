@@ -113,32 +113,6 @@ a space. Ignore page edge blanks. When retained prose continues on the next
 page, start a new paragraph after `.`, `:` or `;` unless the next line is a list
 item.
 
-## AICPA criteria: `aicpa-tsc-2017-pdf`
-
-The 2022 points-of-focus revision is the source for registry version `2017`.
-Enter the criteria table, then stop when it ends, before glossary or appendices.
-Read `CC`, `A`, `C`, `PI`, or `P` with a numeric group and criterion (for
-example `CC1.1`) from the ID column; `P<N>.0` labels groups only. Each
-`criterion` is a root and holds its statement up to the first points-of-focus
-bullet. Each top-level bullet in that criterion's points-of-focus region becomes
-a `point-of-focus` child with
-`<criterion>-pof-<01-based sequence padded to 2 digits>`; keep bullet text and
-wrapped continuation, with the printed lead-in as the optional original title.
-Continue table rows over page breaks; ignore header repeats, nested bullets as
-new nodes, and unrelated bullets outside the table.
-
-## COBIT 2019: `cobit-2019-pdf`
-
-Use the objectives volume only. Recognize objective headers in the objective
-chapters, then delimit each objective's process component before reading left
-cells of its practice table. The `EDM`, `APO`, `BAI`, `DSS`, `MEA` prefixes are
-`domain` roots, emitted before their first child. `AAA99` is an `objective`
-child of its domain; `AAA99.99` is a `practice` child of the matching objective.
-Keep the objective's direct description/purpose fields and each practice's
-description cell. Ignore activity lists, metrics, capability levels,
-responsibility and information-flow tables, and other components. A practice
-reference outside its primary process table never opens a node.
-
 ## ISO/IEC 27001:2022: `iso27001-2022-pdf`
 
 Use the base PDF. Remove the first nonblank line when it ends with the edition
@@ -246,37 +220,8 @@ qualified by both `cloud` and `PII` on their own lines. Use the
 [ISO/IEC 27017 prose joining rules](#isoiec-270172015-iso27017-2015-pdf),
 recognizing lettered and em-dash list items and `NOTE` and `EXAMPLE` markers.
 
-## TCVN 11930:2017: `tcvn11930-2017-pdf`
+## Table and Vietnamese editions
 
-The registered PDF has a usable text layer. Parse the security-level requirement
-sections `5`–`9` and Annex A, not the scope, terms, contents or running headers.
-Flush-left headings take the printed number to four components in the main body,
-or `A.N`/`A.N.N` in Annex A. A heading with numbered children is a `clause`; a
-leaf is a `control`. Use the immediate dotted parent; `A.N` are roots. Preserve
-direct Vietnamese text and lists, without translation.
-
-**Approved by the primary (2026-11-22):** the registered file reuses `8.1.3.2`
-and `9.1.3.2` for distinct passages. For this exact source fingerprint only,
-coalesce each verified pair, retaining both passages in source order (include
-the second printed heading in `body`). The first heading supplies
-`title_original`. For `N` equal to `8` or `9`, require adjacent `N.1.3.2`
-headings between `N.1.3.1` and `N.1.4`. Missing, extra or moved occurrences, or
-any other duplicate, fail. Never invent a citation or silently drop either
-passage.
-
-## PCI DSS v4.0.1: `pci-dss-4-0-1-pdf`
-
-Read the normative requirement sections `1`–`12` and scoped `A1`–`A3`
-appendices. Use their actual section headers as `requirement` roots, not
-contents or summaries. On table pages, locate the band from the column headers,
-then use the first line of a block in the left cell to detect `N.N` through five
-numeric components, or their `A<N>` equivalents. All are `requirement`; parent
-is the immediate dotted prefix. Distinguish a repeated continuation header from
-a new block and append only its continuation text to the open control. Inline ID
-references, overview lists and examples outside the table never open controls.
-
-Keep the left-cell requirements, including the local objective and applicability
-text in that cell. Do not mix in testing procedures, right-column guidance or
-appendix worksheets. Group and root headings supply title and tree position, not
-a copy of their descendant rows. Reject a cell that crosses an unknown column
-boundary, a continuation without an open control, or a duplicate opener.
+The AICPA criteria, COBIT 2019, TCVN 11930:2017 and PCI DSS v4.0.1 profiles are
+in
+[parser profiles: table and Vietnamese editions](frameworks-parser-profiles-tables.md).
