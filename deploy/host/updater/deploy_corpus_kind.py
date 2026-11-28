@@ -7,6 +7,16 @@ from . import deploy_frameworks_verify as frameworks_verify
 from .deploy_frameworks_steps import Steps
 
 
+def safe_cause(error):
+    if error.detail in ('smoke container teardown failed', 'process did not exit',
+                        'smoke container teardown failed: process did not exit'):
+        return error.detail
+    found = re.match(r'[^:]*: exit -?[0-9]+', error.detail or '')
+    if not found:
+        return None
+    return found[0] + (': ' + error.safe if error.safe else '')
+
+
 class Law:
     name, key, label, sql = 'law', 'corpus', 'corpus', deploy_corpus_sql
     pointer_country = 'vn'
@@ -49,7 +59,7 @@ class Law:
         return self.sql.activate(row, database.projection(row), retire)
 
     def cause(self, error):
-        return error.detail
+        return safe_cause(error)
 
     def discard(self, releases):
         pass
@@ -97,13 +107,7 @@ class Frameworks:
         return self.sql.activate(row, retire)
 
     def cause(self, error):
-        if error.detail in ('smoke container teardown failed', 'process did not exit',
-                            'smoke container teardown failed: process did not exit'):
-            return error.detail
-        found = re.match(r'[^:]*: exit -?[0-9]+', error.detail or '')
-        if not found:
-            return None
-        return found[0] + (': ' + error.safe if error.safe else '')
+        return safe_cause(error)
 
     def discard(self, releases):
         if releases.is_symlink() or not releases.is_dir():
