@@ -4,6 +4,10 @@ The activation steps of [corpus release](corpus-release.md#host-activation) for
 the law corpus. The frameworks kind follows them with the differences in
 [frameworks restore](frameworks-release-restore.md).
 
+The steps below use the shared-owner role map. The proposed
+[database role contract](database-roles.md#restore-and-host-activation) changes
+creation, the advisory lock and cleanup after the maintenance cutover.
+
 ## Trust in the dump
 
 `pg_restore` runs the SQL stored in the archive as written, whatever the TOC

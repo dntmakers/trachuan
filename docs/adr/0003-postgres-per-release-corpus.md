@@ -13,11 +13,13 @@ pgvector HNSW, sparsevec BM25 and reciprocal rank fusion.
 PostgreSQL with pgvector in a container on the host. Each corpus release is its
 own database (`corpus_<cc>_<rel>`) activated by a pointer; accounts and tokens
 live in a separate auth database that is never reloaded. The server never writes
-corpus data; the pipeline never connects to the host. Release activation uses a
-dedicated `activator` role limited to creating, restoring and dropping corpus
-and frameworks databases; in `auth` it holds only the activation lock, and its
-catalog reads and drops run from database `postgres`. The updater reads and
-writes the activation tables in `auth` as `auth_owner`, the role that owns them.
+corpus data; the pipeline never connects to the host. The host creates and
+prepares empty release databases as `postgres` before handing ownership to
+`activator` for law or `frameworks_activator` for frameworks. Each restore role
+has `NOCREATEDB` and owns only its kind. In `auth`, `auth_owner` holds the
+activation advisory lock and owns the schema, migrations and release writes. The
+serving process connects as `auth_runtime` with explicit grants and no ownership
+([database roles](../design/database-roles.md)).
 
 ## Consequences
 
@@ -43,3 +45,9 @@ RDS (cost, less control).
   could plant a trigger or view that ran as `activator`, which owns every corpus
   database. The updater now uses `auth_owner` for them and keeps each
   operation's record on the host, so a table row cannot drive it.
+- 2026-11-28: separated law and frameworks restore ownership, moved the
+  activation lock to `auth_owner`, and introduced `auth_runtime` to protect
+  release pointers and entitlement history. The host verifies the rollback floor
+  in a completed release before the maintenance cutover. Rollout follows
+  [database roles](../design/database-roles.md); until it lands, `activator`
+  still restores both kinds.
