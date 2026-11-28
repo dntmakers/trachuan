@@ -39,6 +39,7 @@
 - [ ] A new release whenever a PDF parser or the OCR path lands.
 
 ## 15.6 Downstream contract (corpus and server; dev, dev2)
+- [x] Design: `docs/design/frameworks-links.md` (edge kinds, control-to-law links, schema v1 in place) and `docs/design/frameworks-downstream.md` (reduced export, change list, sc365 import), Sol draft, Astra three rounds (A-01, S-01 to S-08).
 - [ ] Reduced export command and its manifest; a test that no licensed field or body-derived value is in it.
 - [ ] Change list per release by identity (controls and edges added, removed, changed, superseded), written by build next to the report.
 - [ ] Links from controls to legal provisions as reviewed mapping edges with source and evidence (ADR 0017: the control named by identity, law text quoted). First targets, from sc365: TCVN 11930:2017 against Circular 09/2020/TT-NHNN and Decree 85/2016/NĐ-CP; then NIST SP 800-53 and CIS Controls against ISO/IEC 27001:2022 and PCI DSS 4.0.1 (control to control).

@@ -12,9 +12,8 @@ and release. Law stays in the notes it has today.
   (`pci-dss` `4.0.1`). An amendment is a version that amends another.
 - **Control**: the citation unit, a node in a version's tree with a citation
   (`A.5.1`, `8.3.1`, `AC-2(1)`).
-- **Mapping edge**: a stated relation between two controls of different
-  framework versions, with its source (publisher catalog, NIST OLIR, CIS
-  workbook, structural, reviewed by us).
+- **Mapping edge**: a stated relation with a source, defined in
+  [framework links](frameworks-links.md#kinds-and-identity).
 
 ## Sources
 
@@ -57,9 +56,9 @@ A release database `frameworks_<rel>` (schema version 1):
   `pdf_text`, `ocr`), completeness.
 - `control`: version, parent, ordinal, `citation`, `citation_norm`, kind,
   `title` (ours), `title_original`, `body`, status.
-- `control_mapping`: source and target by business key (framework, version,
-  citation), relation, mapping source, provenance; a target not yet ingested
-  stays unresolved and is counted.
+- `control_mapping`: typed endpoint keys, relation, mapping source and
+  resolution, with separate evidence and a frozen law basis. See
+  [framework links](frameworks-links.md#relate-and-schema-version-1).
 - `chunk`, embeddings and lexical postings, split by index (body, public).
 - `quality_gap`: key, class and blocking flag; the kinds are exactly the gap
   kind table in [build](frameworks-build.md#gaps-and-signing), enforced by the
@@ -118,10 +117,9 @@ reviewed before serving work starts. Its fixed rules:
   the reduced record.
 - **Handles.** `fw:<code>:<version>#<citation>`; law handles and framework
   handles never mix in one read.
-- **Outputs.** Control records, not law records: no law validity stamp, no
-  ancestor headings from text. Every nested object has a reduced form: a mapping
-  edge end is citation, version and our title; provenance is the mapping
-  source's name; an outline is citations and our titles.
+- **Outputs.** Control records omit law validity stamps and ancestor headings
+  from text. An outline has citations and our titles. See
+  [link serving](frameworks-links.md#serving) for typed edge ends and evidence.
 - **Diagnostics and counts.** For a version the caller may not read, gaps and
   counts come only from approved public fields; text-dependent gaps are withheld
   ([invariant](frameworks-access.md#the-invariant)). A gap detail never quotes
@@ -167,9 +165,11 @@ path from upload to activation is [frameworks release](frameworks-release.md):
   `version`, `corpus_kind: "frameworks"`, `repository`, `commit`, `rel`,
   `database` (`frameworks_<rel>`), `sequence`, `previous`, `dump` (object,
   SHA-256, size), `report` (SHA-256, `quality_pass`), `build_artifact_sha256`,
-  `schema_version`, `extensions`, `recipes` (parameters only) and the number of
-  framework versions and controls. It holds no text and no citations. The
-  integrity fields are the one body-derived class that is published
+  `schema_version`, `extensions`, `recipes` (parameters only), the number of
+  framework versions and controls, and the
+  [downstream digests](frameworks-downstream.md#build-signing-and-command). It
+  holds no text and no citations. The integrity fields are the one body-derived
+  class that is published
   ([access](frameworks-access.md#licensed-material-and-where-it-may-be));
   nothing else computed from body text is (vocabulary sizes, frequencies,
   lengths).
@@ -182,8 +182,8 @@ path from upload to activation is [frameworks release](frameworks-release.md):
   non-regression gates start with the second release.
 - **Compatibility.** `server release-check` reports supported schema versions
   per kind and refuses a kind the image does not serve. The first image that
-  serves the kind is deployed, then the release floor is raised to it, then the
-  first release is signed ([corpus release](corpus-release.md)).
+  supports the link schema and downstream manifest goes live before the floor
+  rises to it. See [rollout order](frameworks-release.md#order).
 - **Memory.** The host limit is measured with both corpora active before the
   flag is turned on ([host budgets](budgets-host.md)).
 - **Pointer.** The active frameworks database is a row of its own table,
@@ -204,9 +204,10 @@ active, and `entitled` until the licence terms review.
 
 ## Downstream products
 
-The owner's other products (sc365 first) build private knowledge on top of this
-corpus: mappings from an organization's assets to the requirements that apply.
-Those mappings stay downstream. What this corpus gives them:
+The owner's other products (sc365 first) build private mappings from an
+organization's assets to the requirements that apply. The
+[downstream contract](frameworks-downstream.md) defines the handover and import
+rules. This corpus gives them:
 
 - **Identity.** `(framework code, version, citation)` for a control and
   `(country, document key, anchor)` for a legal provision. A downstream mapping

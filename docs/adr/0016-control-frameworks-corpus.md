@@ -138,3 +138,7 @@ and its per-document gate was stored but not enforced when serving
   kind is served only to entitled accounts until the review (decision 10), and
   the coding agents on the MacBook may read licensed sources for parser
   acceptance and title drafting (a new row in the access note's list of places).
+- 2026-11-28: within-edition, cross-edition and control-to-law edges defined in
+  [framework links](../design/frameworks-links.md); the reduced identity export
+  and the change list per release are bound to the signed frameworks manifest
+  ([downstream](../design/frameworks-downstream.md)).

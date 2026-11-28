@@ -43,6 +43,8 @@ lock, AWS CLI settings, size receipts and no-overwrite rule:
 | `build.json`      | `build/build.json`, whose SHA-256 the report binds                       |
 | `evaluate.json`   | `evaluate/manifest.json`, the evaluate step manifest                     |
 | `report.json`     | `evaluate/report.json`                                                   |
+| `identity.jsonl`  | `evaluate/identity.jsonl`                                                |
+| `changes.jsonl`   | `evaluate/changes.jsonl`                                                 |
 | `release.json`    | `release/release.json`, written by `corpus frameworks release-row <rel>` |
 
 `corpus frameworks release-row <rel>` reads `frameworks_<rel>` read-only and
@@ -84,13 +86,14 @@ does not support ends in `waiting`. Signing a released `rel` again uses
 `report.sha256` from its signed manifest. A workflow of its own gives the kind
 its own certificate identity and its own `run_number` sequence. The job:
 
-1. HEADs and downloads the five objects into `$RUNNER_TEMP` with the law job's
+1. HEADs and downloads the seven objects into `$RUNNER_TEMP` with the law job's
    size bounds and range checks.
 2. Repeats the upload checks except the previous one, which here is weaker so
    that a retry and a rollback can be signed: `previous` is null, or names a
    frameworks release whose signed manifest (`frameworks-<rel>`) verifies and
    whose report SHA-256 equals the one named. The host decides whether the
-   release may become active (mode, below).
+   release may become active (mode, below). Upload and signing also verify the
+   [downstream files and predecessor](frameworks-downstream.md#build-signing-and-command).
 3. Writes the canonical manifest:
 
    ```json
@@ -108,13 +111,19 @@ its own certificate identity and its own `run_number` sequence. The job:
      "extensions": {"vector": "<version>", "ltree": "<version>"},
      "recipes": {"dense": {...}, "chunk": {...}, "lexical": {...},
                  "retrieval": {...}},
-     "counts": {"versions": 3, "controls": 1612}
+     "counts": {"versions": 3, "controls": 1612},
+     "downstream": {"version": 1, "identity_sha256": "<64 hex>",
+                    "changes_sha256": "<64 hex>"}
    }
    ```
 
    `previous` is the report's previous `rel` or null; `recipes` are the release
    row's recipe objects, unchanged; `counts` are the row's version and control
-   counts. The field set is closed.
+   counts. The field set is closed, including `downstream`. Both
+   `deploy/github/frameworks_manifest.py` and the host's
+   `deploy/host/updater/deploy_frameworks_verify.py` require these fields. Test
+   both against the same manifest fixture, including refusal when `downstream`
+   is missing or malformed.
 
 4. Signs it keyless with `cosign sign-blob --bundle` and pushes `manifest.json`
    and `manifest.sigstore.json` to `ghcr.io/dntmakers/trachuan-corpus-release`,
@@ -127,7 +136,8 @@ The certificate identity is
 `https://github.com/dntmakers/trachuan/.github/workflows/frameworks-release.yml@refs/heads/main`.
 Dispatching again for the same `rel`, with its report's hash from the signed
 manifest, signs a new sequence (a retry); dispatching for an older retained
-`rel` is a rollback, as for law.
+`rel` is a rollback, as for law. Both keep the original downstream digests and
+predecessor under the new signed sequence.
 
 ## Host
 
@@ -246,12 +256,19 @@ is unaffected, and once B has raised the floor that rollback is refused.
    already in force, 67, which is above A), and adds the key mount and the
    `server.env` lines with the flag off. A's updater installs it only once the
    secret exists; until then each run fails with `secret missing`.
-4. The first frameworks release is uploaded and signed; the host activates it.
-5. Host memory is measured with both corpora active: the runbook starts a
+4. Deploy the first image with the new schema and typed edge support in
+   `server frameworks-schema`, `server release-check --kind frameworks` and the
+   serving engine, plus the downstream fields in the host verifier. Have
+   release-check prove that the typed mapping queries work on restore. Ship the
+   matching OpenAPI and web readers. Raise the host release floor to that
+   image's sequence and verify it before the first frameworks upload or signing.
+   Build can run before the floor changes.
+5. Upload and sign the first frameworks release. The host activates it.
+6. Host memory is measured with both corpora active: the runbook starts a
    one-off server container from the serving image with the flag on, on loopback
    only and outside ingress, warms both kinds, records its resident memory
    against [host budgets](budgets-host.md) and stops it.
-6. The owner's entitlement is created and an image sets
+7. The owner's entitlement is created and an image sets
    `SERVER_FRAMEWORKS=entitled`; acceptance runs with an entitled and a
    non-entitled account, and the second sees what the flag off shows. `true`
    follows the licence terms review.

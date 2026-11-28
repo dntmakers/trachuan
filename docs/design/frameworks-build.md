@@ -11,15 +11,15 @@ material and stays in the places of
 
 ## Steps
 
-| Step       | Reads                    | Writes                                                                           |
-| ---------- | ------------------------ | -------------------------------------------------------------------------------- |
-| `snapshot` | inputs below             | a frozen copy of every input, hash-verified                                      |
-| `parse`    | snapshot                 | controls per version (JSON Lines)                                                |
-| `relate`   | snapshot, parse          | edges and evidence with dependency sets (JSON Lines)                             |
-| `chunk`    | parse                    | body chunks and public-field records (JSON Lines)                                |
-| `embed`    | chunk                    | vectors (float32, the law artifact format) and token counts                      |
-| `build`    | snapshot through `embed` | the `frameworks_<rel>` database, its `pg_dump`, gap rows, build manifest         |
-| `evaluate` | build                    | `report.json`: golden cases, the invariant suite, gap totals by kind and blocker |
+| Step       | Reads                     | Writes                                                                           |
+| ---------- | ------------------------- | -------------------------------------------------------------------------------- |
+| `snapshot` | inputs below              | a frozen copy of every input, hash-verified                                      |
+| `parse`    | snapshot                  | controls per version (JSON Lines)                                                |
+| `relate`   | snapshot, parse           | admitted edges and classified evidence (JSON Lines), reviewed link outcomes      |
+| `chunk`    | parse                     | body chunks and public-field records (JSON Lines)                                |
+| `embed`    | chunk                     | vectors (float32, the law artifact format) and token counts                      |
+| `build`    | snapshot through `embed`  | release database and dump, gaps, build manifest, downstream identity and changes |
+| `evaluate` | build, frozen predecessor | `report.json`, independently verified downstream files                           |
 
 **Inputs.** `snapshot` copies into the run, and hashes, everything later steps
 consume: the registry, the source files of the versions in the release (through
@@ -27,9 +27,12 @@ the hash-checking reader), our paraphrased titles, machine OCR evidence for
 scans, the reviewed waivers (`FRAMEWORKS_SOURCE_DIR/trachuan/ocr-waivers.yaml`,
 its hash in the snapshot manifest), the golden cases with their review file, the
 public floors (`sources/frameworks-floors.yaml`) and the private floors
-([evaluation](frameworks-evaluation.md)) and the gap kind table. No later step,
-and no resume, reads anything outside the snapshot, so a registry or title
-change during a run cannot reach it.
+([evaluation](frameworks-evaluation.md)) and the gap kind table. It also freezes
+the [admitted edge inputs](frameworks-links.md#public-edge-inputs),
+[reviewed law inputs](frameworks-links.md#reviewed-control-to-law-entries) and
+[downstream predecessor](frameworks-downstream.md#build-signing-and-command).
+Later steps and retries read only those frozen inputs and their derived
+artifacts.
 
 The versions in a release are the registry versions that name a parser. Our
 titles are one CSV, `FRAMEWORKS_SOURCE_DIR/trachuan/titles.csv` (`code`,
@@ -47,25 +50,17 @@ See [licensed parsers](frameworks-parsers.md) for selection, extraction and
 title rules, and [parser profiles](frameworks-parser-profiles.md) for edition
 boundaries and citation rules.
 
-**Relate** emits edges by business key with source and relation, and each
-evidence value with the set of licensed versions whose text it uses, computed
-from the snapshot's access classes. The set is not inferred from the evidence's
-words: it holds every licensed version at either end of the edge, which fails
-closed, so only evidence on an edge between free versions is public. A target
-named in a source file resolves through registry codes and aliases. Its version
-token, without a `v`, `Rev` or `Revision` prefix, names the registered version
-equal to it, else the registered version that is its major number (`Rev 5.2.0`
-names `r5`, `v8.0` names `v8`). An edge whose target version or either citation
-is not in a parsed catalog stays unresolved and is counted; this includes a
-target version the registry does not list, of a registered framework. Evidence
-is kept only when both ends of its edge are versions in the release; other
-evidence is not kept, because the release classifies no access for it, and
-counts as `mapping_dropped`. A target that names no registered framework, or an
-end that is not a valid business key (the schema's code, version and citation
-forms), is not an edge: it is counted as `mapping_dropped` for its source and
-version, so every stored edge end is a valid business key with a registry code.
-A link between two controls of one version is not a mapping edge
-([terms](frameworks.md#terms)): the step leaves it out, and it is not a gap.
+**Relate** derives the public key set, classifies evidence and writes all three
+edge kinds under [framework links](frameworks-links.md). Same-edition links use
+the exact edition. For cross-edition direct sources, a target resolves through
+registry codes and aliases. Its version token, without a `v`, `Rev` or
+`Revision` prefix, names the registered version equal to it, else the registered
+version that is its major number (`Rev 5.2.0` names `r5`, `v8.0` names `v8`). A
+valid named key with a missing catalog or citation stays unresolved. Count
+malformed public mapping keys and missing registry codes as `mapping_dropped`.
+Count only admitted public inputs and keep private evidence rejections out of
+public gaps. Reviewed law links use exact identities and record validation
+outcomes separately.
 
 **Chunk** applies the law split rule (size limits and cut points) to each
 control body as one unit. That rule is extracted from the law chunk package into
@@ -86,9 +81,9 @@ Record schemas, named in each manifest and versioned with its recipe:
 - `controls/1`: `code`, `version`, `citation`, `citation_norm`, `kind`, `parent`
   (citation or null), `ordinal`, `status`, `title` (ours), `title_original`,
   `body`, `notes[]`, `tables[]`, `supersedes`, `amends`.
-- `edges/1`: `from` and `to` as `{code, version, citation}`, `relation`,
-  `source`, `resolved`, and `evidence` with `requires[]` (version handles; empty
-  means public) when present.
+- `edges/2`: typed endpoints, admission basis, relation, source, resolution and
+  classified evidence, as in
+  [framework links](frameworks-links.md#relate-and-schema-version-1).
 - `chunks/1`: `index` (`body` or `public`), `document_key`, `ordinal`,
   `citation`, `chunk_index`, `context_prefix`, `content`.
 
@@ -133,8 +128,9 @@ MacBook, outside every sync folder: its outputs and a `manifest.json` with the
 step's recipe (name, version, parameters), the SHA-256 of each input (snapshot
 files or earlier manifests) and of each output. JSON Lines rows are serialized
 canonically in a total order per schema: `controls/1` by (code, version order,
-`citation_norm`), `edges/1` by (`from`, `to`, `relation`, `source`), `chunks/1`
-by (`document_key`, `ordinal`).
+`citation_norm`), `edges/2` by the
+[typed edge key](frameworks-links.md#kinds-and-identity), `chunks/1` by
+(`document_key`, `ordinal`).
 
 The `release` row inside the dump records the recipes and input hashes of
 `snapshot` through `embed`. The build manifest (dump SHA-256 and size, build
@@ -196,6 +192,7 @@ change.
 | ------------------------------------------------------------ | -------- | ------------------------------------------ |
 | `mapping_unresolved`                                         | `public` | no                                         |
 | `mapping_dropped`                                            | `public` | no                                         |
+| `knowledge_stale`                                            | `public` | no                                         |
 | `title_missing`                                              | `public` | yes for a `licensed` version, no otherwise |
 | `ocr_blocked`                                                | `text`   | yes                                        |
 | `ocr_flagged`                                                | `text`   | no                                         |
@@ -209,14 +206,14 @@ SHA-256, the recipe hashes of `snapshot` through `embed`, of `build` and of
 (`previous: {rel, report_sha256}`) with a `previous_diff` of every gating
 comparison. It carries `quality_pass`, true only when: the evaluated copy came
 from that dump; no blocking gap exists; the retrieval recipe status is
-`measured`; the invariant suite passed; the golden-case floors, once set, are
-met; and from the second release every gating comparison against the previous
-report passed. The uploader and signing workflow refuse a frameworks release
-unless `quality_pass` is true, the dump, build manifest and report hashes match
-the files, the report's release id and its `snapshot` through `embed` recipes
-equal the release row's, its `build` and `evaluate` recipes equal those in the
-build and evaluation manifests. The uploader also requires the previous report
-to be the active frameworks release's; the signing workflow requires a signed
-frameworks release or none, so retries and rollbacks can be signed, and the host
-decides activation ([release](frameworks-release.md)). They read no workshop
-state.
+`measured`; the invariant suite and downstream comparison passed; the
+golden-case floors, once set, are met; and from the second release every gating
+comparison against the previous report passed. The uploader and signing workflow
+refuse a frameworks release unless `quality_pass` is true, the dump, build
+manifest and report hashes match the files, the report's release id and its
+`snapshot` through `embed` recipes equal the release row's, its `build` and
+`evaluate` recipes equal those in the build and evaluation manifests. The
+uploader also requires the previous report to be the active frameworks
+release's; the signing workflow requires a signed frameworks release or none, so
+retries and rollbacks can be signed, and the host decides activation
+([release](frameworks-release.md)). They read no workshop state.
