@@ -28,6 +28,7 @@ const (
 	pciLineRow
 	pciLineCaption
 	pciLineStandalone
+	pciPageEndLabel
 	pciLineIgnore
 )
 

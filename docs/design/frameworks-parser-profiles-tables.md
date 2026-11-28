@@ -159,6 +159,14 @@ title in the heading block. Ignore overview text and lists on these pages. Skip
 other pages without a table header. Stop after the last A3 table, before back
 matter and worksheets.
 
+In this edition the table pages are physical 44–64, 66–77, 79–113, 115–122,
+124–137, 139–164, 166–177, 180–213, 215–239, 241–263, 265–293, 295–337, 340–345,
+347–349 and 352–372. Pages 42, 43, 65, 78, 114, 123, 138, 165, 178, 179, 214,
+240, 264, 294, 338, 339, 346, 350 and 351 carry only section introductions and
+overview text. Page kind comes from this map, and detection must agree with it
+on every page: a table page without a valid outer header, or another page with
+one, fails.
+
 The table's outer header pairs the combined requirements/testing and guidance
 labels on a baseline within 0.5 points. Their first words start at `x = 185–205`
 and `580–605`, at `y = 79–123`. This includes the lowered A2 header. Read table
@@ -199,8 +207,16 @@ whose only word is `(continued)` is dropped exactly twice in this edition, once
 on physical page 96 and once on page 98. Each page must lack a paired subheader,
 the row active at the top of the page must still be open with no opener before
 the marker, and left text continuing that row must follow it. A missing, extra
-or misplaced marker fails. Neither a repeated outer header nor a caption creates
-a node. Fail on unowned left text, unknown captions and duplicate openers.
+or misplaced marker fails. Physical pages 87, 89, 91, 95, 97, 101, 103, 204,
+262, 270, 275, 285, 288, 290, 292, 327, 356 and 367 end their table content with
+a page-end caption: the last left-band line above the footer, outside any
+heading block, is exactly four words from `(continued` to `page)` with distinct
+x positions; drop it. On page 275 its last word is split into two adjacent word
+boxes, `page` and `)`, 0.04 points apart, which count as the one last word there
+only. A listed page without that line, a tie in x among its words, or a line of
+that shape anywhere else fails. Neither a repeated outer header nor a caption
+creates a node. Fail on unowned left text, unknown captions and duplicate
+openers.
 
 In row bodies keep the text after the ID and the local objective and
 applicability sections when present. Start each section on its own line. Within
@@ -228,3 +244,4 @@ the left band for section labels is x 54–295.
 | Footer page number      | 2        | `Page` to a positive integer without leading zeros                                                              | x 600 or more, y 530 or more                        |
 | Objective section label | 3        | `Customized` to `Objective`                                                                                     | left band, y 79 to below 530; body words may follow |
 | Applicability label     | 2        | `Applicability` to `Notes`                                                                                      | left band, y 79 to below 530; body words may follow |
+| Page-end caption        | 4        | `(continued` to `page)`                                                                                         | left band, last line above the footer, listed pages |

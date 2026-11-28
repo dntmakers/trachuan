@@ -19,12 +19,12 @@ func TestPCI_CountsFlattenedWordsOnce(t *testing.T) {
 	}
 }
 
-func TestPCI_RequiresEditionInventory(t *testing.T) {
+func TestPCI_RejectsUnmappedFixture(t *testing.T) {
 	_, pages := pciFixture()
 	n := 3
 	_, err := parsePCIDSS(pages, pciSHA, &n)
-	if err == nil || !strings.Contains(err.Error(), "missing required region") {
-		t.Fatalf("expected missing required region, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "page kind mismatch") {
+		t.Fatalf("expected page kind mismatch, got %v", err)
 	}
 }
 

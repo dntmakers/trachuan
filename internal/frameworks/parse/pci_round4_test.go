@@ -29,7 +29,7 @@ func TestPCI_ReviewRound4(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = pciClassifyTable(lines, h, true); err != nil {
+		if err = pciClassifyTable(lines, h, true, 43); err != nil {
 			t.Fatal(err)
 		}
 		found := false
