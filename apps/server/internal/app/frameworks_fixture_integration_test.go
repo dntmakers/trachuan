@@ -156,7 +156,7 @@ func TestFrameworkFixture_ParseRecipeCompatibility(t *testing.T) {
 	for _, tc := range []struct {
 		version int
 		valid   bool
-	}{{2, true}, {1, true}, {3, false}} {
+	}{{1, true}, {2, true}, {3, true}, {4, false}} {
 		t.Run(fmt.Sprint(tc.version), func(t *testing.T) {
 			_, err := pool.Exec(ctx, `UPDATE release SET parse_recipe = jsonb_set(parse_recipe, '{version}', to_jsonb($1::int)) WHERE singleton`, tc.version)
 			require.NoError(t, err)

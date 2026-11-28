@@ -81,6 +81,14 @@ func RunWithOptions(ctx context.Context, rel string, out io.Writer, embedder Emb
 	return nil
 }
 
+func PublishedStepVersions() map[string]int {
+	versions := make(map[string]int, 5)
+	for _, name := range []string{"chunk", "snapshot", "parse", "relate", "embed"} {
+		versions[name] = stepRecipe(name).Version
+	}
+	return versions
+}
+
 func stepRecipe(step string) recipe {
 	params := map[string]any{}
 	version := 1
