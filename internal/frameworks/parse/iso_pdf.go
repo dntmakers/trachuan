@@ -7,8 +7,9 @@ import (
 )
 
 type isoLine struct {
-	raw, text  string
-	page, line int
+	raw, text                 string
+	page, line                int
+	blankBefore, firstContent bool
 }
 
 type isoLineAction uint8
@@ -17,11 +18,13 @@ const (
 	isoKeep isoLineAction = iota
 	isoDrop
 	isoKeepBreak
+	isoTitle
+	isoKeepLabel
 )
 
 type isoHeading struct {
 	citation, title, kind string
-	skip                  int
+	skip, titleColumn     int
 	table, direct         bool
 }
 type isoSection struct {
@@ -30,6 +33,7 @@ type isoSection struct {
 }
 type isoProfile struct {
 	header, footer string
+	headerSuffix   bool
 	lookahead      int
 	start          func(isoLine, []isoLine) bool
 	stop           func(isoLine, []isoLine) bool
@@ -39,6 +43,9 @@ type isoProfile struct {
 	tableEnd       string
 	attribute      func(isoLine) bool
 	bodyLine       func(isoLine) isoLineAction
+	classify       func(isoLine, []isoLine, isoHeading, bool) (isoLineAction, error)
+	joinRules      func(isoHeading) isoJoinRules
+	validateNode   func(Node) error
 }
 
 func isoFlush(line isoLine) bool {
@@ -51,41 +58,12 @@ type isoBody struct {
 	last  byte
 	lines int
 	table bool
-}
-
-func (b *isoBody) add(source isoLine, action isoLineAction) {
-	line := strings.Join(strings.Fields(source.text), " ")
-	row := action == isoKeepBreak
-	if line == "" {
-		return
-	}
-	marker := strings.HasPrefix(line, "—") || strings.HasPrefix(line, "•")
-	if i := strings.IndexByte(line, ')'); i > 0 && i <= 3 {
-		prefix := line[:i]
-		marker = marker || (len(prefix) == 1 && prefix[0] >= 'a' && prefix[0] <= 'z')
-		numeric := true
-		for _, c := range prefix {
-			if c < '0' || c > '9' {
-				numeric = false
-			}
-		}
-		marker = marker || numeric
-	}
-	if b.lines > 0 {
-		if row || b.table || marker || b.last == '.' || b.last == ':' || b.last == ';' {
-			b.text.WriteByte('\n')
-		} else {
-			b.text.WriteByte(' ')
-		}
-	}
-	b.text.WriteString(line)
-	b.last = line[len(line)-1]
-	b.table = row
-	b.lines++
+	label bool
+	page  int
 }
 
 func walkISO(pages []string, profile isoProfile) ([]Node, error) {
-	reader := isoReader{pages: pages, header: profile.header, footer: profile.footer}
+	reader := isoReader{pages: pages, header: profile.header, footer: profile.footer, headerSuffix: profile.headerSuffix}
 	var queue []isoLine
 	fill := func() {
 		for len(queue) < profile.lookahead+1 {
@@ -97,8 +75,10 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 		}
 	}
 	var nodes []Node
-	var body strings.Builder
+	var body, title strings.Builder
 	var text isoBody
+	var current isoHeading
+	var rules isoJoinRules
 	active := -1
 	root, rootCitation := -1, ""
 	citations := make(map[string]int)
@@ -110,18 +90,32 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 	section := -1
 	seen := make([]bool, len(profile.sections))
 	started, ended, table, direct := false, false, false, false
-	appendBody := func(line isoLine) error {
+	appendBody := func(line isoLine, next []isoLine) error {
 		action := isoKeep
 		if profile.bodyLine != nil {
 			action = profile.bodyLine(line)
 		}
+		if profile.classify != nil {
+			var err error
+			action, err = profile.classify(line, next, current, false)
+			if err != nil {
+				return err
+			}
+		}
 		if action == isoDrop {
 			return nil
 		}
-		if action != isoKeep && action != isoKeepBreak {
+		if action == isoTitle {
+			if title.Len() > 0 {
+				title.WriteByte(' ')
+			}
+			title.WriteString(strings.Join(strings.Fields(line.text), " "))
+			return nil
+		}
+		if action != isoKeep && action != isoKeepBreak && action != isoKeepLabel {
 			return fmt.Errorf("invalid body line action")
 		}
-		text.add(line, action)
+		text.addJoined(line, action, rules)
 		return nil
 	}
 	flushSection := func() {
@@ -169,7 +163,14 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 			}
 		}
 		nodes[active].Body = body.String()
+		nodes[active].PublisherTitle = title.String()
+		if profile.validateNode != nil {
+			if err := profile.validateNode(nodes[active]); err != nil {
+				return err
+			}
+		}
 		body = strings.Builder{}
+		title = strings.Builder{}
 		section = -1
 		seen = make([]bool, len(profile.sections))
 		return nil
@@ -201,12 +202,27 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 			if err := closeNode(); err != nil {
 				return nil, err
 			}
+			if profile.classify != nil {
+				action, err := profile.classify(line, next, heading, true)
+				if err != nil {
+					return nil, err
+				}
+				if action != isoKeep {
+					return nil, fmt.Errorf("invalid heading line action")
+				}
+			}
 			parent, err := profile.parent(heading, root, rootCitation, lookup)
 			if err != nil {
 				return nil, err
 			}
 			nodes = append(nodes, Node{Citation: heading.citation, Kind: heading.kind, Parent: parent, Ordinal: len(nodes), PublisherTitle: heading.title, Status: "active"})
 			active = len(nodes) - 1
+			current = heading
+			rules = isoDefaultJoinRules()
+			if profile.joinRules != nil {
+				rules = profile.joinRules(heading)
+			}
+			title.WriteString(heading.title)
 			citations[norm] = active
 			if parent == -1 {
 				root, rootCitation = active, heading.citation
@@ -242,7 +258,7 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 					}
 				}
 			} else if direct {
-				if err := appendBody(line); err != nil {
+				if err := appendBody(line, next); err != nil {
 					return nil, err
 				}
 			} else {
@@ -265,7 +281,7 @@ func walkISO(pages []string, profile isoProfile) ([]Node, error) {
 					flushSection()
 					section = sectionIndex
 				} else if section >= 0 {
-					if err := appendBody(line); err != nil {
+					if err := appendBody(line, next); err != nil {
 						return nil, err
 					}
 				}
