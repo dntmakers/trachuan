@@ -171,6 +171,15 @@ func (p *parser) entry(file *File, rules *structure, position int, node *yaml.No
 			rules.claim(at, c)
 			file.Claims = append(file.Claims, c)
 		}
+	case "control_law_link":
+		m := p.fields(at, node, "id", "kind", "target", "claim", "evidence", "depends", "reviewed")
+		p.text(at+".id", m["id"])
+		link := p.controlLaw(at, m)
+		link.ID, link.Position, link.Reviewed = id, position, reviewed(m)
+		if len(p.problems) == before {
+			rules.controlLaw(at, link)
+			file.ControlLawLinks = append(file.ControlLawLinks, link)
+		}
 	default:
 		p.add("%s: unknown kind %q", at, kind)
 	}

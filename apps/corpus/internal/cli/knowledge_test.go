@@ -48,6 +48,35 @@ func TestKnowledgeCheck_Structural(t *testing.T) {
 	}
 }
 
+const cliControlLaw = `- id: law-link
+  kind: control_law_link
+  target: {key: "vn:vbpl:1", anchor: "dieu-1"}
+  claim: {control: {code: nist, version: "1", citation: AC-1}, relation_kind: related}
+  evidence: {quote: "exact law provision text"}
+  depends:
+    contract: 1
+    target: {number_norm: "1", text_source: source_tree, text_sha256: "sha256:1111111111111111111111111111111111111111111111111111111111111111", heading_sha256: "sha256:2222222222222222222222222222222222222222222222222222222222222222", ancestors: []}
+    target_own_sha256: "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+    control_sha256: "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  reviewed: {date: "2099-11-18", by: owner, method: human}
+`
+
+func TestKnowledgeCheck_ListsControlLawLinks(t *testing.T) {
+	knowledgeDir(t, cliControlLaw)
+	code, out, errout := execKnowledge(t, "check", "vn")
+	if code != 0 || errout != "" || !strings.Contains(out, "1 control-law links") {
+		t.Fatalf("code=%d out=%q err=%q", code, out, errout)
+	}
+}
+
+func TestKnowledgeCheck_ReleaseRefusesControlLawLinks(t *testing.T) {
+	knowledgeDir(t, cliControlLaw)
+	code, _, errout := execKnowledge(t, "check", "vn", "20990101")
+	if code != 1 || !strings.Contains(errout, "control_law_link entries cannot be validated against a law release yet") {
+		t.Fatalf("code=%d err=%q", code, errout)
+	}
+}
+
 func TestKnowledgeCheck_ReportsEveryProblem(t *testing.T) {
 	knowledgeDir(t, "- { id: x }\n- { id: y }\n")
 	code, _, errout := execKnowledge(t, "check", "vn")

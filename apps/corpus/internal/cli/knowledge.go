@@ -50,9 +50,17 @@ func knowledgeCheck(ctx context.Context, cc, rel string, stdout, stderr io.Write
 		printKnowledgeError(stderr, err)
 		return 1
 	}
-	_, _ = fmt.Fprintf(stdout, "validated %d entries: %d decisions, %d effects and relations\n", file.Len(), len(file.Decisions), len(file.Claims))
+	_, _ = fmt.Fprintf(stdout, "validated %d entries: %d decisions, %d effects and relations", file.Len(), len(file.Decisions), len(file.Claims))
+	if len(file.ControlLawLinks) > 0 {
+		_, _ = fmt.Fprintf(stdout, ", %d control-law links", len(file.ControlLawLinks))
+	}
+	_, _ = fmt.Fprintln(stdout)
 	if rel == "" {
 		return 0
+	}
+	if err = file.ValidateForRelease(); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
 	}
 	db, err := openKnowledgeRelease(ctx, database)
 	if err != nil {

@@ -112,7 +112,7 @@ func verifyBuildArtifact(store artifact.Store, art artifact.Result, run stage.Ru
 	if err = read("inputs.json", &inventory); err != nil {
 		return record, "", err
 	}
-	knowledgeHash, err := knowledgeArtifactHash(dir)
+	knowledgeHash, err := knowledgeArtifactHash(run.Country, dir)
 	if err != nil {
 		return record, "", err
 	}
