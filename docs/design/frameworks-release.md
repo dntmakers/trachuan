@@ -207,9 +207,9 @@ The owner generates it locally, as for `account_keys`, and never prints it:
 `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`. The host mounts it at
 `/run/secrets/server_frameworks_key` (owner `65532`, mode `0400`), and
 `server.env` sets `SERVER_FRAMEWORKS_KEY_FILE` to that path and
-`SERVER_FRAMEWORKS=false`. The server reads the key only with the flag on.
-Rotating it invalidates frameworks cursors and access set versions; clients
-search again.
+`SERVER_FRAMEWORKS=false`. The server reads the key only when the flag is `true`
+or `entitled`. Rotating it invalidates frameworks cursors and access set
+versions; clients search again.
 
 A Podman secret exists only after an updater that lists it has reconciled, and a
 container gets its mounts when it is created, so the first image to fetch the
@@ -251,9 +251,10 @@ is unaffected, and once B has raised the floor that rollback is refused.
    one-off server container from the serving image with the flag on, on loopback
    only and outside ingress, warms both kinds, records its resident memory
    against [host budgets](budgets-host.md) and stops it.
-6. The owner's entitlement is created and, on the owner's decision, an image
-   turns the flag on; acceptance runs with an entitled and a non-entitled
-   account.
+6. The owner's entitlement is created and an image sets
+   `SERVER_FRAMEWORKS=entitled`; acceptance runs with an entitled and a
+   non-entitled account, and the second sees what the flag off shows. `true`
+   follows the licence terms review.
 
 ## Proofs
 

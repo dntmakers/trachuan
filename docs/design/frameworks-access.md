@@ -57,6 +57,21 @@ cursor continues; no other path builds a control record. A missing class, an
 unknown framework or a store error is reduced; a store error is also reported as
 unavailable.
 
+## Rollout
+
+Until the licence terms review
+([ADR 0016](../adr/0016-control-frameworks-corpus.md) decision 10) the server
+runs with `SERVER_FRAMEWORKS=entitled`. A caller is **entitled** when the access
+set function returns a non-empty set without error. For a caller who is not,
+every framework surface behaves exactly as with the flag off: the framework
+tools are absent from `tools/list` and from `guide`, a call to one and
+`corpus: "frameworks"` on a shared tool fail as they do with the flag off, and
+every `/api/v1/frameworks` route answers 404; the website learns this from the
+API, as it does today. A store error counts as not entitled and is never cached.
+The check runs on every request, after authentication and before any framework
+cache or cursor, in the function that computes the access set; no other path
+decides it. An entitled caller is served as with `true`.
+
 ## Reduced record
 
 A reduced control carries: framework code and version, citation, kind, tree
@@ -104,18 +119,19 @@ Licensed material is a source file of a `licensed` version and everything
 derived from its text: extracted and OCR text, check results, reviewer readings,
 chunks, embeddings, indexes and dumps. It may exist only in:
 
-| Place                                                                                                                                         | Why                                                                              |
-| --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `FRAMEWORKS_SOURCE_DIR` and `FRAMEWORKS_WORK_DIR` on a local disk of the MacBook, never under a third-party sync folder                       | sources and run artifacts ([build](frameworks-build.md))                         |
-| The MacBook's PostgreSQL instance on its internal disk, holding `frameworks_<rel>` and `frameworks_<rel>_eval` (tables, WAL, temporary files) | the release while it is built and evaluated                                      |
-| Memory of the build command, its parsers, the evaluator and the document embedder on the MacBook                                              | during a run; temporary files go under `FRAMEWORKS_WORK_DIR`, core dumps are off |
-| The private releases bucket `trachuan-frameworks-releases` ([release](frameworks-release.md#bucket-and-keys))                                 | the dump                                                                         |
-| The signing runner, for the length of one job                                                                                                 | hash check; nothing persisted                                                    |
-| The host's release database and its backups ([deployment](deployment.md#backups))                                                             | serving                                                                          |
-| Host staging `/srv/trachuan/data/releases/<kind>-<rel>/`                                                                                      | the dump during activation; owner-only, deleted when activation ends             |
-| The server process's memory                                                                                                                   | indexes and partitioned caches; never written to disk                            |
-| The OCR and cross-check providers, for scans only                                                                                             | see [scans](frameworks.md#scans)                                                 |
-| The owner's own backups of the MacBook                                                                                                        | internal use of the owner's licensed files                                       |
+| Place                                                                                                                                         | Why                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `FRAMEWORKS_SOURCE_DIR` and `FRAMEWORKS_WORK_DIR` on a local disk of the MacBook, never under a third-party sync folder                       | sources and run artifacts ([build](frameworks-build.md))                          |
+| The MacBook's PostgreSQL instance on its internal disk, holding `frameworks_<rel>` and `frameworks_<rel>_eval` (tables, WAL, temporary files) | the release while it is built and evaluated                                       |
+| Memory of the build command, its parsers, the evaluator and the document embedder on the MacBook                                              | during a run; temporary files go under `FRAMEWORKS_WORK_DIR`, core dumps are off  |
+| The private releases bucket `trachuan-frameworks-releases` ([release](frameworks-release.md#bucket-and-keys))                                 | the dump                                                                          |
+| The signing runner, for the length of one job                                                                                                 | hash check; nothing persisted                                                     |
+| The host's release database and its backups ([deployment](deployment.md#backups))                                                             | serving                                                                           |
+| Host staging `/srv/trachuan/data/releases/<kind>-<rel>/`                                                                                      | the dump during activation; owner-only, deleted when activation ends              |
+| The server process's memory                                                                                                                   | indexes and partitioned caches; never written to disk                             |
+| The OCR and cross-check providers, for scans only                                                                                             | see [scans](frameworks.md#scans)                                                  |
+| The owner's own backups of the MacBook                                                                                                        | internal use of the owner's licensed files                                        |
+| The model providers of the coding agents run on the MacBook (Anthropic, OpenAI), until the licence terms review                               | parser acceptance and title drafting; what an agent writes follows the other rows |
 
 Backups are encrypted at rest by Object Storage with Oracle-managed keys, and
 anyone who can read the backup bucket can read them, so licensed rows carry the
