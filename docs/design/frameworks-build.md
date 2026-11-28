@@ -34,6 +34,24 @@ the [admitted edge inputs](frameworks-links.md#public-edge-inputs),
 Later steps and retries read only those frozen inputs and their derived
 artifacts.
 
+Add one `--law-release '<cc>/<rel>=<dir>'` to `corpus frameworks build <rel>`
+for each country whose `sources/<cc>-knowledge.yaml` has a `control_law_link`.
+Select a concrete signed law release for each country. Initially only `vn` is
+supported. Refuse a missing or extra selection, duplicate country, unsupported
+country or release, or mismatch between the selection and the verified input. An
+empty set requires no signed law input. Use the same prepared directories as
+[review](frameworks-links.md#reviewed-control-to-law-entries).
+
+Apply the
+[signed input verifier and restore](signed-release-inputs.md#restore-a-law-input)
+under the run lock. For each country, the snapshot freezes and hashes the exact
+knowledge file, both buffers returned by the verifier, and the projection
+extracted from the verified restore. Record `country`, `rel`, `sequence`,
+`manifest_sha256`, `dump_sha256`, `dump_size` and `schema_version` in the
+snapshot manifest, ordered by country. Do not retain the dump or scratch
+database in the snapshot. `relate` derives its law basis and evidence only from
+the frozen snapshot.
+
 The versions in a release are the registry versions that name a parser. Our
 titles are one CSV, `FRAMEWORKS_SOURCE_DIR/trachuan/titles.csv` (`code`,
 `version`, `citation`, `title`), outside Git like the waivers. A control of a
@@ -176,6 +194,15 @@ run with the step named; the operator removes that directory and every later
 one, or starts a new `<rel>`. A failed step, including disk full, leaves only
 its temporary directory, removed on the next run, so the rerun starts at that
 step.
+
+Once `snapshot` exists, verify each frozen law manifest and bundle through the
+shared verifier and check the hashes of the frozen inputs. A retry may omit
+`--law-release` and use those inputs. If supplied, the full set of selections
+and the verified manifest and bundle bytes must match the frozen inputs. A
+re-signing under the same law `rel` changes the manifest digest. A retry uses
+the frozen projection without restoring or fetching again. To select a different
+binding, start a new frameworks `rel` or rebuild from `snapshot` under the
+existing step removal rule.
 
 A run reads each manifest (the snapshot's and each step's) once and keeps it for
 the whole run. Every file a step consumes is checked against that manifest and
