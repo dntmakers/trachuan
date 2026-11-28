@@ -40,8 +40,8 @@ type Extractor struct {
 	platform func([]string) (platformIdentity, error)
 }
 
-func NewExtractor(limiter *Limiter) (*Extractor, error) {
-	if runtime.GOOS != "darwin" || limiter == nil || cap(limiter.slots) != 2 {
+func NewExtractor(ctx context.Context, limiter *Limiter) (*Extractor, error) {
+	if ctx.Err() != nil || runtime.GOOS != "darwin" || limiter == nil || cap(limiter.slots) != 2 {
 		return nil, ErrConfiguration
 	}
 	path, err := exec.LookPath("pdftotext")
@@ -52,19 +52,25 @@ func NewExtractor(limiter *Limiter) (*Extractor, error) {
 	if err != nil || !filepath.IsAbs(path) {
 		return nil, ErrConfiguration
 	}
-	set, err := resolveRuntime(path)
+	set, err := resolveRuntime(ctx, path)
 	if err != nil {
 		return nil, ErrConfiguration
 	}
 	e := &Extractor{path: path, runtime: set, limiter: limiter, platform: readPlatformIdentity}
-	if err := e.checkVersion(); err != nil {
+	if err := e.checkVersion(ctx); err != nil {
 		return nil, err
 	}
 	return e, nil
 }
 
-func (e *Extractor) checkVersion() error {
-	_, stderr, err := e.execute(context.Background(), []string{"-v"}, nil, 10*time.Second, 64*1024, 64*1024)
+func (e *Extractor) checkVersion(ctx context.Context) error {
+	return checkVersionWith(ctx, e.execute)
+}
+
+func checkVersionWith(ctx context.Context, execute func(context.Context, []string, []byte, time.Duration, int, int) ([]byte, []byte, error)) error {
+	ctx, cancel := context.WithTimeout(ctx, callTimeout)
+	defer cancel()
+	_, stderr, err := execute(ctx, []string{"-v"}, nil, callTimeout, 64*1024, 64*1024)
 	if err != nil || !strings.HasPrefix(string(stderr), "pdftotext version "+Version+"\n") {
 		return ErrConfiguration
 	}
@@ -151,7 +157,7 @@ func (e *Extractor) execute(ctx context.Context, args []string, input []byte, li
 	if ctx.Err() != nil {
 		return nil, nil, ErrFile
 	}
-	p, err := e.start(args, input, stdoutLimit, stderrLimit)
+	p, err := e.start(ctx, args, input, stdoutLimit, stderrLimit)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -175,8 +181,14 @@ type process struct {
 	writerDone chan processResult
 }
 
-func (e *Extractor) start(args []string, input []byte, stdoutLimit, stderrLimit int) (*process, error) {
-	if e.runtime.snapshot == nil || checkRuntimeSnapshot(e.runtime, e.runtime.snapshot) != nil {
+func (e *Extractor) start(ctx context.Context, args []string, input []byte, stdoutLimit, stderrLimit int) (*process, error) {
+	if ctx.Err() != nil {
+		return nil, ErrFile
+	}
+	if e.runtime.snapshot == nil || checkRuntimeSnapshotContext(ctx, e.runtime, e.runtime.snapshot) != nil {
+		if ctx.Err() != nil {
+			return nil, ErrFile
+		}
 		return nil, ErrConfiguration
 	}
 	argv := append([]string{"-p", sandboxProfile(e.path, e.runtime), e.path}, args...)
@@ -193,6 +205,11 @@ func (e *Extractor) start(args []string, input []byte, stdoutLimit, stderrLimit 
 	stdout := &boundedOutput{limit: stdoutLimit, exceeded: exceeded}
 	stderr := &boundedOutput{limit: stderrLimit, exceeded: exceeded}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
+	if ctx.Err() != nil {
+		_ = readEnd.Close()
+		_ = writeEnd.Close()
+		return nil, ErrFile
+	}
 	if startErr := cmd.Start(); startErr != nil {
 		_ = readEnd.Close()
 		_ = writeEnd.Close()
@@ -211,20 +228,37 @@ func (e *Extractor) start(args []string, input []byte, stdoutLimit, stderrLimit 
 }
 
 func (p *process) wait(ctx context.Context) ([]byte, []byte, error) {
-	if len(p.data) > 0 {
-		rss, err := p.sample(ctx, p.cmd.Process.Pid)
-		if err != nil {
-			if ctx.Err() != nil {
-				return p.kill(ErrFile)
-			}
-			return p.kill(ErrConfiguration)
+	return p.waitWithClock(ctx, systemWatchdogClock{})
+}
+
+func (p *process) waitWithClock(ctx context.Context, clock watchdogClock) ([]byte, []byte, error) {
+	lastSample := clock.Now()
+	ticks, stopTicks := clock.Tick()
+	defer stopTicks()
+	stale, resetStale, stopStale := clock.Timer(time.Second)
+	defer stopStale()
+	sampleCtx, cancelSample := context.WithCancel(ctx)
+	var pending <-chan memoryResult
+	defer func() {
+		cancelSample()
+		if pending != nil {
+			<-pending
 		}
-		if ctx.Err() != nil {
-			return p.kill(ErrFile)
-		}
-		if rss > 1<<30 {
-			return p.kill(ErrMemoryLimit)
-		}
+	}()
+	fail := func(err error) ([]byte, []byte, error) {
+		_ = p.signal()
+		cancelSample()
+		return p.kill(err)
+	}
+	startSample := func() {
+		result := make(chan memoryResult, 1)
+		pending = result
+		go func() {
+			rss, err := p.sample(sampleCtx, p.cmd.Process.Pid)
+			result <- memoryResult{rss: rss, err: err, completed: clock.Now()}
+		}()
+	}
+	startInput := func() {
 		p.writerDone = make(chan processResult, 1)
 		go func() {
 			_, err := io.Copy(p.input, bytes.NewReader(p.data))
@@ -233,33 +267,74 @@ func (p *process) wait(ctx context.Context) ([]byte, []byte, error) {
 			}
 			p.writerDone <- processResult{err: err}
 		}()
+	}
+	waitingInput := len(p.data) > 0
+	if waitingInput {
+		startSample()
 	} else {
 		_ = p.input.Close()
 	}
-	ticker := time.NewTicker(50 * time.Millisecond)
-	defer ticker.Stop()
+	applySample := func(result memoryResult) error {
+		pending = nil
+		if result.err != nil || !result.completed.Before(lastSample.Add(time.Second)) {
+			return ErrConfiguration
+		}
+		if result.rss > 1<<30 {
+			return ErrMemoryLimit
+		}
+		lastSample = result.completed
+		resetStale(lastSample.Add(time.Second).Sub(clock.Now()))
+		if waitingInput {
+			if ctx.Err() != nil {
+				return ErrFile
+			}
+			waitingInput = false
+			startInput()
+		}
+		return nil
+	}
+	drainSample := func() error {
+		select {
+		case result := <-pending:
+			return applySample(result)
+		default:
+			return nil
+		}
+	}
 	for {
 		if ctx.Err() != nil {
-			return p.kill(ErrFile)
+			return fail(ErrFile)
+		}
+		if err := drainSample(); err != nil {
+			return fail(err)
+		}
+		if !clock.Now().Before(lastSample.Add(time.Second)) {
+			return fail(ErrConfiguration)
 		}
 		select {
 		case res := <-p.done:
 			p.observed = true
-			if res.err != nil {
-				return p.kill(ErrConfiguration)
+			if err := drainSample(); err != nil {
+				return fail(err)
+			}
+			if !clock.Now().Before(lastSample.Add(time.Second)) || res.err != nil {
+				return fail(ErrConfiguration)
 			}
 			if ctx.Err() != nil {
-				return p.kill(ErrFile)
+				return fail(ErrFile)
 			}
 			waitErr := p.reap()
 			var writeErr error
 			if p.writerDone != nil {
 				writeErr = (<-p.writerDone).err
 			}
-			if err := checkRuntimeSnapshot(p.runtime, p.runtime.snapshot); err != nil {
+			if err := checkRuntimeSnapshotContext(ctx, p.runtime, p.runtime.snapshot); err != nil {
+				if ctx.Err() != nil {
+					return nil, nil, ErrFile
+				}
 				return nil, nil, ErrConfiguration
 			}
-			if waitErr != nil || writeErr != nil || ctx.Err() != nil {
+			if waitErr != nil || writeErr != nil || ctx.Err() != nil || waitingInput {
 				return nil, nil, ErrFile
 			}
 			select {
@@ -269,22 +344,23 @@ func (p *process) wait(ctx context.Context) ([]byte, []byte, error) {
 			}
 			return p.stdout.buf.Bytes(), p.stderr.buf.Bytes(), nil
 		case <-ctx.Done():
-			return p.kill(ErrFile)
+			return fail(ErrFile)
 		case <-p.exceeded:
-			return p.kill(ErrFile)
-		case <-ticker.C:
-			rss, err := p.sample(ctx, p.cmd.Process.Pid)
-			if err != nil {
-				if ctx.Err() != nil {
-					return p.kill(ErrFile)
-				}
-				if processExited(p.cmd.Process.Pid) {
-					continue
-				}
-				return p.kill(ErrConfiguration)
+			return fail(ErrFile)
+		case <-stale:
+			if err := drainSample(); err != nil {
+				return fail(err)
 			}
-			if rss > 1<<30 {
-				return p.kill(ErrMemoryLimit)
+			if !clock.Now().Before(lastSample.Add(time.Second)) {
+				return fail(ErrConfiguration)
+			}
+		case <-ticks:
+			if pending == nil && !processExited(p.cmd.Process.Pid) {
+				startSample()
+			}
+		case result := <-pending:
+			if err := applySample(result); err != nil {
+				return fail(err)
 			}
 		}
 	}

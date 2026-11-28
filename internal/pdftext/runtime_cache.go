@@ -2,6 +2,7 @@ package pdftext
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/fs"
@@ -46,10 +47,23 @@ func readCacheUUID(path string) ([16]byte, error) {
 }
 
 func cacheIdentities(dirs []string) ([]cacheIdentity, error) {
+	return cacheIdentitiesContext(context.Background(), dirs)
+}
+
+func cacheIdentitiesContext(ctx context.Context, dirs []string) ([]cacheIdentity, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	seen := map[string]bool{}
 	var caches []cacheIdentity
 	for _, dir := range dirs {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -102,6 +116,9 @@ func cacheIdentities(dirs []string) ([]cacheIdentity, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	if len(caches) == 0 {
 		return nil, errors.New("no dyld caches")

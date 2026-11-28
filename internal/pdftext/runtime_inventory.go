@@ -1,6 +1,7 @@
 package pdftext
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -40,11 +41,24 @@ func cacheContains(roots []string, path string) (bool, error) {
 }
 
 func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
+	return snapshotRuntimeContext(context.Background(), set)
+}
+
+func snapshotRuntimeContext(ctx context.Context, set runtimeSet) (runtimeSnapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	paths := map[string]bool{}
 	for _, path := range set.files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		paths[path] = true
 	}
 	for _, path := range set.systemFiles {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		info, err := os.Stat(path)
 		if errors.Is(err, os.ErrNotExist) {
 			paths[path] = false
@@ -63,6 +77,9 @@ func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
 		paths[path] = !inCache
 	}
 	for i, dir := range append(append([]string(nil), set.dataDirs...), set.systemDirs...) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		data := i < len(set.dataDirs)
 		inCache := false
 		for _, root := range set.cacheDirs {
@@ -80,6 +97,9 @@ func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
 			}
 		}
 		err := filepath.WalkDir(walkRoot, func(path string, entry fs.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -104,6 +124,9 @@ func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
 		}
 	}
 	for _, path := range set.metadata {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		info, err := os.Lstat(path)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -124,6 +147,9 @@ func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
 	sort.Strings(ordered)
 	result := make(runtimeSnapshot, 0, len(ordered))
 	for _, path := range ordered {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		entry := runtimeEntry{path: path, hash: paths[path]}
 		link, err := os.Lstat(path)
 		if errors.Is(err, os.ErrNotExist) {
@@ -145,6 +171,9 @@ func snapshotRuntime(set runtimeSet) (runtimeSnapshot, error) {
 		entry.target = target
 		result = append(result, entry)
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -156,7 +185,11 @@ func sameInfo(a, b os.FileInfo) bool {
 }
 
 func checkRuntimeSnapshot(set runtimeSet, expected runtimeSnapshot) error {
-	actual, err := snapshotRuntime(set)
+	return checkRuntimeSnapshotContext(context.Background(), set, expected)
+}
+
+func checkRuntimeSnapshotContext(ctx context.Context, set runtimeSet, expected runtimeSnapshot) error {
+	actual, err := snapshotRuntimeContext(ctx, set)
 	if err != nil {
 		return err
 	}
@@ -164,6 +197,9 @@ func checkRuntimeSnapshot(set runtimeSet, expected runtimeSnapshot) error {
 		return errors.New("runtime files changed")
 	}
 	for i := range actual {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		a, b := actual[i], expected[i]
 		if a.path != b.path || a.hash != b.hash || !sameInfo(a.link, b.link) || !sameInfo(a.target, b.target) {
 			return errors.New("runtime files changed")

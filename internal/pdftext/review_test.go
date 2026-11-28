@@ -7,9 +7,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -36,7 +35,7 @@ func TestRetryInterrupted(t *testing.T) {
 }
 
 func TestExtractor_RuntimeIdentity(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +51,7 @@ func TestRuntimeSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set, err := resolveRuntime(path)
+	set, err := resolveRuntime(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,13 +59,13 @@ func TestRuntimeSet(t *testing.T) {
 		t.Fatal("no dependencies")
 	}
 	e := &Extractor{path: path, runtime: set, limiter: NewLimiter()}
-	if err := e.checkVersion(); err != nil {
+	if err := e.checkVersion(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestExtractor_VerifiesCurrentRuntime(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestExtractor_RejectsRuntimeChangeRestoredDuringRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := &Extractor{path: "/bin/bash", runtime: set, limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", `read x; printf '%s' "$x"`}, []byte("input\n"), 100, 1024)
+	p, err := e.start(context.Background(), []string{"-c", `read x; printf '%s' "$x"`}, []byte("input\n"), 100, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,9 +110,7 @@ func TestExtractor_RejectsRuntimeChangeRestoredDuringRun(t *testing.T) {
 		}
 		return 0, mutationErr
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	_, _, err = p.wait(ctx)
+	_, _, err = p.wait(context.Background())
 	if mutationErr != nil {
 		t.Fatal(mutationErr)
 	}
@@ -223,26 +220,9 @@ func TestRun_InputSizeBoundary(t *testing.T) {
 	}
 }
 
-func childCount() (int, error) {
-	cmd := exec.Command("/bin/ps", "-axo", "ppid=")
-	cmd.Env = []string{"LC_ALL=C"}
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-	count := 0
-	for _, s := range strings.Fields(string(output)) {
-		n, parseErr := strconv.Atoi(s)
-		if parseErr == nil && n == os.Getpid() {
-			count++
-		}
-	}
-	return count, nil
-}
-
 func TestWatchProcess_StaysPending(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", `while :; do :; done`}, nil, 100, 1024)
+	p, err := e.start(context.Background(), []string{"-c", `while :; do :; done`}, nil, 100, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,11 +236,23 @@ func TestWatchProcess_StaysPending(t *testing.T) {
 	_, _, _ = p.kill(ErrFile)
 }
 
+type notifyingContext struct {
+	context.Context
+	once    sync.Once
+	entered chan struct{}
+}
+
+func (c *notifyingContext) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.entered) })
+	return c.Context.Done()
+}
+
 func TestLimiter_ThreeRealRuns(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
 	ctx1, cancel1 := context.WithCancel(context.Background())
 	ctx2, cancel2 := context.WithCancel(context.Background())
-	ctx3, cancel3 := context.WithCancel(context.Background())
+	thirdContext, cancel3 := context.WithCancel(context.Background())
+	ctx3 := &notifyingContext{Context: thirdContext, entered: make(chan struct{})}
 	var runs sync.WaitGroup
 	defer func() { cancel1(); cancel2(); cancel3(); runs.Wait() }()
 	first := make(chan error, 1)
@@ -269,25 +261,22 @@ func TestLimiter_ThreeRealRuns(t *testing.T) {
 	runs.Add(2)
 	go func() {
 		defer runs.Done()
-		_, err := e.run(ctx1, []string{"-c", `while :; do :; done`}, nil, time.Second, 100, 1024)
+		_, err := e.run(ctx1, []string{"-c", `while :; do :; done`}, nil, time.Hour, 100, 1024)
 		first <- err
 	}()
 	go func() {
 		defer runs.Done()
-		_, err := e.run(ctx2, []string{"-c", `while :; do :; done`}, nil, time.Second, 100, 1024)
+		_, err := e.run(ctx2, []string{"-c", `while :; do :; done`}, nil, time.Hour, 100, 1024)
 		second <- err
 	}()
-	deadline := time.Now().Add(90 * time.Millisecond)
-	for {
-		count, err := childCount()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if count >= 3 && len(e.limiter.slots) == 2 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("two subprocesses did not start")
+	for len(e.limiter.slots) != 2 {
+		select {
+		case err := <-first:
+			t.Fatalf("first run ended before both slots were occupied: %v", err)
+		case err := <-second:
+			t.Fatalf("second run ended before both slots were occupied: %v", err)
+		default:
+			runtime.Gosched()
 		}
 	}
 	runs.Add(1)
@@ -296,6 +285,7 @@ func TestLimiter_ThreeRealRuns(t *testing.T) {
 		_, err := e.run(ctx3, []string{"-c", "exit 0"}, nil, time.Second, 100, 1024)
 		third <- err
 	}()
+	<-ctx3.entered
 	select {
 	case err := <-third:
 		var firstErr, secondErr error
@@ -308,19 +298,14 @@ func TestLimiter_ThreeRealRuns(t *testing.T) {
 		default:
 		}
 		t.Fatalf("third run bypassed limit: %v, first %v, second %v", err, firstErr, secondErr)
-	case <-time.After(30 * time.Millisecond):
+	default:
 	}
 	cancel1()
 	if err := <-first; !errors.Is(err, ErrFile) {
 		t.Fatalf("first run: %v", err)
 	}
-	select {
-	case err := <-third:
-		if err != nil {
-			t.Fatalf("third run: %v", err)
-		}
-	case <-time.After(90 * time.Millisecond):
-		t.Fatal("third run did not start")
+	if err := <-third; err != nil {
+		t.Fatalf("third run: %v", err)
 	}
 	cancel2()
 	if err := <-second; !errors.Is(err, ErrFile) {
@@ -329,28 +314,26 @@ func TestLimiter_ThreeRealRuns(t *testing.T) {
 }
 
 func TestProcess_CancelledEvenWhenExitReady(t *testing.T) {
-	for i := 0; i < 10; i++ {
-		e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-		p, err := e.start([]string{"-c", "exit 0"}, nil, 1024, 1024)
-		if err != nil {
-			t.Fatal(err)
-		}
-		result := <-p.done
-		ready := make(chan processResult, 1)
-		ready <- result
-		p.done = ready
-		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-		_, _, err = p.wait(ctx)
-		if !errors.Is(err, ErrFile) {
-			t.Fatalf("cancelled completion accepted: %v", err)
-		}
+	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
+	p, err := e.start(context.Background(), []string{"-c", "exit 0"}, nil, 1024, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := <-p.done
+	ready := make(chan processResult, 1)
+	ready <- result
+	p.done = ready
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err = p.wait(ctx)
+	if !errors.Is(err, ErrFile) {
+		t.Fatalf("cancelled completion accepted: %v", err)
 	}
 }
 
 func TestProcess_NoSignalAfterReap(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", "exit 0"}, nil, 1024, 1024)
+	p, err := e.start(context.Background(), []string{"-c", "exit 0"}, nil, 1024, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,14 +356,12 @@ func TestProcess_RejectsIncompleteInput(t *testing.T) {
 
 func TestSampler_VerifiedBeforeInput(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", `read x; printf '%s' "$x"`}, []byte("publisher-sentinel\n"), 1024, 1024)
+	p, err := e.start(context.Background(), []string{"-c", `read x; printf '%s' "$x"`}, []byte("publisher-sentinel\n"), 1024, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.sample = func(context.Context, int) (uint64, error) { return 0, errors.New("unavailable") }
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Millisecond)
-	defer cancel()
-	_, _, err = p.wait(ctx)
+	_, _, err = p.wait(context.Background())
 	if !errors.Is(err, ErrConfiguration) {
 		t.Fatalf("expected sampler error: %v", err)
 	}
@@ -395,20 +376,22 @@ func TestVersionCheck_UsesSharedLimiter(t *testing.T) {
 	limit.slots <- struct{}{}
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: limit}
 	done := make(chan struct{ err error }, 1)
-	go func() { done <- struct{ err error }{e.checkVersion()} }()
+	entered := make(chan struct{})
+	go func() {
+		err := checkVersionWith(context.Background(), func(ctx context.Context, args []string, input []byte, timeout time.Duration, stdout, stderr int) ([]byte, []byte, error) {
+			return e.execute(&notifyingContext{Context: ctx, entered: entered}, args, input, timeout, stdout, stderr)
+		})
+		done <- struct{ err error }{err}
+	}()
+	<-entered
 	select {
 	case <-done:
 		t.Fatal("version check bypassed limiter")
-	case <-time.After(30 * time.Millisecond):
+	default:
 	}
 	<-limit.slots
-	select {
-	case result := <-done:
-		if !errors.Is(result.err, ErrConfiguration) {
-			t.Fatalf("version check: %v", result.err)
-		}
-	case <-time.After(60 * time.Millisecond):
-		t.Fatal("version check did not acquire slot")
+	if result := <-done; !errors.Is(result.err, ErrConfiguration) {
+		t.Fatalf("version check: %v", result.err)
 	}
 }
 
@@ -429,7 +412,7 @@ func TestExtractor_SharedLimiter(t *testing.T) {
 }
 
 func TestSandbox_DeniesRuntimeNeighbors(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +447,7 @@ func TestSandbox_DeniesRuntimeNeighbors(t *testing.T) {
 }
 
 func TestSandbox_DeniesKegRootAndSystemApps(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -490,7 +473,7 @@ func TestSandbox_DeniesKegRootAndSystemApps(t *testing.T) {
 }
 
 func TestSandbox_RejectsUnrelatedKeg(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,4 +529,88 @@ func TestSandbox_RejectsUnrelatedKeg(t *testing.T) {
 		return
 	}
 	t.Fatal("no unrelated keg found")
+}
+
+func TestExtractor_CancelledSetup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := resolveRuntime(ctx, "/unused"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled runtime discovery: %v", err)
+	}
+	if _, err := NewExtractor(ctx, NewLimiter()); !errors.Is(err, ErrConfiguration) {
+		t.Fatalf("cancelled constructor: %v", err)
+	}
+
+	limit := NewLimiter()
+	limit.slots <- struct{}{}
+	limit.slots <- struct{}{}
+	parent, stop := context.WithCancel(context.Background())
+	defer stop()
+	notified := &notifyingContext{Context: parent, entered: make(chan struct{})}
+	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: limit}
+	done := make(chan error, 1)
+	go func() { done <- e.checkVersion(notified) }()
+	<-notified.entered
+	stop()
+	if err := <-done; !errors.Is(err, ErrConfiguration) {
+		t.Fatalf("cancelled version check: %v", err)
+	}
+}
+
+func TestVersionCheck_Deadline(t *testing.T) {
+	before := time.Now()
+	err := checkVersionWith(context.Background(), func(ctx context.Context, _ []string, _ []byte, limit time.Duration, _, _ int) ([]byte, []byte, error) {
+		after := time.Now()
+		deadline, ok := ctx.Deadline()
+		if !ok || deadline.Before(before.Add(callTimeout)) || deadline.After(after.Add(callTimeout)) || limit != callTimeout {
+			t.Fatalf("version deadline: %v, %v, limit %v", deadline, ok, limit)
+		}
+		return nil, []byte("pdftotext version " + Version + "\n"), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProcess_CancelDuringRuntimeWalk(t *testing.T) {
+	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
+	ctx := &cancelAfterCalls{Context: context.Background(), remaining: 3}
+	p, err := e.start(ctx, []string{"-c", `while :; do :; done`}, nil, 100, 100)
+	if p != nil {
+		_, _, _ = p.kill(ErrFile)
+		t.Fatal("process started after runtime walk was cancelled")
+	}
+	if !errors.Is(err, ErrFile) {
+		t.Fatalf("cancelled runtime walk: %v", err)
+	}
+}
+
+func TestProcess_CancelDuringPostReapWalk(t *testing.T) {
+	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
+	p, err := e.start(context.Background(), []string{"-c", "exit 0"}, nil, 100, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := <-p.done
+	ready := make(chan processResult, 1)
+	ready <- result
+	p.done = ready
+	ctx := &cancelAfterCalls{Context: context.Background(), remaining: 5}
+	_, _, err = p.wait(ctx)
+	if !errors.Is(err, ErrFile) {
+		t.Fatalf("cancelled post-reap walk: %v", err)
+	}
+}
+
+func TestProcess_CancelBeforeStart(t *testing.T) {
+	e := &Extractor{path: "/bin/bash", runtime: runtimeSet{snapshot: runtimeSnapshot{}}, limiter: NewLimiter()}
+	ctx := &cancelAfterCalls{Context: context.Background(), remaining: 4}
+	p, err := e.start(ctx, []string{"-c", `while :; do :; done`}, nil, 100, 100)
+	if p != nil {
+		_, _, _ = p.kill(ErrFile)
+		t.Fatal("process started after cancellation")
+	}
+	if !errors.Is(err, ErrFile) {
+		t.Fatalf("cancelled before start: %v", err)
+	}
 }

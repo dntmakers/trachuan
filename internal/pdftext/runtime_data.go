@@ -1,6 +1,7 @@
 package pdftext
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
@@ -10,6 +11,13 @@ import (
 )
 
 func runtimeDataPaths(cellar, poppler string) (runtimeSet, error) {
+	return runtimeDataPathsContext(context.Background(), cellar, poppler)
+}
+
+func runtimeDataPathsContext(ctx context.Context, cellar, poppler string) (runtimeSet, error) {
+	if err := ctx.Err(); err != nil {
+		return runtimeSet{}, err
+	}
 	var err error
 	cellar, err = filepath.EvalSymlinks(cellar)
 	if err != nil {
@@ -19,6 +27,9 @@ func runtimeDataPaths(cellar, poppler string) (runtimeSet, error) {
 	var set runtimeSet
 	var visit func(string) error
 	visit = func(path string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		real, links, directories, err := traceRuntimePath(path)
 		if err != nil {
 			return err
@@ -53,6 +64,9 @@ func runtimeDataPaths(cellar, poppler string) (runtimeSet, error) {
 		seen[real] = true
 		set.dataDirs = append(set.dataDirs, real)
 		return filepath.WalkDir(real, func(path string, entry fs.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -63,6 +77,9 @@ func runtimeDataPaths(cellar, poppler string) (runtimeSet, error) {
 		})
 	}
 	if err := visit(filepath.Join(poppler, "share", "poppler")); err != nil {
+		return runtimeSet{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return runtimeSet{}, err
 	}
 	sort.Strings(set.files)

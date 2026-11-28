@@ -3,6 +3,7 @@
 package pdftext
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -10,11 +11,18 @@ import (
 )
 
 func readPlatformIdentity(cacheDirs []string) (platformIdentity, error) {
+	return readPlatformIdentityContext(context.Background(), cacheDirs)
+}
+
+func readPlatformIdentityContext(ctx context.Context, cacheDirs []string) (platformIdentity, error) {
+	if err := ctx.Err(); err != nil {
+		return platformIdentity{}, err
+	}
 	build, err := unix.Sysctl("kern.osversion")
 	if err != nil || strings.TrimSpace(build) == "" {
 		return platformIdentity{}, errors.New("macOS build unavailable")
 	}
-	caches, err := cacheIdentities(cacheDirs)
+	caches, err := cacheIdentitiesContext(ctx, cacheDirs)
 	if err != nil {
 		return platformIdentity{}, err
 	}
