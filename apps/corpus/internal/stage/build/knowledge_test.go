@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
+	"danny.vn/trachuan/internal/knowledge"
 )
 
 const knowledgeDecision = `- id: "decision-mau"

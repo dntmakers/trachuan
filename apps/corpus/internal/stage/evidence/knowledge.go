@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"danny.vn/trachuan/apps/corpus/internal/artifact"
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
+	"danny.vn/trachuan/internal/knowledge"
 )
 
 const (

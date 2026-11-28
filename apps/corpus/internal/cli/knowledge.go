@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"danny.vn/trachuan/apps/corpus/internal/knowledge"
 	"danny.vn/trachuan/apps/corpus/internal/stage/build"
 	"danny.vn/trachuan/internal/corpusdb"
+	"danny.vn/trachuan/internal/knowledge"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
