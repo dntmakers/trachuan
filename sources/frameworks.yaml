@@ -536,7 +536,9 @@ frameworks:
     size: 13785102
     role: guide
     format: pdf
-  parser: ''
+  parser: csa-ccm-4-1-xlsx
+  parse_source: csa/csa-ccm-v4.1.0.xlsx
+  expected_controls: 224
 - code: swiftcscf
   version: v2026
   name: SWIFT Customer Security Controls Framework

@@ -153,7 +153,6 @@ func TestCSAGuards(t *testing.T) {
 		count  int
 	}{
 		{"count", nil, 3},
-		{"missing merge", func(f *excelize.File) { _ = f.UnmergeCell("CCM", "F2", "H2") }, 2},
 		{"shifted merge", func(f *excelize.File) { _ = f.UnmergeCell("CCM", "F2", "H2"); _ = f.MergeCell("CCM", "E2", "H2") }, 2},
 		{"missing header", func(f *excelize.File) { _ = f.SetCellValue("CCM", "J3", "") }, 2},
 		{"unknown header", func(f *excelize.File) { _ = f.SetCellValue("CCM", "X3", "Unknown") }, 2},
@@ -177,6 +176,74 @@ func TestCSAGuards(t *testing.T) {
 				t.Fatal("expected failure")
 			}
 		})
+	}
+}
+
+func TestCSARejectsMissingGroupMerges(t *testing.T) {
+	data := csaFixture(t, func(f *excelize.File) {
+		if err := f.UnmergeCell("CCM", "F2", "H2"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	expected := 2
+	if _, err := Parse("csa-ccm-4-1-xlsx", data, "invented", "1", &expected); err == nil {
+		t.Fatal("accepted missing group merges")
+	}
+}
+
+func TestCSARejectsOtherRowTwoLabels(t *testing.T) {
+	for _, address := range []string{"A2", "E2", "G2", "J2", "W2"} {
+		t.Run(address, func(t *testing.T) {
+			data := csaFixture(t, func(f *excelize.File) {
+				_ = f.UnmergeCell("CCM", "F2", "H2")
+				_ = f.UnmergeCell("CCM", "I2", "N2")
+				_ = f.UnmergeCell("CCM", "O2", "W2")
+				_ = f.SetCellValue("CCM", address, "unexpected")
+			})
+			data = mutateCSAWorksheet(t, data, func(s string) string {
+				return strings.Replace(s, `</worksheet>`, `<mergeCells count="3"><mergeCell ref="F2:H2"/><mergeCell ref="I2:N2"/><mergeCell ref="O2:W2"/></mergeCells></worksheet>`, 1)
+			})
+			expected := 2
+			wantError := "invalid workbook merge"
+			if address == "A2" || address == "E2" {
+				wantError = "invalid workbook header"
+			}
+			if _, err := Parse("csa-ccm-4-1-xlsx", data, "invented", "1", &expected); err == nil || err.Error() != wantError {
+				t.Fatalf("expected %s, got %v", wantError, err)
+			}
+		})
+	}
+}
+
+func TestCSARejectsEmptyGroupAnchor(t *testing.T) {
+	for _, address := range []string{"F2", "I2", "O2"} {
+		t.Run(address, func(t *testing.T) {
+			data := csaFixture(t, func(f *excelize.File) { _ = f.SetCellValue("CCM", address, "") })
+			expected := 2
+			if _, err := Parse("csa-ccm-4-1-xlsx", data, "invented", "1", &expected); err == nil || err.Error() != "invalid workbook header" {
+				t.Fatalf("expected invalid workbook header, got %v", err)
+			}
+		})
+	}
+}
+
+func TestCSATrailerAt228(t *testing.T) {
+	data := csaFixture(t, func(f *excelize.File) {
+		_ = f.SetCellValue("CCM", "B227", "Last control")
+		_ = f.SetCellValue("CCM", "C227", "EX-02")
+		_ = f.SetCellValue("CCM", "D227", "Last statement")
+		_ = f.SetCellValue("CCM", "A228", "End of Standard")
+		_ = f.SetCellValue("CCM", "A229", "invented copyright")
+	})
+	nodes, err := parseCSAPinned(data, fmt.Sprintf("%x", sha256.Sum256(data)), 228)
+	if err != nil {
+		t.Fatalf("pinned trailer rejected: %v", err)
+	}
+	if len(nodes) != 3 || nodes[2].Citation != "EX-02" || nodes[2].PublisherTitle != "Last control" {
+		t.Fatalf("row 227 control missing: %+v", nodes)
+	}
+	if _, err := parseCSA(data); err == nil {
+		t.Fatal("accepted unpinned trailer")
 	}
 }
 

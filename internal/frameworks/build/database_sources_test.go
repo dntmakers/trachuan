@@ -18,7 +18,7 @@ func (db *sourceFileCapture) Exec(_ context.Context, _ string, args ...any) (pgc
 
 func TestSourceProvenanceRecipe(t *testing.T) {
 	require.Equal(t, "source-selection/2", databaseRecipe()["source_provenance"])
-	require.Equal(t, "csa-ccm-4-1-xlsx/1", stepRecipe("parse").Parameters["csa_parser"])
+	require.Equal(t, "csa-ccm-4-1-xlsx/2", stepRecipe("parse").Parameters["csa_parser"])
 }
 
 func TestLoadSourceFiles_SelectedCompletenessAndRepresentation(t *testing.T) {
