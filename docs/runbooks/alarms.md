@@ -9,6 +9,12 @@ The alarms, their conditions, how long each must persist and their severity are
 listed once in [host budgets](../design/budgets-host.md#host-alarms); they are
 defined in `deploy/oci/` and applied with OpenTofu, never created by hand.
 
+The two corpus release alarms (failed and waiting) send separate notifications
+for each metric stream, so a `kind` `frameworks` stream that fails while the law
+stream already fires sends its own messages. Read
+`/var/log/trachuan/release.log` for law and
+`/var/log/trachuan/release-frameworks.log` for frameworks.
+
 The external HTTPS alarms mean every vantage point failed for 5 minutes. In the
 OCI Console, open Health Checks and inspect the results page for
 `trachuan website uptime` (`/`) or `trachuan public status uptime`
