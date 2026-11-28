@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Static checks before every push. No tests, no builds, no network.
+# Static checks before every push, including a Linux type check because CI runs on Linux. No tests, no network.
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 bash scripts/check-lengths.sh
@@ -11,6 +11,7 @@ fi
 for mod in $(git ls-files -- '**/go.mod' 'go.mod' 2>/dev/null); do
   dir=$(dirname "$mod")
   if command -v golangci-lint >/dev/null; then (cd "$dir" && golangci-lint run ./...); fi
+  (cd "$dir" && GOOS=linux go vet ./... && GOOS=linux go vet -tags integration ./...)
 done
 if command -v npx >/dev/null && [[ -f package.json ]]; then
   npx prettier --check "**/*.md" "!**/AGENTS.md" "!**/CLAUDE.md" "!**/CLAUDE.local.md" "!instructions/**" "!docs/plans/**" "!.claude/**" "!**/node_modules/**" "!**/.venv/**"
