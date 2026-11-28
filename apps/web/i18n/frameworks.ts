@@ -11,7 +11,7 @@ const en = {
   unit_too_large: 'Part of this item is too large to show.', invalid_item: 'This item could not be read.', reload: 'The data was updated; the page starts again from the top.',
   restarted: 'The list was reloaded from the top.',
   relation: { equivalent: 'equivalent to', subset: 'subset of', superset: 'superset of', intersects: 'intersects', related: 'related to' },
-  gap: { mapping_unresolved: 'Mapping target not resolved', mapping_dropped: 'Mapping left out of the release', title_missing: 'No Tra Chuẩn title yet', ocr_blocked: 'Character recognition did not pass', ocr_flagged: 'Character recognition under review', text_incomplete: 'Text incomplete', chunk_omission: 'Part of the text is not searchable', embedding_input_too_long: 'Part of the text is too long to search', embedding_input_bytes_exceeded: 'Part of the text is too long to search' },
+  gap: { knowledge_stale: 'Reviewed link needs review', mapping_unresolved: 'Mapping target not resolved', mapping_dropped: 'Mapping left out of the release', title_missing: 'No Tra Chuẩn title yet', ocr_blocked: 'Character recognition did not pass', ocr_flagged: 'Character recognition under review', text_incomplete: 'Text incomplete', chunk_omission: 'Part of the text is not searchable', embedding_input_too_long: 'Part of the text is too long to search', embedding_input_bytes_exceeded: 'Part of the text is too long to search' },
 }
 const vi: typeof en = {
   law: 'Văn bản pháp luật', frameworks: 'Khung kiểm soát', search: 'Tra cứu', filter: 'Khung kiểm soát', all: 'Tất cả khung kiểm soát', more: 'Xem thêm', next: 'Xem tiếp',
@@ -24,6 +24,6 @@ const vi: typeof en = {
   unit_too_large: 'Một phần của mục này quá lớn để hiển thị.', invalid_item: 'Không đọc được mục này.', reload: 'Dữ liệu đã được cập nhật; trang hiện lại từ đầu.',
   restarted: 'Danh sách đã được tải lại từ đầu.',
   relation: { equivalent: 'tương đương', subset: 'là một phần của', superset: 'bao gồm', intersects: 'giao với', related: 'liên quan' },
-  gap: { mapping_unresolved: 'Liên kết chưa xác định đích', mapping_dropped: 'Liên kết không đưa vào bản phát hành', title_missing: 'Chưa có tên do Tra Chuẩn đặt', ocr_blocked: 'Nhận dạng ký tự chưa đạt', ocr_flagged: 'Nhận dạng ký tự đang được xem xét', text_incomplete: 'Nội dung chưa đầy đủ', chunk_omission: 'Một phần nội dung không được đưa vào tìm kiếm', embedding_input_too_long: 'Một phần nội dung quá dài để đưa vào tìm kiếm', embedding_input_bytes_exceeded: 'Một phần nội dung quá dài để đưa vào tìm kiếm' },
+  gap: { knowledge_stale: 'Liên kết đã duyệt cần rà soát lại', mapping_unresolved: 'Liên kết chưa xác định đích', mapping_dropped: 'Liên kết không đưa vào bản phát hành', title_missing: 'Chưa có tên do Tra Chuẩn đặt', ocr_blocked: 'Nhận dạng ký tự chưa đạt', ocr_flagged: 'Nhận dạng ký tự đang được xem xét', text_incomplete: 'Nội dung chưa đầy đủ', chunk_omission: 'Một phần nội dung không được đưa vào tìm kiếm', embedding_input_too_long: 'Một phần nội dung quá dài để đưa vào tìm kiếm', embedding_input_bytes_exceeded: 'Một phần nội dung quá dài để đưa vào tìm kiếm' },
 }
 export function frameworkMessages(language: Language): typeof en { return language === 'en' ? en : vi }
