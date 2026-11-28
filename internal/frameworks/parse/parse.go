@@ -52,6 +52,37 @@ func Parse(name string, data []byte, code, version string, expected *int) (*Resu
 	default:
 		return nil, fmt.Errorf("unknown parser")
 	}
+	return finish(nodes, err, expected)
+}
+
+func ParsePages(name string, pages []string, code, version, sourceSHA string, expected *int) (*Result, error) {
+	if name != "iso27002-2022-pdf" {
+		return nil, fmt.Errorf("unknown parser")
+	}
+	return parseISO27002Pages(pages, sourceSHA, expected, iso27002Layout{
+		sourceSHA:   "1da41b305cce13c7d9150e8ceb520eb13d082d8a80080f9768a5dc9f2900b7e2",
+		annexColumn: 49,
+		tables:      []isoTableRange{{page: 21, first: 31, last: 35}},
+	})
+}
+
+func parseISO27002Pages(pages []string, sourceSHA string, expected *int, layout iso27002Layout) (*Result, error) {
+	if sourceSHA != layout.sourceSHA {
+		return nil, fmt.Errorf("source fingerprint mismatch")
+	}
+	const maxPageBytes = 50_000_000
+	total := 0
+	for _, page := range pages {
+		if len(page) > maxPageBytes-total {
+			return nil, fmt.Errorf("page text limit exceeded")
+		}
+		total += len(page)
+	}
+	nodes, err := parseISO27002(pages, layout)
+	return finish(nodes, err, expected)
+}
+
+func finish(nodes []Node, err error, expected *int) (*Result, error) {
 	if err != nil && len(nodes) == 0 {
 		return nil, err
 	}
