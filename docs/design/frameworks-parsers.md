@@ -86,11 +86,18 @@ path. Bound stdout in memory. Deny network access and filesystem reads outside
 tool runtime files. Enforce the law input, memory, scratch, stdout, stderr,
 concurrency and time limits; kill and reap the process tree on cancellation.
 Refuse to run if the version pin, sandbox or resource limits cannot be enforced.
-Never log extractor output or raw errors. Discard bounded stderr on success.
-Nonzero exit, exceeded limit, invalid output, a missing target region or
-unusable text in a required body region fails `parse`. Empty non-content pages
-do not fail. Do not fall back to OCR on extraction or parser failure; use
-separate scan eligibility in [scans](frameworks.md#scans).
+On macOS the sandbox is a `sandbox-exec` deny-default profile that allows only
+the tool's runtime files, `/dev/null` and the inherited pipes, so the scratch
+limit is zero writes. macOS enforces neither `RLIMIT_RSS` (a reclaim preference,
+`man 2 setrlimit`) nor `RLIMIT_AS`, so the memory limit is a watchdog: it
+samples the resident memory of the subprocess every 50 ms and kills its process
+group above the limit, which fails as an exceeded limit. The sampling gap is
+accepted because every input is a registry-pinned file. Never log extractor
+output or raw errors. Discard bounded stderr on success. Nonzero exit, exceeded
+limit, invalid output, a missing target region or unusable text in a required
+body region fails `parse`. Empty non-content pages do not fail. Do not fall back
+to OCR on extraction or parser failure; use separate scan eligibility in
+[scans](frameworks.md#scans).
 
 The parse recipe binds the exact extractor version and flags, parser revisions
 and normalization rules. Today it records only the output schema

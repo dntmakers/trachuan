@@ -70,6 +70,18 @@ func validateIdentity(kind, rel string, schemaVersion int, sealed bool) error {
 	return nil
 }
 
+func SupportsStepVersion(name string, version int) bool {
+	accepted := map[string][]int{
+		"chunk": {1}, "snapshot": {2}, "parse": {1, 2, 3}, "relate": {4}, "embed": {1},
+	}
+	for _, supported := range accepted[name] {
+		if version == supported {
+			return true
+		}
+	}
+	return false
+}
+
 func validStep(raw []byte, name string) bool {
 	var step struct {
 		Name       string                     `json:"name"`
@@ -79,14 +91,7 @@ func validStep(raw []byte, name string) bool {
 	if decodeRecipe(raw, &step) != nil || step.Name != name || step.Parameters == nil {
 		return false
 	}
-	wantVersion := 1
-	if name == "snapshot" {
-		wantVersion = 2
-	}
-	if name == "relate" {
-		wantVersion = 4
-	}
-	if step.Version != wantVersion && (name != "parse" || step.Version != 2) {
+	if !SupportsStepVersion(name, step.Version) {
 		return false
 	}
 	if name == "chunk" {

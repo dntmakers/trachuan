@@ -27,7 +27,7 @@ func runGoldenSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	base := filepath.Join(work, "20990101")
 	require.NoError(t, os.MkdirAll(base, 0700))
-	require.NoError(t, runStep(context.Background(), base, "snapshot", DatabaseRequest{RunID: "invented"}, source, &bytes.Buffer{}, nil, nil))
+	require.NoError(t, runStep(context.Background(), base, "snapshot", DatabaseRequest{RunID: "invented"}, source, &bytes.Buffer{}, nil, nil, RunOptions{}))
 }
 
 func TestSnapshot_GoldenInputs(t *testing.T) {

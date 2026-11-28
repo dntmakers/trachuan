@@ -13,10 +13,19 @@ import (
 
 	"danny.vn/trachuan/internal/embedding"
 	"danny.vn/trachuan/internal/frameworks/businesskey"
+	"danny.vn/trachuan/internal/pdftext"
 	"golang.org/x/sys/unix"
 )
 
+type RunOptions struct {
+	PDFRuntime PDFRuntime
+}
+
 func Run(ctx context.Context, rel string, out io.Writer, embedder Embedder, database Database, calibration ...CalibrationOpener) error {
+	return RunWithOptions(ctx, rel, out, embedder, database, RunOptions{}, calibration...)
+}
+
+func RunWithOptions(ctx context.Context, rel string, out io.Writer, embedder Embedder, database Database, options RunOptions, calibration ...CalibrationOpener) error {
 	if len(calibration) > 1 {
 		return fmt.Errorf("multiple calibration engine openers")
 	}
@@ -65,11 +74,19 @@ func Run(ctx context.Context, rel string, out io.Writer, embedder Embedder, data
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("%s: %w", step, err)
 		}
-		if err := runStep(ctx, base, step, request, source, out, embedder, database, calibration...); err != nil {
+		if err := runStep(ctx, base, step, request, source, out, embedder, database, options, calibration...); err != nil {
 			return fmt.Errorf("%s: %w", step, err)
 		}
 	}
 	return nil
+}
+
+func PublishedStepVersions() map[string]int {
+	versions := make(map[string]int, 5)
+	for _, name := range []string{"chunk", "snapshot", "parse", "relate", "embed"} {
+		versions[name] = stepRecipe(name).Version
+	}
+	return versions
 }
 
 func stepRecipe(step string) recipe {
@@ -87,7 +104,10 @@ func stepRecipe(step string) recipe {
 		version = 2
 		params = databaseRecipe()
 	case "parse":
-		version = 2
+		version = 3
+		params["pdf_extractor_version"] = pdftext.Version
+		params["pdf_layout_flags"] = pdftext.LayoutFlags()
+		params["pdf_bbox_flags"] = pdftext.BBoxFlags()
 		params["schema"] = "controls/1"
 		params["csa_parser"] = "csa-ccm-4-1-xlsx/2"
 		params["csa_normalization"] = "trim-replace-linebreaks/1"
@@ -134,7 +154,7 @@ func stepInputs(base, step string) (map[string]*string, error) {
 	return inputs, nil
 }
 
-func runStep(ctx context.Context, base, step string, request DatabaseRequest, source string, out io.Writer, embedder Embedder, database Database, calibration ...CalibrationOpener) error {
+func runStep(ctx context.Context, base, step string, request DatabaseRequest, source string, out io.Writer, embedder Embedder, database Database, options RunOptions, calibration ...CalibrationOpener) error {
 	target, err := checkedDir(filepath.Join(base, step))
 	if err != nil {
 		return err
@@ -161,6 +181,30 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 		return err
 	}
 	r := stepRecipe(step)
+	pdfIdentity := ""
+	pdfRequired := false
+	if step == "parse" {
+		reg, readErr := readRegistry(filepath.Join(base, "snapshot", "sources/frameworks.yaml"))
+		if readErr != nil {
+			return readErr
+		}
+		if availablePDFRuntime(options.PDFRuntime) {
+			pdfIdentity = options.PDFRuntime.RuntimeIdentity()
+		}
+		r, err = pdfParseRecipe(reg, pdfIdentity)
+		if err != nil {
+			return err
+		}
+		_, pdfRequired = r.Parameters["pdf_runtime_sha256"]
+		if pdfRequired {
+			if verifyErr := options.PDFRuntime.VerifyRuntime(); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+				return fmt.Errorf("PDF runtime verification failed")
+			}
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+		}
+	}
 	if step == "embed" {
 		if embedder == nil {
 			return fmt.Errorf("embedder unavailable")
@@ -240,6 +284,14 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if pdfRequired {
+		if verifyErr := options.PDFRuntime.VerifyRuntime(); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+			return fmt.Errorf("PDF runtime verification failed")
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 	if step == "embed" {
 		if err := validateEmbeddings(ctx, base, tmp, embedder, *inputs["chunk/manifest.json"]); err != nil {
