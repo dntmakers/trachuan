@@ -9,13 +9,13 @@ import FrameworkUnits from '../app/components/FrameworkUnits.vue'
 const response = (data: unknown) => ({ data, response: { status: 200 } })
 const failure = (code: string) => ({ error: { error: { code } }, response: { status: 409 } })
 const head = { kind: 'head', head: { handle: 'fw:fw-alpha:2.1#A', citation: 'A', kind: 'control', access: 'licensed', text_withheld: true } }
-function setup(component: typeof FrameworkRead | typeof FrameworkGaps, replies: unknown[]) {
+function setup(component: typeof FrameworkRead | typeof FrameworkGaps, replies: unknown[], language: 'en' | 'vi' = 'en') {
   const calls: unknown[] = []
   const notFound = vi.fn()
   vi.stubGlobal('computed', computed)
   vi.stubGlobal('ref', ref)
   vi.stubGlobal('useState', () => ref('en'))
-  vi.stubGlobal('useFrameworkPage', () => ({ language: ref('en'), notFound, api: { client: { GET: async (_path: string, options: unknown) => { calls.push(options); return replies.shift() } } } }))
+  vi.stubGlobal('useFrameworkPage', () => ({ language: ref(language), notFound, api: { client: { GET: async (_path: string, options: unknown) => { calls.push(options); return replies.shift() } } } }))
   const root = defineComponent({ render: () => h(Suspense, null, { default: () => h(component, { handle: 'fw:fw-alpha:2.1#A', kind: 'control' }) }) })
   return { wrapper: mount(root, { global: { components: { FrameworkUnits }, stubs: { NuxtLink: true } } }), calls, notFound }
 }
@@ -34,6 +34,15 @@ it.each(['invalid_next', 'release_expired'])('restarts a read when its continuat
   expect(calls).toHaveLength(3)
   expect(calls[1]).toMatchObject({ params: { query: { next: 'next-a', release: '20990101' } } })
   expect(wrapper.find('button').exists()).toBe(false)
+})
+
+it.each([
+  ['en', 'Reviewed link needs review'],
+  ['vi', 'Liên kết đã duyệt cần rà soát lại'],
+] as const)('renders knowledge_stale in %s', async (language, label) => {
+  const { wrapper } = setup(FrameworkGaps, [response({ release: '20990101', gaps: [{ kind: 'knowledge_stale', detail: '1' }] })], language)
+  await flushPromises()
+  expect(wrapper.get('.fw-title').text()).toBe(label)
 })
 
 it('restarts expired gaps with the same version selector', async () => {

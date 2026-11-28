@@ -88,6 +88,8 @@ func TestQualityGaps_ValidatesVersionFiltersAndKind(t *testing.T) {
 		_, _, err := e.validateGaps(request)
 		require.ErrorIs(t, err, ErrInvalidRequest)
 	}
+	_, _, err := e.validateGaps(GapsRequest{Kind: "knowledge_stale"})
+	require.NoError(t, err)
 	r, ids, err := e.validateGaps(GapsRequest{Versions: []string{"fw:fw-beta:1", "fw:fw-alpha:2", "fw:fw-beta:1"}, Kind: "text_incomplete"})
 	require.NoError(t, err)
 	require.Equal(t, []string{"fw:fw-alpha:2", "fw:fw-beta:1"}, r.Versions)

@@ -127,7 +127,7 @@ func TestGapPolicy_ClassAndBlocking(t *testing.T) {
 		kind, class    string
 		free, licensed bool
 	}{
-		{"mapping_unresolved", "public", false, false}, {"mapping_dropped", "public", false, false},
+		{"knowledge_stale", "public", false, false}, {"mapping_unresolved", "public", false, false}, {"mapping_dropped", "public", false, false},
 		{"title_missing", "public", false, true}, {"ocr_blocked", "text", true, true},
 		{"ocr_flagged", "text", false, false}, {"text_incomplete", "text", false, false},
 		{"chunk_omission", "text", false, false}, {"embedding_input_too_long", "text", false, false},

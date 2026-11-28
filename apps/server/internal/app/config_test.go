@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -125,7 +127,11 @@ func TestConfig_PreregisteredFileOptional(t *testing.T) {
 	if _, err := loadConfig(); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/", "../../../../docs/architecture.md"} {
+	invalidJSON := filepath.Join(t.TempDir(), "clients.json")
+	if err := os.WriteFile(invalidJSON, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/", invalidJSON} {
 		t.Setenv("SERVER_OAUTH_CLIENTS", path)
 		if _, err := loadConfig(); err == nil || err.Error() != "invalid preregistered OAuth clients" {
 			t.Fatalf("error=%v", err)
