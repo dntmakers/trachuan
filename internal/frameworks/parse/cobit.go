@@ -9,6 +9,7 @@ import (
 )
 
 const cobitSHA = "8bbdf564a15a01a90feee58ac4a94307dd08b0ea26def4886d3864d23e6bfa01"
+const cobitWrappedTitles = "|APO01.02|APO01.03|APO01.10|APO01.11|APO02.02|APO04.04|APO05.03|APO07.05|APO08.02|APO11.03|APO13.01|APO13.02|APO13.03|APO14.01|APO14.03|BAI02.01|BAI03.11|BAI03.12|BAI04.01|BAI04.05|BAI08.01|DSS02.01|DSS04.04|DSS05.07|DSS06.01|DSS06.03|MEA04.01|MEA04.06|MEA04.07|"
 
 type cobitState uint8
 
@@ -20,6 +21,7 @@ const (
 	cobitAwaitPage
 	cobitAwaitID
 	cobitPractice
+	cobitTitleContinuation
 	cobitAwaitContinuation
 	cobitAwaitActivity
 	cobitClosed
@@ -70,6 +72,8 @@ func parseCOBIT(layout []string, words []pdftext.Page, replacements int, sourceS
 			state = cobitAwaitPage
 		case cobitPractice:
 			state = cobitAwaitContinuation
+		case cobitTitleContinuation:
+			return nil, fmt.Errorf("missing title continuation")
 		case cobitAwaitPage, cobitAwaitContinuation, cobitAwaitActivity, cobitAwaitID:
 			return nil, fmt.Errorf("missing immediate continuation")
 		}
@@ -157,6 +161,9 @@ func parseCOBIT(layout []string, words []pdftext.Page, replacements int, sourceS
 				continue
 			}
 			if component == 3 || component == 4 {
+				if state == cobitTitleContinuation {
+					return nil, fmt.Errorf("missing title continuation")
+				}
 				if state == cobitPractice || state == cobitAwaitID || state == cobitAwaitContinuation || state == cobitAwaitActivity {
 					return nil, fmt.Errorf("missing activity boundary")
 				}
@@ -165,11 +172,14 @@ func parseCOBIT(layout []string, words []pdftext.Page, replacements int, sourceS
 				}
 				continue
 			}
-			if state == cobitPractice || state == cobitAwaitActivity {
+			if state == cobitPractice || state == cobitAwaitActivity || state == cobitTitleContinuation {
 				if _, _, header, err := row.practiceHeader(); err != nil || header {
 					return nil, fmt.Errorf("missing activity boundary")
 				}
 				if row.activity() {
+					if state == cobitTitleContinuation {
+						return nil, fmt.Errorf("missing title continuation")
+					}
 					if body.text.Len() == 0 {
 						return nil, fmt.Errorf("empty practice body")
 					}
@@ -186,7 +196,13 @@ func parseCOBIT(layout []string, words []pdftext.Page, replacements int, sourceS
 				if err != nil {
 					return nil, err
 				}
-				if line != "" {
+				if strings.TrimSpace(line) != "" {
+					if state == cobitTitleContinuation {
+						nodes[active].PublisherTitle += " " + strings.Join(strings.Fields(line), " ")
+						previousY = row.y
+						state = cobitPractice
+						continue
+					}
 					if previousY > 0 && row.y-previousY > 16 {
 						body.gap = true
 					}
@@ -250,6 +266,9 @@ func parseCOBIT(layout []string, words []pdftext.Page, replacements int, sourceS
 			previousY = row.y
 			nodes = append(nodes, Node{Citation: id, Kind: "practice", Parent: objective, Ordinal: active, PublisherTitle: title, Status: "active"})
 			state = cobitPractice
+			if strings.Contains(cobitWrappedTitles, "|"+id+"|") {
+				state = cobitTitleContinuation
+			}
 		}
 	}
 	if state != cobitClosed && state != cobitNoObjective {
