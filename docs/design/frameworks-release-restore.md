@@ -5,6 +5,10 @@ and the pointer swap of [frameworks release](frameworks-release.md#host). It
 follows the law [activation steps](corpus-release-activation.md#steps) except
 where this file says otherwise.
 
+The steps below use the shared-owner role map. The proposed
+[database role contract](database-roles.md#restore-and-host-activation) gives
+frameworks its own owner and defines checks for shared catalogs.
+
 ## Trust in the dump
 
 `pg_restore` runs the SQL stored in the archive as written, whatever the TOC

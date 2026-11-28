@@ -152,15 +152,43 @@ its socket or archive.
 
 ## Production restore
 
-Use the [backup runbook](../runbooks/backups.md#restore-production) to restore
-and promote the chosen target. Run migrations, then commit the auth restore
-fence. The fence increments every `auth_epoch`, revokes sessions and tokens and
-revokes every live framework entitlement with reason `restore`. Start the
-services for loopback checks, prewarm the active corpus database and pass
-readiness before reopening ingress. Record the timed whole-cluster rehearsal
-before claiming the one-hour RTO. [Auth](auth.md) ·
-[Framework entitlements](frameworks-access.md#classes-and-entitlements) ·
-[Corpus prewarm](../runbooks/corpus-restore-manual.md#prewarm-a-corpus-database)
+Use the [backup runbook](../runbooks/backups.md#restore-production) under the
+[restore ingress hold](#restore-ingress-hold). Stop PostgreSQL and restore the
+chosen backup files with `pgbackrest restore --delta`. Start PostgreSQL so it
+can replay WAL. After the database role cutover, start on the private
+peer-authenticated socket with TCP disabled. Wait until `pg_is_in_recovery()`
+returns `false`. Then reconcile privileges and passwords using the
+[current database roles](database-roles.md#auth-grants). Enable TCP only after
+installing the current HBA and checking the role configuration.
+[PostgreSQL 18 PITR](https://www.postgresql.org/docs/18/continuous-archiving.html#BACKUP-PITR-RECOVERY),
+[recovery state](https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-RECOVERY-INFO-TABLE).
+
+Run migrations, then commit the auth restore fence. The fence increments every
+`auth_epoch`, revokes sessions and tokens and revokes every live framework
+entitlement with reason `restore`. [Auth](auth.md),
+[framework entitlements](frameworks-access.md#classes-and-entitlements).
+
+For each recovered serving pointer, verify the named database against the
+current owner, catalog, reader and smoke checks. If its database needs a
+rebuild, build and sign a release for the same kind under a fresh name, using
+the recovered pointer as its predecessor. Use verified artifacts and regenerate
+the release row, dump and manifest for the new identity. Under the deploy and
+backup locks, reconcile the host release records with the recovered cluster,
+then allow only that recovery activation. Prepare, restore and smoke the new
+target under the ingress hold. Atomically compare and swap the recovered pointer
+and journal the operation, then settle the host record. Keep active and retained
+names protected from in-place rebuilds. Exclude recovered targets that fail
+current checks from rollback eligibility.
+[Activation guards](activation-record.md#mode).
+
+If the required verified artifact is missing, including for a manual database
+with no signed dump, stop recovery and keep ingress held. The owner must supply
+a verified, signed replacement release before the pointer can move. Start server
+and web for operator loopback checks after the pointer and host state agree.
+Prewarm the active law database and pass readiness. The operator then clears the
+restore hold and opens Caddy. Record the timed whole-cluster rehearsal before
+claiming the one-hour RTO.
+[Corpus prewarm](../runbooks/corpus-restore-manual.md#prewarm-a-corpus-database).
 
 ### Restore ingress hold
 
@@ -173,21 +201,22 @@ loopback recovery and readiness traffic can run while the hold exists.
 
 Caddy and every other listener that can serve restored data or accept restored
 credentials must check the hold before startup, including after reboot. The
-updater defers deploy, secret and corpus activations and leaves this hold in
-place on every path, including rollback and recovery. Its existing `deploy-hold`
-has a separate lifecycle. Require a release with the restore hold guards, and a
-rollback floor that preserves them, before replacing data. If a listener or
-updater cannot check the hold, it keeps ingress closed.
+scheduled updater defers deploy, secret and corpus activations and prune. It
+leaves this hold in place on every path, including rollback and recovery. Only
+the restore operator may run the scoped recovery activation above. The updater's
+`deploy-hold` has a separate lifecycle. Require a release with the restore hold
+guards, and a rollback floor that preserves them, before replacing data. If a
+listener or updater cannot check the hold, it keeps ingress closed.
 
 Only the restore operator may clear the hold after confirming the fence
-committed for this restore attempt and loopback readiness passed. A failure,
-interruption or reboot leaves the hold in place. If completion is uncertain,
-rerun the fence and readiness under the hold. On a synthetic deployment, reboot
-immediately after promotion and before the fence commits. Attempt a listener
-start and updater run, and verify a session and entitlement restored from before
-their revocation cannot be served. Complete the fence and readiness under the
-hold, clear it as the operator, and verify ingress opens with both still
-revoked.
+committed for this restore attempt, the release checks passed and loopback
+readiness passed. A failure, interruption or reboot leaves the hold in place. If
+completion is uncertain, rerun the fence and readiness under the hold. On a
+synthetic deployment, reboot immediately after promotion and before the fence
+commits. Attempt a listener start and updater run, and verify a session and
+entitlement restored from before their revocation cannot be served. Complete the
+fence and readiness under the hold, clear it as the operator, and verify ingress
+opens with both still revoked.
 
 ## Size
 
