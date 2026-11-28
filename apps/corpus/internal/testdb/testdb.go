@@ -9,11 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"testing"
 
 	"danny.vn/trachuan/apps/corpus/internal/migrate"
 	"danny.vn/trachuan/internal/pgdrop"
+	"danny.vn/trachuan/internal/testpg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -25,26 +25,21 @@ func NewEmpty(t *testing.T) string { return create(t, false) }
 func create(t *testing.T, migrated bool) string {
 	t.Helper()
 	ctx := context.Background()
-	adminURL := os.Getenv("CORPUS_TEST_ADMIN_URL")
-	if adminURL == "" {
-		adminURL = "postgres://trachuan@127.0.0.1:25433/postgres"
-	}
-	parsed, err := url.Parse(adminURL)
-	if err != nil {
-		t.Fatal("invalid test database URL")
-	}
 	var random [12]byte
 	if _, randErr := rand.Read(random[:]); randErr != nil {
 		t.Fatalf("generate database name: %v", randErr)
 	}
 	name := "corpus_test_" + hex.EncodeToString(random[:])
-	admin, err := pgx.Connect(ctx, adminURL)
+	admin, parsed, err := testpg.OpenAdministrator(ctx)
 	if err != nil {
 		t.Fatal("connect to test database administrator")
 	}
+	created := false
 	t.Cleanup(func() {
-		if err := dropIfExists(ctx, admin, name); err != nil {
-			t.Errorf("drop test database: %v", err)
+		if created {
+			if err := dropIfExists(ctx, admin, name); err != nil {
+				t.Errorf("drop test database: %v", err)
+			}
 		}
 		if err := admin.Close(ctx); err != nil {
 			t.Errorf("close test database administrator: %v", err)
@@ -61,6 +56,7 @@ func create(t *testing.T, migrated bool) string {
 	if _, err := admin.Exec(ctx, query); err != nil {
 		t.Fatalf("create test database: %v", err)
 	}
+	created = true
 	parsed.Path = "/" + name
 	return parsed.String()
 }

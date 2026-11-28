@@ -24,7 +24,7 @@ func releaseCandidates(name string) []string {
 }
 
 func validRunKey(key string) bool {
-	if !regexp.MustCompile(`^vn/2099[0-9]{4}(_[0-9]{1,2})?$`).MatchString(key) {
+	if !regexp.MustCompile(`^vn/2099[0-9]{4}(_[1-9][0-9]?)?$`).MatchString(key) {
 		return false
 	}
 	_, err := time.Parse("20060102", key[3:11])
