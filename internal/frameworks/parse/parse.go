@@ -59,6 +59,9 @@ func ParsePages(name string, pages []string, code, version, sourceSHA string, ex
 	if name == "aicpa-tsc-2017-pdf" {
 		return parseAICPAPages(pages, sourceSHA, expected)
 	}
+	if name == "iso27001-2022-pdf" {
+		return parseISO27001Pages(pages, sourceSHA, expected)
+	}
 	if name != "iso27002-2022-pdf" {
 		return nil, fmt.Errorf("unknown parser")
 	}

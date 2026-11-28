@@ -9,6 +9,8 @@ type isoReader struct {
 	active, first, endFiltered bool
 	pending                    []isoLine
 	header, footer             string
+	headerSuffix               bool
+	blankBefore, contentFirst  bool
 }
 
 func (r *isoReader) next() (isoLine, bool) {
@@ -23,6 +25,8 @@ func (r *isoReader) next() (isoLine, bool) {
 			r.active = true
 			r.first = true
 			r.endFiltered = false
+			r.blankBefore = true
+			r.contentFirst = true
 		}
 		if r.rest == "" {
 			if !r.endFiltered {
@@ -55,17 +59,20 @@ func (r *isoReader) next() (isoLine, bool) {
 		r.line++
 		r.rest = rest
 		raw = strings.TrimRight(raw, "\r")
-		text := strings.TrimSpace(strings.NewReplacer("\uFEFF", "", "\b", "").Replace(raw))
+		text := strings.TrimSpace(strings.NewReplacer("\uFEFF", "", "\b", "", "\u200B", "").Replace(raw))
 		if text == "" {
+			r.blankBefore = true
 			continue
 		}
 		if r.first {
 			r.first = false
-			if text == r.header {
+			if text == r.header || (r.headerSuffix && strings.HasSuffix(text, r.header)) {
 				continue
 			}
 		}
-		line := isoLine{raw: raw, text: text, page: r.page, line: r.line}
+		line := isoLine{raw: raw, text: text, page: r.page, line: r.line, blankBefore: r.blankBefore, firstContent: r.contentFirst}
+		r.blankBefore = false
+		r.contentFirst = false
 		r.pending = append(r.pending, line)
 		if len(r.pending) <= 3 {
 			continue
