@@ -63,13 +63,23 @@ pdftotext -layout -enc UTF-8 -eol unix - -
 pdftotext -bbox-layout -enc UTF-8 -eol unix - -
 ```
 
-The first form preserves the page and row structure the prose parsers need;
-split on form feeds, retaining physical page order. Use the second for PCI,
-where word boxes, not whitespace or reading order, separate cells. Parse the XML
-without external entities or network access. Ordinary reading order (the law
-default) loses cell boundaries; a linked Go/C PDF library would duplicate the
+The first form preserves the page and row structure of prose. Split on form
+feeds in physical page order. Use the second form for PCI and COBIT practice
+cells, where word boxes separate columns. COBIT runs both forms sequentially on
+the same verified bytes, with the first for objective fields. Ordinary reading
+order loses cell boundaries. A linked Go/C PDF library would duplicate the
 runtime boundary without a measured advantage. XLSX checks use the workbook
 parser.
+
+Decode word-box XML without external entities or network access. Reject invalid
+UTF-8 and any literal or numeric character reference outside the
+[XML 1.0 character range](https://www.w3.org/TR/xml/#charsets). The decoder
+accepts an explicit per-call option naming one invalid code point to replace
+with U+FFFD in word text and returns the number of replacements. Other invalid
+characters and occurrences outside word text still fail. A parser may pass the
+option only when the verified source SHA-256 matches its pinned fingerprint. The
+parser must check the returned count against its profile before accepting the
+result. Keep the option and replacement count internal to extraction.
 
 Feed only the hash-verified bytes to stdin; never pass or reopen the original
 path. Bound stdout in memory. Deny network access and filesystem reads outside
@@ -174,9 +184,12 @@ count mismatch, duplicate, wrong/missing parent and malformed layout cases.
 Include the relevant traps: header/footer collisions, continued rows, wrong
 worksheet or file, neighboring table cells, aliasing false references, glossary
 bullets, amendment self-links, and duplicated printed IDs outside the exact TCVN
-profile. Test output determinism and that extraction failures and malformed rows
-never expose a sentinel publisher string in errors or diagnostics. Test selected
-and unselected source rows and reject divergent source selection across entry
+profile. Test that the word-box replacement option requires a matching source
+hash and replacement count. Check rejection of invalid literals and numeric
+references, including another invalid code point with the option set. Test
+output determinism and that extraction failures and malformed rows never expose
+a sentinel publisher string in errors or diagnostics. Test selected and
+unselected source rows and reject divergent source selection across entry
 points. Test poor title coverage, stale rows, normalized duplicates and failed
 import leaving the old CSV intact using an invented `FRAMEWORKS_SOURCE_DIR`.
 
