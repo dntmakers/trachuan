@@ -82,12 +82,21 @@ practice header's x position, and fail on a word crossing the right edge.
 Exclude margin labels by that same band. An ID in an activity, metric or any
 other component cannot open a practice.
 
-Use the citation-free remainder of the opener as `title_original`. Keep the
-following left-cell description up to the activity header or the page footer. If
-the activity header moves to the next page, require the repeated component A
-header followed by the activity header there. Exclude activities, capability
-levels, related guidance and the metrics column. Join wraps with spaces.
-Preserve field breaks and explicit lists.
+Use the citation-free remainder of the opener as `title_original`. In the pinned
+edition a title wraps onto a second left-cell line for exactly these practices:
+APO01.02, APO01.03, APO01.10, APO01.11, APO02.02, APO04.04, APO05.03, APO07.05,
+APO08.02, APO11.03, APO13.01, APO13.02, APO13.03, APO14.01, APO14.03, BAI02.01,
+BAI03.11, BAI03.12, BAI04.01, BAI04.05, BAI08.01, DSS02.01, DSS04.04, DSS05.07,
+DSS06.01, DSS06.03, MEA04.01, MEA04.06 and MEA04.07. Only the font separates
+that line from the description, and word boxes carry no font, so the set is part
+of the fingerprint-bound profile: for these practices the second left-cell line
+joins `title_original`, a listed practice without a second line before the
+activity header fails, and every other title is one line. Keep the following
+left-cell description up to the activity header or the page footer. If the
+activity header moves to the next page, require the repeated component A header
+followed by the activity header there. Exclude activities, capability levels,
+related guidance and the metrics column. Join wraps with spaces. Preserve field
+breaks and explicit lists.
 
 The parser recognises each label only by this shape. In `-layout` a word is a
 whitespace-separated token; lines are one-based and include blank lines, and

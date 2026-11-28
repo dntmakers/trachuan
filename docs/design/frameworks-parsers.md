@@ -234,10 +234,10 @@ that excluded columns and sections did not enter the body. Before enabling the
 parser, save a regression baseline under `FRAMEWORKS_WORK_DIR`, keyed by edition
 and source hash. Store only counts and hashes: total, source and recipe hashes,
 and SHA-256 of the reviewed canonical parser records before the title join, both
-as a whole and per record in canonical order. Later parser changes must compare
-against this baseline, review each change against the source, and replace the
-baseline only after that review. These are local PR checks, not additional
-runtime build inputs.
+as a whole and per record in canonical order. Later parser changes, including a
+change to the Poppler pin or the adapter, must compare against this baseline,
+review each change against the source, and replace the baseline only after that
+review. These are local PR checks, not additional runtime build inputs.
 
 No source text, original titles, or private baseline data leave the
 [approved places](frameworks-access.md#licensed-material-and-where-it-may-be).
