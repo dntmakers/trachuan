@@ -44,12 +44,33 @@ func parseBBox(data []byte) ([]Page, error) {
 }
 
 func parseBBoxContext(ctx context.Context, data []byte) ([]Page, error) {
+	clean, _, err := scanBBox(ctx, data, false)
+	if err != nil {
+		return nil, ErrFile
+	}
+	return parseBBoxDecode(ctx, clean)
+}
+
+func parseBBoxWithReplacement(ctx context.Context, data []byte) ([]Page, int, error) {
+	clean, count, err := scanBBox(ctx, data, true)
+	if err != nil {
+		return nil, 0, ErrFile
+	}
+	pages, err := parseBBoxDecode(ctx, clean)
+	if err != nil {
+		return nil, 0, err
+	}
+	return pages, count, nil
+}
+
+func parseBBoxDecode(ctx context.Context, data []byte) ([]Page, error) {
 	const prefix = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">`
 	data = bytes.TrimPrefix(data, []byte(prefix))
 	decoder := xml.NewDecoder(&contextReader{ctx: ctx, reader: bytes.NewReader(data)})
 	var pages []Page
 	var stack []string
 	var word Word
+	var wordText strings.Builder
 	root, head, body, doc := false, false, false, false
 	for {
 		if ctx.Err() != nil {
@@ -107,6 +128,7 @@ func parseBBoxContext(ctx context.Context, data []byte) ([]Page, error) {
 				}
 				pages = append(pages, page)
 			case "word":
+				wordText.Reset()
 				word = Word{XMin: attrValue(value.Attr, "xMin"), YMin: attrValue(value.Attr, "yMin"), XMax: attrValue(value.Attr, "xMax"), YMax: attrValue(value.Attr, "yMax")}
 				xMin, ok1 := coordinate(word.XMin)
 				yMin, ok2 := coordinate(word.YMin)
@@ -122,6 +144,7 @@ func parseBBoxContext(ctx context.Context, data []byte) ([]Page, error) {
 				return nil, ErrFile
 			}
 			if value.Name.Local == "word" {
+				word.Text = wordText.String()
 				pages[len(pages)-1].Words = append(pages[len(pages)-1].Words, word)
 			}
 			stack = stack[:len(stack)-1]
@@ -134,7 +157,7 @@ func parseBBoxContext(ctx context.Context, data []byte) ([]Page, error) {
 			}
 			switch stack[len(stack)-1] {
 			case "word":
-				word.Text += string(value)
+				_, _ = wordText.Write(value)
 			case "title":
 			default:
 				if strings.TrimSpace(string(value)) != "" {
