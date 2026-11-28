@@ -105,6 +105,24 @@ class FrameworksVerificationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             v.manifest(FIXTURE.read_bytes() + b'\n', self.rules)
 
+    def test_manifest_refuses_unknown_recipe_fields(self):
+        recipes = json.loads(json.dumps(self.m['recipes']))
+        recipes['dense']['query']['private'] = 'LICENSED-SENTINEL'
+        with self.assertRaises(ValueError) as caught:
+            v.manifest(canonical(dict(self.m, recipes=recipes)), self.rules)
+        self.assertNotIn('LICENSED-SENTINEL', str(caught.exception))
+
+    def test_manifest_refuses_out_of_range_number_before_signature(self):
+        recipes = json.loads(json.dumps(self.m['recipes']))
+        recipes['retrieval']['rrf']['dense_weight'] = 10**400
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            path.joinpath('manifest.json').write_bytes(canonical(dict(self.m, recipes=recipes)))
+            calls = []
+            with self.assertRaisesRegex(ValueError, '^invalid frameworks recipe value: retrieval.rrf.dense_weight$'):
+                v.verify(path, self.rules, lambda args: calls.append(args))
+            self.assertEqual(calls, [])
+
     def test_deeply_nested_or_undecodable_manifest_is_a_verification_refusal(self):
         for data in (NESTED, b'\xff\xfe', b'{"kind": NaN', b''):
             for verifier, message in ((v.manifest, 'invalid frameworks manifest JSON'),

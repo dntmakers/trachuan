@@ -221,8 +221,10 @@ def state(rel=REL):
                framework_count=2, version_count=3, control_count=1612, versions_sealed=True,
                built_at='2099-01-02T00:00:00+00:00', extensions=dict(vector='0.8.1', ltree='1.3'))
     result = dict(row=row, dump=b'dump ' + SENTINEL.encode(),
-                  build=dict(dump=dict(sha256='', size=0), recipe=step('build', loader_version=1, k1=1.2),
-                             notes=SENTINEL),
+                  build=dict(dump=dict(sha256='', size=0),
+                             recipe=step('build', **{key: copy.deepcopy(row[key]) for key in
+                                                   ('schema_version', 'dense_recipe', 'lexical_recipe')}),
+                             retrieval_recipe=copy.deepcopy(row['retrieval_recipe']), notes=SENTINEL),
                   evaluate=dict(recipe=step('evaluate', limit=8), inputs={}, outputs={}),
                   report=dict(version=1, rel=rel, quality_pass=True, previous=None, cases=[dict(question=SENTINEL)]))
     return bind(result)

@@ -1,5 +1,8 @@
 import copy
 import importlib
+import importlib.util
+from pathlib import Path
+import sys
 import unittest
 
 from frameworks_test_support import release_recipes, vector_values
@@ -69,6 +72,19 @@ class RecipeShapesTest(unittest.TestCase):
             with self.subTest(index=index):
                 self.refused(change)
 
+    def test_numbers_outside_float_range_are_refused_with_field_path(self):
+        for number in (int(sys.float_info.max), -int(sys.float_info.max), sys.float_info.max):
+            recipes = copy.deepcopy(self.recipes)
+            recipes['retrieval']['rrf']['dense_weight'] = number
+            with self.subTest(number=number):
+                self.module.check_recipe_shapes(recipes)
+        for number in (10**400, -(10**400), int(sys.float_info.max) + 1, -int(sys.float_info.max) - 1):
+            recipes = copy.deepcopy(self.recipes)
+            recipes['retrieval']['rrf']['dense_weight'] = number
+            with self.subTest(number=number), self.assertRaisesRegex(
+                    ValueError, '^invalid frameworks recipe value: retrieval.rrf.dense_weight$'):
+                self.module.check_recipe_shapes(recipes)
+
     def test_only_a_measured_retrieval_recipe_can_be_signed(self):
         placeholder = vector_values()['step_build']['parameters']['retrieval_recipe']
         self.refused(lambda recipes: recipes.update(retrieval=placeholder))
@@ -79,6 +95,20 @@ class RecipeShapesTest(unittest.TestCase):
         self.refused(lambda recipes: recipes.pop('chunk'))
         self.refused(lambda recipes: recipes.update(extra={'version': 1}))
         self.refused(lambda recipes: recipes.update(chunk=[]))
+
+
+class HostRecipeShapesParityTest(RecipeShapesTest):
+    def test_validator_definitions_are_identical(self):
+        github = Path(__file__).with_name('frameworks_recipe_shapes.py')
+        host = Path(__file__).parents[1] / 'host' / 'updater' / 'deploy_frameworks_recipe_shapes.py'
+        self.assertEqual(github.read_bytes(), host.read_bytes())
+
+    def setUp(self):
+        path = Path(__file__).parents[1] / 'host' / 'updater' / 'deploy_frameworks_recipe_shapes.py'
+        spec = importlib.util.spec_from_file_location('host_recipe_shapes', path)
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.recipes = release_recipes()
 
 
 if __name__ == '__main__':

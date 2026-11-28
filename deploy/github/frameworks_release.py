@@ -1,8 +1,9 @@
+from decimal import Decimal
 import hashlib
 from typing import NamedTuple
 
 from corpus_manifest import sha256
-from frameworks_recipes import decode, decode_floats, recipe_sha256
+from frameworks_recipes import decode, decode_floats, parse, recipe_sha256
 from manifest import require_match
 
 BUCKET = 'trachuan-frameworks-releases'
@@ -73,6 +74,16 @@ def check_recipes(report, row_numbers, build_numbers, evaluate_numbers):
             raise ValueError(name + ' recipe differs from report')
 
 
+def same_json(left, right):
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(same_json(left[key], right[key]) for key in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(same_json(a, b) for a, b in zip(left, right))
+    if type(left) in (int, Decimal) and type(right) in (int, Decimal):
+        return left == right
+    return type(left) is type(right) and left == right
+
+
 def validate_release(rel, paths):
     release_id(rel)
     if set(paths) != set(LIMITS):
@@ -97,6 +108,15 @@ def validate_release(rel, paths):
         raise ValueError('release identity differs from request')
     if row.get('kind') != 'frameworks':
         raise ValueError('release row is not a frameworks release')
+    comparison_row = parse(row_bytes, parse_float=Decimal)
+    comparison_build = parse(build_bytes, parse_float=Decimal)
+    recipe = comparison_build.get('recipe')
+    parameters = recipe.get('parameters') if isinstance(recipe, dict) else None
+    for field in ('schema_version', 'dense_recipe', 'lexical_recipe', 'retrieval_recipe'):
+        source = comparison_build if field == 'retrieval_recipe' else parameters
+        if (not isinstance(source, dict) or field not in source or field not in comparison_row
+                or not same_json(comparison_row[field], source[field])):
+            raise ValueError(field)
     check_recipes(report, row_numbers, build_numbers, evaluate_numbers)
     if 'previous' not in report:
         raise ValueError('report previous reference missing')

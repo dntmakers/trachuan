@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from frameworks_test_support import PREVIOUS, REL, STEPS, digest, object_bytes, rebind_build, state, write_objects
+from frameworks_test_support import PREVIOUS, REL, STEPS, bind, digest, object_bytes, rebind_build, state, write_objects
 
 
 class FrameworksReleaseChecksTest(unittest.TestCase):
@@ -68,6 +68,29 @@ class FrameworksReleaseChecksTest(unittest.TestCase):
         value['build']['recipe']['version'] = 2
         rebind_build(value)
         with self.assertRaises(ValueError):
+            self.check(value)
+
+    def test_row_matches_bound_build_fields(self):
+        for field in ('schema_version', 'dense_recipe', 'lexical_recipe', 'retrieval_recipe'):
+            for side in ('row', 'build', 'missing_row', 'missing_build'):
+                with self.subTest(field=field, side=side):
+                    value = state()
+                    build = value['build'] if field == 'retrieval_recipe' else value['build']['recipe']['parameters']
+                    target = value['row'] if side.endswith('row') else build
+                    if side.startswith('missing'):
+                        target.pop(field)
+                    else:
+                        target[field] = True if field == 'schema_version' else {'private': 'secret'}
+                    bind(value)
+                    with self.assertRaisesRegex(ValueError, '^' + field + '$'):
+                        self.check(value)
+
+    def test_row_recipe_compares_large_integers_without_rounding(self):
+        value = state()
+        value['row']['dense_recipe']['dimensions'] = 9007199254740992
+        value['build']['recipe']['parameters']['dense_recipe']['dimensions'] = 9007199254740993
+        bind(value)
+        with self.assertRaisesRegex(ValueError, '^dense_recipe$'):
             self.check(value)
 
     def test_previous_must_be_null_or_a_closed_reference(self):

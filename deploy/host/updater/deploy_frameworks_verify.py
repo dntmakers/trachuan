@@ -1,6 +1,7 @@
 import hashlib
 from pathlib import Path
 
+from .deploy_frameworks_recipe_shapes import check_recipe_shapes
 from .deploy_frameworks_sql import RELEASE
 from .deploy_io import canonical, decode, read_json_bytes
 from .deploy_verify import accepted, flags, match, positive
@@ -48,14 +49,7 @@ def manifest(data, rules):
         raise ValueError('invalid frameworks counts')
     for field in ('versions', 'controls'):
         positive(counts[field], 'frameworks ' + field + ' count')
-    recipes = obj['recipes']
-    if not isinstance(recipes, dict) or set(recipes) != {'dense', 'chunk', 'lexical', 'retrieval'}:
-        raise ValueError('invalid frameworks recipes')
-    if any(not isinstance(recipe, dict) or not recipe for recipe in recipes.values()):
-        raise ValueError('invalid frameworks recipe')
-    match('[0-9a-f]{64}', recipes['dense'].get('query_hash'), 'dense query hash')
-    for name in ('lexical', 'retrieval'):
-        positive(recipes[name].get('version'), 'frameworks ' + name + ' recipe version')
+    check_recipe_shapes(obj['recipes'])
     if canonical(obj) != data:
         raise ValueError('frameworks manifest is not canonical JSON')
     return obj
