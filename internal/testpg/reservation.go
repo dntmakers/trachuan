@@ -54,7 +54,7 @@ func releaseForNameChecked(t *testing.T, name string, fail func()) string {
 			defer entry.mu.Unlock()
 			if !entry.lost {
 				var unlocked bool
-				if err := entry.conn.QueryRow(context.Background(), `SELECT pg_advisory_unlock($1)`, entry.key).Scan(&unlocked); err != nil || !unlocked {
+				if err := entry.conn.QueryRow(context.Background(), `SELECT pg_catalog.pg_advisory_unlock($1)`, entry.key).Scan(&unlocked); err != nil || !unlocked {
 					t.Errorf("unlock test release: unlocked=%v error=%v", unlocked, err)
 				}
 			}
@@ -69,7 +69,7 @@ func releaseForNameChecked(t *testing.T, name string, fail func()) string {
 			var held bool
 			err := entry.conn.Ping(ctx)
 			if err == nil {
-				err = entry.conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND pid=pg_backend_pid() AND classid::bigint=(($1::bigint >> 32) & 4294967295) AND objid::bigint=($1::bigint & 4294967295) AND objsubid=1 AND mode='ExclusiveLock' AND granted)`, entry.key).Scan(&held)
+				err = entry.conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_locks WHERE locktype='advisory' AND pid=pg_catalog.pg_backend_pid() AND classid::bigint=(($1::bigint >> 32) & 4294967295) AND objid::bigint=($1::bigint & 4294967295) AND objsubid=1 AND mode='ExclusiveLock' AND granted)`, entry.key).Scan(&held)
 			}
 			if err != nil || !held {
 				entry.lost = true
@@ -86,19 +86,19 @@ func acquireReservation(ctx context.Context, conn *pgx.Conn, name string) (strin
 		hash := sha256.Sum256([]byte("trachuan-test-release:" + rel))
 		key := int64(binary.BigEndian.Uint64(hash[:8]))
 		var locked bool
-		if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, key).Scan(&locked); err != nil {
+		if err := conn.QueryRow(ctx, `SELECT pg_catalog.pg_try_advisory_lock($1)`, key).Scan(&locked); err != nil {
 			return "", 0, fmt.Errorf("lock candidate: %w", err)
 		}
 		if !locked {
 			continue
 		}
-		var exists bool
-		if err := conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=$1)`, "corpus_vn_"+rel).Scan(&exists); err != nil {
+		exists, err := releaseTaken(ctx, conn, rel)
+		if err != nil {
 			return "", 0, fmt.Errorf("inspect candidate database: %w", err)
 		}
 		if exists {
 			var unlocked bool
-			if err := conn.QueryRow(ctx, `SELECT pg_advisory_unlock($1)`, key).Scan(&unlocked); err != nil {
+			if err := conn.QueryRow(ctx, `SELECT pg_catalog.pg_advisory_unlock($1)`, key).Scan(&unlocked); err != nil {
 				return "", 0, fmt.Errorf("unlock existing candidate: %w", err)
 			}
 			if !unlocked {
@@ -109,4 +109,23 @@ func acquireReservation(ctx context.Context, conn *pgx.Conn, name string) (strin
 		return rel, key, nil
 	}
 	return "", 0, fmt.Errorf("no test release available in 2099")
+}
+
+func releaseTaken(ctx context.Context, conn *pgx.Conn, rel string) (bool, error) {
+	rows, err := conn.Query(ctx, `SELECT datname, pg_catalog.shobj_description(oid, 'pg_database') FROM pg_catalog.pg_database`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var marker *string
+		if err := rows.Scan(&name, &marker); err != nil {
+			return false, err
+		}
+		if name == "corpus_vn_"+rel || name == "frameworks_"+rel || MarkerRunKey(marker) == "vn/"+rel {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }

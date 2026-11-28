@@ -124,3 +124,33 @@ func TestRelease_CleanupReleasesLock(t *testing.T) {
 		t.Fatalf("lock after cleanup: locked=%v error=%v", locked, err)
 	}
 }
+
+func TestRelease_SkipsDatabaseWithMatchingMarker(t *testing.T) {
+	admin, _ := administrator(t)
+	ctx := context.Background()
+	seed := t.Name()
+	var rel, name string
+	t.Run("create", func(t *testing.T) {
+		rel = releaseForName(t, seed)
+		if rel != releaseCandidates(seed)[0] {
+			t.Skip("first candidate is unavailable")
+		}
+		name = "corpus_tmp_vn_" + rel
+		if _, err := admin.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
+			t.Fatal(err)
+		}
+		marker := `{"run_key":"vn/` + rel + `"}`
+		if _, err := admin.Exec(ctx, "COMMENT ON DATABASE "+pgx.Identifier{name}.Sanitize()+" IS '"+marker+"'"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if name == "" {
+		t.Skip("could not prepare a marked database")
+	}
+	t.Cleanup(func() { DropCorpusDatabase(t, admin, name, "vn/"+rel) })
+	t.Run("reserve", func(t *testing.T) {
+		if got := releaseForName(t, seed); got == rel {
+			t.Fatalf("selected release %q with an existing marked database", got)
+		}
+	})
+}
