@@ -162,6 +162,14 @@ adds `title_original` and `snippet`: the body chunk with the best fused rank,
 cut by the law [snippet rule](mcp-results.md#snippet-rule) with the control as
 its one member. A reduced hit has neither, and `text_withheld: true`.
 
+### OCR provenance
+
+Set optional `text_source: "ocr"` on a search hit (including citation lookup),
+read unit or continuation part, or mapping edge when that object includes OCR
+text in its original title, snippet, text or evidence. A read's mapping units
+follow the edge rule. Reduced records, mapping ends and objects without OCR text
+omit the field. Apply the same rule to cached and paginated results.
+
 **Cursors** follow [continuations](#continuations).
 
 ## Read

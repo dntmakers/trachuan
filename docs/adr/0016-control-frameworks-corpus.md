@@ -142,3 +142,8 @@ and its per-document gate was stored but not enforced when serving
   [framework links](../design/frameworks-links.md); the reduced identity export
   and the change list per release are bound to the signed frameworks manifest
   ([downstream](../design/frameworks-downstream.md)).
+- 2026-11-28: framework OCR designed in
+  [framework OCR](../design/frameworks-ocr.md): a MacBook prepare command under
+  recorded provider terms checked before each send, evidence and waivers frozen
+  at snapshot. Sending the scan waits for the owner's approval of the terms
+  records and the caps.

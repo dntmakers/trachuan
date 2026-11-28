@@ -55,6 +55,7 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [control frameworks: release](frameworks-release.md)                             | Bucket, upload, signing workflow, host phase, schema, key and flag, and order for frameworks releases            |
 | [control frameworks: build](frameworks-build.md)                                 | Offline build command: steps, artifacts, resume, gaps and signing evidence                                       |
 | [control frameworks: licensed parsers](frameworks-parsers.md)                    | PDF and workbook parsers, version profiles, title import and coverage                                            |
+| [control frameworks: OCR](frameworks-ocr.md)                                     | Scan preparation, provider terms, frozen evidence, waivers and the TCVN 14423 profile                            |
 | [account mail](account-mail.md)                                                  | Mail outbox: classes, sender, content                                                                            |
 | [web API](web-api.md)                                                            | Google login flow, web sessions, CSRF, `/api/v1` routes, OpenAPI contract                                        |
 | [OAuth](oauth.md)                                                                | MCP authorization server: clients, consent, codes, tokens, aboutme import gaps                                   |

@@ -26,7 +26,7 @@
 - [ ] Titles: commands landed (#519); left: import compliary's `control_title.csv` into `FRAMEWORKS_SOURCE_DIR/trachuan/titles.csv` for each enabled edition and pass `check-titles`, again whenever an edition is enabled.
 - [ ] CIS Controls v8.1 back in releases: draft and review its 171 paraphrased titles (no seed row exists), then restore `parser`.
 - [ ] PDF parsers, one PR each in the order of frameworks-parsers.md: the sandboxed `pdftotext` adapter with ISO/IEC 27002:2022, then ISO/IEC 27017:2015, AICPA criteria, COBIT 2019, ISO/IEC 27001:2022, its Amd 1, ISO/IEC 27018:2019, TCVN 11930:2017, PCI DSS v4.0.1; each with private acceptance and `expected_controls`.
-- [ ] OCR path for `tcvn-14423-2025.pdf`: record both providers' data-use terms in the registry first (else gap `ocr_blocked`); Vision OCR, cross-check, flags; waivers under `FRAMEWORKS_SOURCE_DIR`, never in `sources/`; report cost before running.
+- [ ] OCR path for `tcvn-14423-2025.pdf` (design `docs/design/frameworks-ocr.md`, Astra four rounds, S-01 to S-12): record both providers' data-use terms in the registry first (else gap `ocr_blocked`); Vision OCR, cross-check, flags; waivers under `FRAMEWORKS_SOURCE_DIR`, never in `sources/`; report cost before running.
 
 ## 15.4 Serving (server and web)
 - [x] Results contract, engine, invariant suite, `/api/v1/frameworks`, OpenAPI, pages and corpus switch. Landed in #341, #345, #363, #366, #382, #396, #399, #400, #428 and #430.
