@@ -41,6 +41,7 @@ func (r frameworksResolver) ResolveFrameworks(ctx context.Context, rel string) (
 
 func configureFrameworks(ctx context.Context, cfg config, pool *pgxpool.Pool, queries *store.Queries, client *embedding.Client, tools *mcpapi.Config) func() {
 	if !cfg.frameworks {
+		tools.FrameworkEntitled = frameworkEntitled(queries)
 		return func() {}
 	}
 	resolver := &release.Resolver{Auth: frameworksStore{pool}, URLTemplate: cfg.corpusURL, Clock: time.Now, Logger: tools.Logger,
@@ -49,6 +50,9 @@ func configureFrameworks(ctx context.Context, cfg config, pool *pgxpool.Pool, qu
 			return embedding.Query{Client: client, RecipeHash: hash, ExpectedRecipe: &expected}
 		}}
 	tools.Frameworks = true
+	if cfg.frameworksMode == "entitled" {
+		tools.FrameworkEntitled = frameworkEntitled(queries)
+	}
 	tools.FrameworkResolver = frameworksResolver{resolver}
 	tools.FrameworkAccess = frameworkCaller(queries)
 	work, cancel := context.WithCancel(ctx)

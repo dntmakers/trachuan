@@ -231,10 +231,13 @@ podman exec trachuan-server /app/server admin frameworks list
 ```
 
 `revoke` takes the same `--email`, `--scope` and `--by`. Turning the flag on is
-an image change (`SERVER_FRAMEWORKS=true` in `deploy/host/server.env`), made
-only on the owner's decision after the memory check. Acceptance then runs with
-an entitled and a non-entitled account: the non-entitled one sees reduced
-records for licensed versions and full text for `free` ones.
+an image change (`SERVER_FRAMEWORKS=entitled` in `deploy/host/server.env`), made
+after the memory check. Acceptance then runs with an entitled and a non-entitled
+account: the entitled one reads every version, and the non-entitled one sees
+what the flag off shows (no framework tools, 404 on `/api/v1/frameworks`).
+`SERVER_FRAMEWORKS=true`, which shows reduced records to every account, waits
+for the licence terms review
+([rollout](../design/frameworks-access.md#rollout)).
 
 ## Retry and roll back
 

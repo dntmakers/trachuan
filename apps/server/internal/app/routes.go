@@ -94,7 +94,13 @@ func newWebMux(d webDeps) *webMux {
 		}
 	}
 	mountRoutes(mux, d.loginLimit.middleware(d.login.Start), d.loginLimit.middleware(d.login.Callback), logout, account, corpus)
-	return &webMux{ServeMux: mux, frameworks: guardFrameworkRoutes(d.tools.Frameworks, corpus)}
+	frameworks := guardFrameworkRoutes(d.tools.Frameworks, corpus)
+	if d.tools.FrameworkEntitled != nil {
+		frameworks = guardEntitledFrameworkRoutes(d.sessions, d.tools.FrameworkEntitled, d.tools.Frameworks, frameworks)
+	}
+	frameworkLimit := newLoginLimiter(d.loginLimit.clock, d.loginLimit.proxies)
+	frameworkLimit.cost = 500 * time.Millisecond
+	return &webMux{ServeMux: mux, frameworks: guardFrameworkAdmission(frameworkLimit, frameworks)}
 }
 
 func mountRoutes(mux *http.ServeMux, start, callback, logout, account, corpus http.Handler) {

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
+	"danny.vn/trachuan/apps/server/internal/accountemail"
 	"danny.vn/trachuan/apps/server/internal/store"
 	"github.com/jackc/pgx/v5"
 )
@@ -49,6 +51,20 @@ type accessStore struct {
 	rows                       []store.FrameworkEntitlement
 }
 
+func (s *accessStore) FrameworkAccessSnapshot(_ context.Context, id int64) (store.FrameworkAccessSnapshot, error) {
+	if id != 42 {
+		return store.FrameworkAccessSnapshot{}, pgx.ErrNoRows
+	}
+	if s.accountErr != nil {
+		return store.FrameworkAccessSnapshot{}, s.accountErr
+	}
+	if s.entitlementErr != nil {
+		return store.FrameworkAccessSnapshot{}, s.entitlementErr
+	}
+	s.email, _ = accountemail.Parse(s.account.Email)
+	return store.FrameworkAccessSnapshot{Account: s.account, Entitlements: append([]store.FrameworkEntitlement(nil), s.rows...)}, nil
+}
+
 func (s *accessStore) GetAccount(_ context.Context, id int64) (store.Account, error) {
 	if id != 42 {
 		return store.Account{}, pgx.ErrNoRows
@@ -59,6 +75,84 @@ func (s *accessStore) ListLiveFrameworkEntitlementsByEmail(_ context.Context, em
 	s.email = email
 	return s.rows, s.entitlementErr
 }
+
+type changingAccessStore struct {
+	*accessStore
+}
+
+func (s *changingAccessStore) FrameworkAccessSnapshot(ctx context.Context, id int64) (store.FrameworkAccessSnapshot, error) {
+	snapshot, err := s.accessStore.FrameworkAccessSnapshot(ctx, id)
+	blocked := time.Now()
+	s.account.BlockedAt = &blocked
+	s.rows = []store.FrameworkEntitlement{{Email: s.account.Email, Scope: "fw-alpha"}}
+	return snapshot, err
+}
+
+func TestEntitled_BlockAndGrantCannotCombineSnapshots(t *testing.T) {
+	s := &changingAccessStore{&accessStore{account: store.Account{ID: 42, Email: "Owner@example.test"}}}
+	service := Service{Store: s}
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("pre-block snapshot admitted a later grant")
+	}
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("post-block snapshot admitted the grant")
+	}
+}
+
+func TestEntitled_RechecksLiveAccess(t *testing.T) {
+	s := &accessStore{account: store.Account{ID: 42, Email: "Owner@example.test"}}
+	service := Service{Store: s, Frameworks: []string{"fw-alpha"}}
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("empty access set is entitled")
+	}
+	s.rows = []store.FrameworkEntitlement{{Email: "Owner@example.test", Scope: "fw-alpha"}}
+	if !service.Entitled(t.Context(), 42) {
+		t.Fatal("live entitlement was not recognized")
+	}
+	if service.Entitled(t.Context(), 0) {
+		t.Fatal("unauthenticated caller is entitled")
+	}
+	s.entitlementErr = errors.New("store unavailable")
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("store failure is entitled")
+	}
+	s.entitlementErr = nil
+	if !service.Entitled(t.Context(), 42) {
+		t.Fatal("store failure was cached")
+	}
+	revoked := time.Now()
+	s.rows[0].RevokedAt = &revoked
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("revocation was not observed")
+	}
+	s.rows = []store.FrameworkEntitlement{{Email: "Owner@example.test", Scope: "fw-other"}}
+	if !service.Entitled(t.Context(), 42) {
+		t.Fatal("live entitlement outside the active release was not recognized")
+	}
+	service.Frameworks = nil
+	if !service.Entitled(t.Context(), 42) {
+		t.Fatal("live entitlement requires a release")
+	}
+	s.rows[0].Scope = "*"
+	if !service.Entitled(t.Context(), 42) {
+		t.Fatal("wildcard entitlement was not recognized")
+	}
+	s.rows[0].Email = "other@example.test"
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("another email's entitlement was recognized")
+	}
+	s.rows[0].Email = "Owner@example.test"
+	s.account.Email = "invalid"
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("invalid account email was entitled")
+	}
+	s.account.Email = "Owner@example.test"
+	s.accountErr = errors.New("store unavailable")
+	if service.Entitled(t.Context(), 42) {
+		t.Fatal("account store failure is entitled")
+	}
+}
+
 func TestAccessSet_StoreFailureIsUnavailable(t *testing.T) {
 	for _, tc := range []struct {
 		name                       string
@@ -70,7 +164,7 @@ func TestAccessSet_StoreFailureIsUnavailable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &accessStore{account: store.Account{ID: 42, Email: "Owner@example.test"}, accountErr: tc.accountErr, entitlementErr: tc.entitlementErr}
 			service := Service{Store: s, Frameworks: []string{"fw-alpha"}}
-			set, err := service.AccessSet(context.Background(), 42)
+			set, err := service.AccessSet(t.Context(), 42)
 			if !errors.Is(err, ErrUnavailable) || err.Error() != "framework access unavailable" {
 				t.Fatalf("error=%v", err)
 			}
@@ -89,7 +183,7 @@ func TestAccessSet_CanonicalEmailAndKnownScopes(t *testing.T) {
 		{Email: "other@example.test", Scope: "*"},
 	}}
 	service := Service{Store: s, Frameworks: []string{"fw-alpha", "fw-beta"}}
-	set, err := service.AccessSet(context.Background(), 42)
+	set, err := service.AccessSet(t.Context(), 42)
 	if err != nil || s.email != "Owner@example.test" || !reflect.DeepEqual(set.Scopes(), []string{"fw-alpha"}) {
 		t.Fatalf("scopes=%v email=%q error=%v", set.Scopes(), s.email, err)
 	}
@@ -97,11 +191,11 @@ func TestAccessSet_CanonicalEmailAndKnownScopes(t *testing.T) {
 		t.Fatal("incorrect scope decision")
 	}
 	s.rows = []store.FrameworkEntitlement{{Email: "Owner@example.test", Scope: "*"}}
-	set, err = service.AccessSet(context.Background(), 42)
+	set, err = service.AccessSet(t.Context(), 42)
 	if err != nil || !reflect.DeepEqual(set.Scopes(), []string{"*"}) || Decide("fw-unknown", "licensed", set) != Reduced {
 		t.Fatal("wildcard admitted unknown framework")
 	}
-	set, err = service.AccessSet(context.Background(), 99)
+	set, err = service.AccessSet(t.Context(), 99)
 	if err != nil || len(set.Scopes()) != 0 || Decide("fw-alpha", "free", set) != Reduced {
 		t.Fatal("missing account gained access")
 	}

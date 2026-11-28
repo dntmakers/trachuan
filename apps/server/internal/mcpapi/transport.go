@@ -2,9 +2,12 @@ package mcpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"unicode/utf8"
 
 	"danny.vn/trachuan/apps/server/internal/credential"
@@ -50,11 +53,18 @@ func guard(next http.Handler) http.Handler {
 			return
 		}
 
-		r = r.Clone(r.Context())
+		limited := &discoveryLimit{}
+		r = r.Clone(context.WithValue(r.Context(), discoveryLimitKey{}, limited))
 		r.Header.Del("Mcp-Session-Id")
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		buffered := &jsonResponse{header: make(http.Header)}
 		next.ServeHTTP(buffered, r)
+		if limited.limited {
+			seconds := max(int64(1), int64(math.Ceil(limited.retry.Seconds())))
+			w.Header().Set("Retry-After", strconv.FormatInt(seconds, 10))
+			protocolError(w, http.StatusTooManyRequests, -32000, request.ID.Raw())
+			return
+		}
 		for key, values := range buffered.header {
 			if key != "Mcp-Session-Id" {
 				w.Header()[key] = values

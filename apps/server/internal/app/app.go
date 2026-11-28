@@ -125,7 +125,7 @@ func readyCheck(ctx context.Context, auth, activeRelease func(context.Context) e
 }
 
 func serve(ctx context.Context, cfg config, pool *pgxpool.Pool, queries *store.Queries, stderr io.Writer) error {
-	slog.New(slog.NewJSONHandler(stderr, nil)).Info("frameworks configuration", "enabled", cfg.frameworks)
+	slog.New(slog.NewJSONHandler(stderr, nil)).Info("frameworks configuration", "mode", cfg.frameworksMode)
 	clock := time.Now
 	summaryManager := publicsummary.NewManager(publicsummary.Metadata(pool), publicsummary.OpenPostgres(cfg.corpusURL), clock)
 	defer summaryManager.Close()

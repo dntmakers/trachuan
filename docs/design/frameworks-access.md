@@ -24,7 +24,9 @@ again. Auth database table `framework_entitlement`:
 | `revoke_reason`            | `operator` or `restore`                                 |
 
 One live row per `(email, scope)`. It applies only to an account whose email is
-verified and equals `email`; it may exist before the account does.
+verified and equals `email`; it may exist before the account does. An account
+the operator creates with `server admin account create` counts as verified by
+the operator, who also grants entitlements.
 
 `server admin frameworks allow|revoke` writes grants and revocations. Each
 change commits with its `framework_entitlement_event` row, which records who,
@@ -61,16 +63,20 @@ unavailable.
 
 Until the licence terms review
 ([ADR 0016](../adr/0016-control-frameworks-corpus.md) decision 10) the server
-runs with `SERVER_FRAMEWORKS=entitled`. A caller is **entitled** when the access
-set function returns a non-empty set without error. For a caller who is not,
-every framework surface behaves exactly as with the flag off: the framework
-tools are absent from `tools/list` and from `guide`, a call to one and
+runs with `SERVER_FRAMEWORKS=entitled`. A caller is **entitled** when the
+entitlement lookup returns, without error, at least one live entitlement (any
+scope) for the verified email of the account; it needs no release. For a caller
+who is not, every framework surface behaves exactly as with the flag off: the
+framework tools are absent from `tools/list` and from `guide`, a call to one and
 `corpus: "frameworks"` on a shared tool fail as they do with the flag off, and
 every `/api/v1/frameworks` route answers 404; the website learns this from the
 API, as it does today. A store error counts as not entitled and is never cached.
 The check runs on every request, after authentication and before any framework
-cache or cursor, in the function that computes the access set; no other path
-decides it. An entitled caller is served as with `true`.
+cache or cursor, through the store the access set function reads, so one request
+sees one snapshot; no other path decides it. An entitled caller is served as
+with `true`. Protocol checks and the admission limits in [budgets](budgets.md)
+run before any entitlement read, so a caller who is not entitled cannot load the
+auth store faster than the limits allow.
 
 ## Reduced record
 

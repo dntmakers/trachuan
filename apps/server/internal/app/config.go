@@ -23,6 +23,7 @@ type config struct {
 	publicSummaries                                                                                    bool
 	publicSample                                                                                       bool
 	frameworks                                                                                         bool
+	frameworksMode                                                                                     string
 	frameworksKey                                                                                      []byte
 	omitCompactRelated                                                                                 bool
 	trustedProxies                                                                                     []netip.Prefix
@@ -59,14 +60,16 @@ func loadConfig() (config, error) {
 			return config{}, errors.New("invalid SERVER_PUBLIC_SAMPLE")
 		}
 	}
+	c.frameworksMode = "false"
 	if raw, present := os.LookupEnv("SERVER_FRAMEWORKS"); present {
 		switch raw {
-		case "true":
+		case "true", "entitled":
 			c.frameworks = true
 		case "false":
 		default:
 			return config{}, errors.New("invalid SERVER_FRAMEWORKS")
 		}
+		c.frameworksMode = raw
 	}
 	if c.frameworks {
 		c.frameworksKey, err = loadFrameworksKey(os.Getenv("SERVER_FRAMEWORKS_KEY_FILE"))

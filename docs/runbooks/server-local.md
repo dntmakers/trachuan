@@ -46,9 +46,11 @@ unset and rejects outside origins with 403; `log` explicitly allows them while
 recording observations. Any other value, including an empty value, prevents
 startup.
 
-`SERVER_FRAMEWORKS` defaults to `false`. Only `true` and `false` are accepted;
-an empty or any other value prevents startup. The server logs the value at
-startup; the flag gates no routes yet.
+`SERVER_FRAMEWORKS` defaults to `false`. Only `false`, `entitled` and `true` are
+accepted; an empty or any other value prevents startup. `entitled` shows the
+framework tools, routes and pages only to an account with a live entitlement
+([rollout](../design/frameworks-access.md#rollout)). The server logs the mode at
+startup.
 
 Create the required local key file outside the repository, then enable captured
 mail. Capture requires loopback hosts in both `SERVER_PUBLIC_URL` and

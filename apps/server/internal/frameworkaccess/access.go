@@ -11,8 +11,7 @@ import (
 )
 
 type Store interface {
-	GetAccount(context.Context, int64) (store.Account, error)
-	ListLiveFrameworkEntitlementsByEmail(context.Context, string) ([]store.FrameworkEntitlement, error)
+	FrameworkAccessSnapshot(context.Context, int64) (store.FrameworkAccessSnapshot, error)
 }
 
 type Service struct {
@@ -65,31 +64,38 @@ func (s Set) Scopes() []string {
 	return scopes
 }
 
-func (s *Service) AccessSet(ctx context.Context, accountID int64) (Set, error) {
-	account, err := s.Store.GetAccount(ctx, accountID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Set{}, nil
+func (s *Service) Entitled(ctx context.Context, accountID int64) bool {
+	if accountID <= 0 || s.Store == nil {
+		return false
 	}
-	if err != nil {
-		return Set{}, ErrUnavailable
+	email, rows, err := s.liveEntitlements(ctx, accountID)
+	if err != nil || email == "" {
+		return false
 	}
-	if account.BlockedAt != nil || account.DeleteRequestedAt != nil {
-		return Set{}, nil
+	for _, row := range rows {
+		if row.Email == email && row.RevokedAt == nil {
+			return true
+		}
 	}
-	email, err := accountemail.Parse(account.Email)
-	if err != nil {
-		return Set{}, ErrUnavailable
-	}
-	rows, err := s.Store.ListLiveFrameworkEntitlementsByEmail(ctx, email)
-	if err != nil {
-		return Set{}, ErrUnavailable
-	}
-	set := Set{known: make(map[string]struct{}, len(s.Frameworks)), codes: make(map[string]struct{})}
-	for _, code := range s.Frameworks {
-		if _, err = store.ParseFrameworkScope(code); err == nil && code != "*" {
+	return false
+}
+
+func EmptySet(frameworks []string) Set {
+	set := Set{known: make(map[string]struct{}, len(frameworks)), codes: make(map[string]struct{})}
+	for _, code := range frameworks {
+		if _, err := store.ParseFrameworkScope(code); err == nil && code != "*" {
 			set.known[code] = struct{}{}
 		}
 	}
+	return set
+}
+
+func (s *Service) AccessSet(ctx context.Context, accountID int64) (Set, error) {
+	email, rows, err := s.liveEntitlements(ctx, accountID)
+	if err != nil || email == "" {
+		return Set{}, err
+	}
+	set := EmptySet(s.Frameworks)
 	for _, row := range rows {
 		if row.Email != email || row.RevokedAt != nil {
 			continue
@@ -103,4 +109,23 @@ func (s *Service) AccessSet(ctx context.Context, accountID int64) (Set, error) {
 		}
 	}
 	return set, nil
+}
+
+func (s *Service) liveEntitlements(ctx context.Context, accountID int64) (string, []store.FrameworkEntitlement, error) {
+	snapshot, err := s.Store.FrameworkAccessSnapshot(ctx, accountID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, nil
+	}
+	if err != nil {
+		return "", nil, ErrUnavailable
+	}
+	account := snapshot.Account
+	if account.BlockedAt != nil || account.DeleteRequestedAt != nil {
+		return "", nil, nil
+	}
+	email, err := accountemail.Parse(account.Email)
+	if err != nil {
+		return "", nil, ErrUnavailable
+	}
+	return email, snapshot.Entitlements, nil
 }

@@ -119,6 +119,9 @@ func frameworkToolCall(cfg Config, name string, input, output *jsonschema.Schema
 		panic("invalid combined tool output schema")
 	}
 	return combinedInput, combinedOutput, func(ctx context.Context, raw json.RawMessage) (*mcp.CallToolResult, error) {
+		if lawCall != nil && !frameworkVisible(ctx) {
+			return lawCall(ctx, raw)
+		}
 		var value map[string]any
 		if json.Unmarshal(raw, &value) != nil || resolved.Validate(value) != nil {
 			return nil, invalidRequest{}
