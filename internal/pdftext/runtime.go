@@ -2,6 +2,7 @@ package pdftext
 
 import (
 	"bufio"
+	"context"
 	"debug/macho"
 	"errors"
 	"os"
@@ -62,7 +63,7 @@ func binaryRpaths(path, executable string) ([]string, error) {
 	return paths, nil
 }
 
-func resolveRuntime(executable string) (runtimeSet, error) {
+func resolveRuntime(ctx context.Context, executable string) (runtimeSet, error) {
 	var set runtimeSet
 	seen := map[string]bool{}
 	aliases := map[string]bool{}
@@ -78,6 +79,9 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 	}
 	var visit func(string, []string) error
 	visit = func(path string, inherited []string) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		addMetadata(path)
 		real, links, directories, err := traceRuntimePath(path)
 		if err != nil {
@@ -106,7 +110,7 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 			return err
 		}
 		rpaths = append(rpaths, inherited...)
-		cmd := exec.Command("/usr/bin/otool", "-L", real)
+		cmd := exec.CommandContext(ctx, "/usr/bin/otool", "-L", real)
 		cmd.Env = []string{"LC_ALL=C"}
 		data, err := cmd.Output()
 		if err != nil {
@@ -117,6 +121,9 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 			return errors.New("invalid library list")
 		}
 		for scanner.Scan() {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
 			lib, _, ok := strings.Cut(strings.TrimSpace(scanner.Text()), " (compatibility version ")
 			if !ok {
 				return errors.New("invalid library record")
@@ -163,18 +170,24 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 		return runtimeSet{}, err
 	}
 	poppler := filepath.Dir(filepath.Dir(executable))
-	data, err := runtimeDataPaths("/opt/homebrew/Cellar", poppler)
+	data, err := runtimeDataPathsContext(ctx, "/opt/homebrew/Cellar", poppler)
 	if err != nil {
 		return runtimeSet{}, err
 	}
 	set.files = append(set.files, data.files...)
 	set.dataDirs = append(set.dataDirs, data.dataDirs...)
 	for _, path := range data.metadata {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return runtimeSet{}, ctxErr
+		}
 		addMetadata(path)
 	}
 	set.systemFiles = append(set.systemFiles, "/usr/lib/dyld")
 	addMetadata("/usr/lib/dyld")
 	for _, path := range []string{"/System/Library/dyld", "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld", "/private/var/db/dyld"} {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return runtimeSet{}, ctxErr
+		}
 		if _, statErr := os.Stat(path); errors.Is(statErr, os.ErrNotExist) {
 			continue
 		} else if statErr != nil {
@@ -190,12 +203,21 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 		addMetadata(real)
 	}
 	for _, path := range set.files {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return runtimeSet{}, ctxErr
+		}
 		addMetadata(path)
 	}
 	for _, path := range set.dataDirs {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return runtimeSet{}, ctxErr
+		}
 		addMetadata(path)
 	}
 	for path := range aliases {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return runtimeSet{}, ctxErr
+		}
 		set.metadata = append(set.metadata, path)
 	}
 	sort.Strings(set.files)
@@ -203,19 +225,19 @@ func resolveRuntime(executable string) (runtimeSet, error) {
 	sort.Strings(set.dataDirs)
 	sort.Strings(set.systemDirs)
 	sort.Strings(set.metadata)
-	set.snapshot, err = snapshotRuntime(set)
+	set.snapshot, err = snapshotRuntimeContext(ctx, set)
 	if err != nil {
 		return runtimeSet{}, err
 	}
-	set.platform, err = readPlatformIdentity(set.cacheDirs)
+	set.platform, err = readPlatformIdentityContext(ctx, set.cacheDirs)
 	if err != nil {
 		return runtimeSet{}, err
 	}
-	set.identity, err = runtimeIdentity(set, "pdftotext version "+Version+"\n")
+	set.identity, err = runtimeIdentityContext(ctx, set, "pdftotext version "+Version+"\n")
 	if err != nil {
 		return runtimeSet{}, err
 	}
-	if err = checkRuntimeSnapshot(set, set.snapshot); err != nil {
+	if err = checkRuntimeSnapshotContext(ctx, set, set.snapshot); err != nil {
 		return runtimeSet{}, err
 	}
 	return set, nil

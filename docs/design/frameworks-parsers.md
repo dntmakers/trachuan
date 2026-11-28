@@ -91,12 +91,15 @@ the tool's runtime files, `/dev/null` and the inherited pipes, so the scratch
 limit is zero writes. macOS enforces neither `RLIMIT_RSS` (a reclaim preference,
 `man 2 setrlimit`) nor `RLIMIT_AS`, so the memory limit is a watchdog: it
 samples the resident memory of the subprocess every 50 ms and kills its process
-group above the limit, which fails as an exceeded limit. The sampling gap is
-accepted because every input is a registry-pinned file. Never log extractor
-output or raw errors. Discard bounded stderr on success. Nonzero exit, exceeded
-limit, invalid output, a missing target region or unusable text in a required
-body region fails `parse`. Empty non-content pages do not fail. Do not fall back
-to OCR on extraction or parser failure; use separate scan eligibility in
+group above the limit, which fails as an exceeded limit. One sample may take up
+to 1 s on a loaded machine; a failed sample, or no completed sample for 1 s,
+fails the run as an unenforceable limit. The version check runs under the same
+60 s per-call bound as extraction. The sampling gap is accepted because every
+input is a registry-pinned file. Never log extractor output or raw errors.
+Discard bounded stderr on success. Nonzero exit, exceeded limit, invalid output,
+a missing target region or unusable text in a required body region fails
+`parse`. Empty non-content pages do not fail. Do not fall back to OCR on
+extraction or parser failure; use separate scan eligibility in
 [scans](frameworks.md#scans).
 
 The parse recipe binds the exact extractor version and flags, parser revisions

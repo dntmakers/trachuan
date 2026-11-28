@@ -1,6 +1,7 @@
 package pdftext
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -22,7 +23,11 @@ type runtimeSet struct {
 }
 
 func runtimeIdentity(set runtimeSet, versionLine string) (string, error) {
-	entries, err := snapshotRuntime(set)
+	return runtimeIdentityContext(context.Background(), set, versionLine)
+}
+
+func runtimeIdentityContext(ctx context.Context, set runtimeSet, versionLine string) (string, error) {
+	entries, err := snapshotRuntimeContext(ctx, set)
 	if err != nil {
 		return "", err
 	}
@@ -31,12 +36,18 @@ func runtimeIdentity(set runtimeSet, versionLine string) (string, error) {
 	h := sha256.New()
 	_, _ = fmt.Fprintf(h, "%d:%s\n%d:%s\n", len(versionLine), versionLine, len(set.platform.build), set.platform.build)
 	for i, cache := range caches {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if cache.path == "" || cache.uuid == [16]byte{} || (i > 0 && caches[i-1].path == cache.path) {
 			return "", errors.New("invalid cache identity")
 		}
 		_, _ = fmt.Fprintf(h, "%d:%s:%x\n", len(cache.path), cache.path, cache.uuid)
 	}
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if !entry.hash {
 			continue
 		}
@@ -70,6 +81,9 @@ func runtimeIdentity(set runtimeSet, versionLine string) (string, error) {
 			return "", errors.New("runtime changed during verification")
 		}
 		_, _ = fmt.Fprintf(h, "%d:%s:%d:%x\n", len(entry.path), entry.path, size, digest.Sum(nil))
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }

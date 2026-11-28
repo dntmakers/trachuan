@@ -79,7 +79,7 @@ func cmapPDF() []byte {
 }
 
 func TestLayout_UsesBundledCMap(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestLayout_UsesBundledCMap(t *testing.T) {
 }
 
 func TestLayout_PagesAndDeterminism(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestLayout_PagesAndDeterminism(t *testing.T) {
 }
 
 func TestBBox_MetadataFromPDF(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestBBox_MetadataFromPDF(t *testing.T) {
 }
 
 func TestBBox_PagesAndCoordinates(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestBBox_PagesAndCoordinates(t *testing.T) {
 }
 
 func TestLayout_FailureHidesInput(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,18 +160,27 @@ func TestLayout_FailureHidesInput(t *testing.T) {
 }
 
 func TestDocument_SharedDeadline(t *testing.T) {
-	e, err := NewExtractor(NewLimiter())
+	e, err := NewExtractor(context.Background(), NewLimiter())
 	if err != nil {
 		t.Fatal(err)
 	}
-	doc, cancel := e.open(context.Background(), pagePDF("First"), 90*time.Millisecond)
+	before := time.Now()
+	doc, cancel := e.open(context.Background(), pagePDF("First"), time.Hour)
+	after := time.Now()
 	defer cancel()
+	deadline, ok := doc.ctx.Deadline()
+	if !ok || deadline.Before(before.Add(time.Hour)) || deadline.After(after.Add(time.Hour)) {
+		t.Fatalf("configured document deadline: %v, %v", deadline, ok)
+	}
 	if _, err := doc.Layout(); err != nil {
 		t.Fatal(err)
 	}
-	<-doc.ctx.Done()
+	if got, ok := doc.ctx.Deadline(); !ok || !got.Equal(deadline) {
+		t.Fatalf("document deadline: %v, %v; want %v", got, ok, deadline)
+	}
+	cancel()
 	if _, err := doc.BBox(); !errors.Is(err, ErrFile) {
-		t.Fatalf("expired document: %v", err)
+		t.Fatalf("cancelled document: %v", err)
 	}
 }
 
@@ -193,14 +202,12 @@ func TestSampleRSS_CurrentProcess(t *testing.T) {
 
 func TestWatchdog_SamplerFailure(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", `while :; do :; done`}, nil, 100, 100)
+	p, err := e.start(context.Background(), []string{"-c", `while :; do :; done`}, nil, 100, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.sample = func(context.Context, int) (uint64, error) { return 0, errors.New("unavailable") }
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Millisecond)
-	defer cancel()
-	_, _, err = p.wait(ctx)
+	_, _, err = p.wait(context.Background())
 	if !errors.Is(err, ErrConfiguration) {
 		t.Fatalf("sampler failure: %v", err)
 	}
@@ -211,18 +218,38 @@ func TestWatchdog_SamplerFailure(t *testing.T) {
 
 func TestWatchdog_ExceedsMemory(t *testing.T) {
 	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
-	p, err := e.start([]string{"-c", `while :; do :; done`}, nil, 100, 100)
+	p, err := e.start(context.Background(), []string{"-c", `while :; do :; done`}, nil, 100, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p.sample = func(context.Context, int) (uint64, error) { return 1<<30 + 1, nil }
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Millisecond)
-	defer cancel()
-	_, _, err = p.wait(ctx)
+	_, _, err = p.wait(context.Background())
 	if !errors.Is(err, ErrMemoryLimit) {
 		t.Fatalf("memory limit: %v", err)
 	}
 	if err = syscall.Kill(-p.cmd.Process.Pid, 0); !errors.Is(err, syscall.ESRCH) {
 		t.Fatalf("process group remains: %v", err)
+	}
+}
+
+func TestWatchdog_ContinuesAfterSample(t *testing.T) {
+	e := &Extractor{path: "/bin/bash", runtime: testRuntime(), limiter: NewLimiter()}
+	p, err := e.start(context.Background(), []string{"-c", `while :; do :; done`}, []byte("input"), 100, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	calls := 0
+	p.sample = func(context.Context, int) (uint64, error) {
+		calls++
+		if calls == 2 {
+			cancel()
+		}
+		return 0, nil
+	}
+	_, _, err = p.wait(ctx)
+	if !errors.Is(err, ErrFile) || calls != 2 {
+		t.Fatalf("sample calls: %d, error: %v", calls, err)
 	}
 }
