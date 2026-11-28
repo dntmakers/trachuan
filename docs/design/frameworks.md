@@ -89,7 +89,7 @@ version's expected count in the registry.
 ### Scans
 
 A PDF with no text layer (today `tcvn-14423-2025.pdf`, 48 pages) goes through
-[OCR](ocr-check.md): Vision OCR, the model cross-check, flags and reviewed
+[OCR](frameworks-ocr.md): Vision OCR, the model cross-check, flags and reviewed
 waivers. [ADR 0014](../adr/0014-ocr-on-the-write-path.md) lets only public legal
 text reach the two providers; ADR 0016 adds the exception for framework scans,
 on the owner's decision. Before the first licensed scan is sent, the registry
