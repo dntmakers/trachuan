@@ -33,6 +33,7 @@ type isoSection struct {
 }
 type isoProfile struct {
 	header, footer string
+	footerLast     func(isoLine) bool
 	headerSuffix   bool
 	lookahead      int
 	start          func(isoLine, []isoLine) bool
@@ -63,7 +64,7 @@ type isoBody struct {
 }
 
 func walkISO(pages []string, profile isoProfile) ([]Node, error) {
-	reader := isoReader{pages: pages, header: profile.header, footer: profile.footer, headerSuffix: profile.headerSuffix}
+	reader := isoReader{pages: pages, header: profile.header, footer: profile.footer, headerSuffix: profile.headerSuffix, footerLast: profile.footerLast}
 	var queue []isoLine
 	fill := func() {
 		for len(queue) < profile.lookahead+1 {

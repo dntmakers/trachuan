@@ -9,6 +9,7 @@ type isoReader struct {
 	active, first, endFiltered bool
 	pending                    []isoLine
 	header, footer             string
+	footerLast                 func(isoLine) bool
 	headerSuffix               bool
 	blankBefore, contentFirst  bool
 }
@@ -37,7 +38,11 @@ func (r *isoReader) next() (isoLine, bool) {
 						hasFooter = true
 					}
 				}
-				if hasFooter {
+				if r.footerLast != nil {
+					if n := len(r.pending); n > 0 && r.footerLast(r.pending[n-1]) {
+						r.pending = r.pending[:n-1]
+					}
+				} else if hasFooter {
 					kept := r.pending[:0]
 					for _, line := range r.pending {
 						if !strings.Contains(line.text, r.footer) && !isoPageNumber(line.text) {
