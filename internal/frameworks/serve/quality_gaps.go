@@ -28,7 +28,7 @@ func (e *Engine) validateGaps(r GapsRequest) (GapsRequest, []int64, error) {
 	if !e.releaseMatches(r.Release) {
 		return r, nil, ErrReleaseExpired
 	}
-	kinds := []string{"mapping_unresolved", "mapping_dropped", "title_missing", "ocr_blocked", "ocr_flagged", "text_incomplete", "chunk_omission", "embedding_input_too_long", "embedding_input_bytes_exceeded"}
+	kinds := []string{"knowledge_stale", "mapping_unresolved", "mapping_dropped", "title_missing", "ocr_blocked", "ocr_flagged", "text_incomplete", "chunk_omission", "embedding_input_too_long", "embedding_input_bytes_exceeded"}
 	if r.Kind != "" && !slices.Contains(kinds, r.Kind) {
 		return r, nil, ErrInvalidRequest
 	}

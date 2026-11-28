@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS quality_gap (
  blocks boolean NOT NULL,
  PRIMARY KEY (kind,version_id,subject,detail),
  CONSTRAINT quality_gap_class_check CHECK (
-  (class='public' AND kind IN ('mapping_unresolved','mapping_dropped','title_missing')) OR
+  (class='public' AND kind IN ('knowledge_stale','mapping_unresolved','mapping_dropped','title_missing')) OR
   (class='text' AND kind IN ('ocr_blocked','ocr_flagged','text_incomplete','chunk_omission','embedding_input_too_long','embedding_input_bytes_exceeded'))
  ),
  CONSTRAINT quality_gap_blocks_check CHECK (

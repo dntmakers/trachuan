@@ -9,7 +9,7 @@ type gapRule struct {
 
 func gapKinds() map[string]gapRule {
 	return map[string]gapRule{
-		"mapping_unresolved": {"public", "never"}, "mapping_dropped": {"public", "never"},
+		"knowledge_stale": {"public", "never"}, "mapping_unresolved": {"public", "never"}, "mapping_dropped": {"public", "never"},
 		"title_missing": {"public", "licensed"}, "ocr_blocked": {"text", "always"},
 		"ocr_flagged": {"text", "never"}, "text_incomplete": {"text", "never"},
 		"chunk_omission": {"text", "never"}, "embedding_input_too_long": {"text", "never"},

@@ -71,6 +71,7 @@ jobs:
                 deploy/oci/*|.github/workflows/ci.yml) tofu=true ;;
               esac
               case "$path" in
+                docs/design/*|docs/runbooks/*) go=true ;;
                 *.md) ;;
                 deploy/host/*|deploy/images/*|deploy/github/*|.github/workflows/*) go=true ;;
                 apps/web/*) ;;

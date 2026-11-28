@@ -40,8 +40,13 @@ for path in json.loads(os.environ['CHANGED_PATHS']): sys.stdout.buffer.write(pat
             with self.subTest(path=path):
                 self.assertEqual(self.preflight([path])['go'], 'true')
 
-    def test_docs_only_skips_static_but_pushes_run_it(self):
-        self.assertEqual(self.preflight(['docs/design/backups.md'])['go'], 'false')
+    def test_docs_select_static_when_tests_read_them(self):
+        for path in ['docs/design/backups.md', 'docs/design/nested/example.md',
+                     'docs/runbooks/release-restore.md', 'docs/runbooks/nested/example.md']:
+            with self.subTest(path=path):
+                self.assertEqual(self.preflight([path])['go'], 'true')
+        self.assertEqual(self.preflight(['docs/standards/engineering.md'])['go'], 'false')
+        self.assertEqual(self.preflight(['README.md'])['go'], 'false')
         self.assertEqual(self.preflight([], event='push')['go'], 'true')
 
     def test_agenteval_paths_select_the_harness_job(self):
