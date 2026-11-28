@@ -139,3 +139,6 @@ knowledge.
   previous report the run freezes at start; the uploader requires that previous
   to be the production release. Reviewed knowledge lives in
   `sources/<cc>-knowledge.yaml`.
+- 2026-11-28: reviewed links from a control to a legal provision, by public
+  identity, with exact law quotes validated against a frozen signed law release
+  ([framework links](../design/frameworks-links.md)).

@@ -48,6 +48,8 @@ Intended behavior of trachuan. Decisions with alternatives are in the
 | [control frameworks: access](frameworks-access.md)                               | Access classes, entitlements, reduced record, the invariant, places for licensed material                        |
 | [control frameworks: results](frameworks-results.md)                             | Handles, inputs, search, read, mappings, diagnostics and web routes for frameworks                               |
 | [control frameworks: results and the invariant](frameworks-results-invariant.md) | Why each results rule holds the invariant, and its tests                                                         |
+| [framework links](frameworks-links.md)                                           | Edge kinds, mapping schema, reviewed law links and serving                                                       |
+| [downstream framework releases](frameworks-downstream.md)                        | Reduced export, signed identity and change files, and sc365 import                                               |
 | [control frameworks: evaluation](frameworks-evaluation.md)                       | Golden cases, hits, cohorts, measured recipe, release invariant check, floors                                    |
 | [control frameworks: restore](frameworks-release-restore.md)                     | What a frameworks dump may do on the host, log settings, restore steps and smoke                                 |
 | [control frameworks: release](frameworks-release.md)                             | Bucket, upload, signing workflow, host phase, schema, key and flag, and order for frameworks releases            |

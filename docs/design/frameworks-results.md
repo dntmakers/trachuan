@@ -192,30 +192,24 @@ units built from public fields, so its boundaries do not depend on text.
 
 ## Mappings
 
-Input: `handle` (edges at one control) or `from` and `to` (version handles:
-edges from one version to the other), optional `relation[]`, `limit` and
-`cursor`. Output: `release`, `edges`, `next_cursor`, `access_set_version`.
+Input: `handle` or `from` and `to`, optional `relation[]`, `limit` and `cursor`.
+Output: `release`, `edges`, `next_cursor`, `access_set_version`. The
+[link contract](frameworks-links.md#serving) owns the selectors, kind and
+relation sets, typed ends, public edge key and evidence admission. Equal version
+handles select within-version edges. A control handle also selects its reviewed
+law links. The typed key orders and continues all results.
 
-An edge: `from` and `to` ends, `relation` (`equivalent`, `subset`, `superset`,
-`intersects`, `related`), `source` (mapping source name) and `resolved`. Edges
-are directed as stored; a `handle` query returns edges where the control is
-either end. The build rejects two edges with the same (`from`, `to`, `relation`,
-`source`), so that tuple is unique; it is the order and the continuation key.
-The page size and the evidence size per edge are in [budgets](budgets.md):
-evidence longer than its cap is cut by the law cut rule and carries
-`evidence_truncated: true`; the full value is in the control's read units.
+Each edge has `kind`, `from`, `to`, `relation`, `source` and `resolved`. Control
+ends always use the reduced form. Resolved ends give `handle`, `citation`,
+`version` and `title`. Unresolved ends give only the business key. Law ends give
+`country`, `key`, `anchor` and the law `release` that verified that exact
+provision.
 
-**Every end is reduced for every caller**: `handle`, `citation`, `version`,
-`title` (ours). An unresolved end gives the target's business key (code,
-version, citation) and no title.
-
-**Evidence.** Each evidence value carries, from the build, the set of licensed
-versions whose text it quotes or paraphrases, whatever source supplied it. An
-empty set means public. A value whose set cannot be established fails the build.
-The edge carries `evidence` only when the set is empty or the caller can read
-every version in it. Otherwise the edge has no `evidence` field and no
-withholding indicator, so an edge with private evidence and an edge with none
-look the same to that caller.
+Return `evidence` only if its dependency set is a subset of the caller's
+readable versions. An approved law quote has an empty set. Omit `evidence`
+without a withholding marker when no value is visible. Apply the evidence cap in
+[budgets](budgets.md) with the law cut rule and `evidence_truncated: true` when
+cut. Framework `read` emits the full permitted value in split units.
 
 ## Diagnostics and counts
 
