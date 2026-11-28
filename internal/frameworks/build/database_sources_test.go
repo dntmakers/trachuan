@@ -18,7 +18,7 @@ func (db *sourceFileCapture) Exec(_ context.Context, _ string, args ...any) (pgc
 
 func TestSourceProvenanceRecipe(t *testing.T) {
 	require.Equal(t, "source-selection/2", databaseRecipe()["source_provenance"])
-	require.Equal(t, "csa-ccm-4-1-xlsx/2", stepRecipe("parse").Parameters["csa_parser"])
+	require.NotContains(t, stepRecipe("parse").Parameters, "csa_parser")
 }
 
 func TestLoadSourceFiles_SelectedCompletenessAndRepresentation(t *testing.T) {
@@ -45,7 +45,7 @@ func TestLoadSourceFiles_SelectedCompletenessAndRepresentation(t *testing.T) {
 }
 
 func TestLoadSourceFiles_OnlyConsumedRoles(t *testing.T) {
-	d := databaseInputs{versions: []registry.Framework{{Code: "fw-alpha", Version: "v1", LicenceKind: "synthetic", Files: []registry.File{
+	d := databaseInputs{versions: []registry.Framework{{Code: "fw-alpha", Version: "v1", Parser: "nist-oscal-800-53", LicenceKind: "synthetic", Files: []registry.File{
 		{Path: "e-change-log.pdf", Role: "change log"},
 		{Path: "d-text.json", Role: "text"},
 		{Path: "a-guide.pdf", Role: "guide"},
@@ -66,4 +66,14 @@ func TestLoadSourceFiles_OnlyConsumedRoles(t *testing.T) {
 		require.Equal(t, want.role, db.rows[i][3])
 	}
 	require.Equal(t, "change log", d.versions[0].Files[0].Role)
+}
+
+func TestLoadSourceFiles_InventedPDFParser(t *testing.T) {
+	v := registry.Framework{Code: "invented", Version: "1", Parser: "invented-pdf", ParseSource: "selected.pdf", Files: []registry.File{{Path: "selected.pdf", Role: "text", Format: "pdf"}, {Path: "other.pdf", Role: "text", Format: "pdf"}}}
+	db := &sourceFileCapture{}
+	err := loadSourceFiles(context.Background(), db, databaseInputs{versions: []registry.Framework{v}, parserTable: inventedTable()}, databaseIDs{versions: map[string]int64{"invented:1": 1}})
+	require.NoError(t, err)
+	require.Len(t, db.rows, 2)
+	require.Equal(t, false, db.rows[0][8])
+	require.Equal(t, true, db.rows[1][8])
 }

@@ -128,10 +128,7 @@ func TestPreviousComparison_UnavailableAndAbsent(t *testing.T) {
 	}
 }
 func TestPreviousReport_RejectsInvalidInputWithoutText(t *testing.T) {
-	base := t.TempDir()
-	dir := filepath.Join(base, "snapshot/trachuan")
-	require.NoError(t, os.MkdirAll(dir, 0700))
-	_, _, err := readPreviousReport(base, "20990102")
+	_, _, err := parsePreviousReport(nil, "20990102")
 	require.NoError(t, err)
 	for _, raw := range []string{
 		`{"version":1,"rel":"20990101","quality_pass":false,"cases":[]}`,
@@ -139,8 +136,7 @@ func TestPreviousReport_RejectsInvalidInputWithoutText(t *testing.T) {
 		`{"version":1,"rel":"20990101","quality_pass":true,"cases":[{"id":"a","adjudication":"unverified"},{"id":"a","adjudication":"unverified"}]}`,
 		`{"version":1,"rel":"20990101","quality_pass":true,"cases":"invented private question"}`,
 	} {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "previous-report.json"), []byte(raw), 0600))
-		_, _, err := readPreviousReport(base, "20990102")
+		_, _, err := parsePreviousReport([]byte(raw), "20990102")
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), "invented private question")
 	}

@@ -16,9 +16,10 @@ func TestFrameworksBridge(t *testing.T) {
 		return
 	}
 	var req struct {
-		Op, Dir, Key, Hash string
-		Chunks             []build.Chunk
-		Reject             map[int]string
+		Op, Key, Hash string
+		Artifact      build.EmbedArtifact
+		Chunks        []build.Chunk
+		Reject        map[int]string
 	}
 	if err := json.NewDecoder(os.Stdin).Decode(&req); err != nil {
 		os.Exit(2)
@@ -26,14 +27,14 @@ func TestFrameworksBridge(t *testing.T) {
 	startFrameworkEmbedder(t)
 	service := newFrameworkEmbedder()
 	if req.Op == "read" {
-		rows, err := service.Read(context.Background(), req.Dir, req.Key, req.Chunks, req.Hash)
+		rows, err := service.Read(context.Background(), req.Artifact, req.Key, req.Chunks, req.Hash)
 		if err != nil || json.NewEncoder(os.Stdout).Encode(rows) != nil {
 			os.Exit(10)
 		}
 		os.Exit(0)
 	}
 	if req.Op == "validate" {
-		if service.Validate(context.Background(), req.Dir, req.Key, req.Chunks, req.Hash) != nil {
+		if service.Validate(context.Background(), req.Artifact, req.Key, req.Chunks, req.Hash) != nil {
 			os.Exit(3)
 		}
 		os.Exit(0)

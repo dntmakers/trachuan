@@ -2,11 +2,6 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 
@@ -23,16 +18,8 @@ func TestFrameworkEmbedder_ReadsVerifiedVectorRows(t *testing.T) {
 	hash := strings.Repeat("a", 64)
 	result, err := service.Build(ctx, "fw:invented:v1", chunks, hash)
 	require.NoError(t, err)
-	dir := t.TempDir()
-	files := map[string][]byte{"index.json": result.Index, "vectors.f32": result.Vectors, "report.json": []byte(`{"version":1,"rows":2,"rejected":0,"gaps":[]}`)}
-	var manifest []string
-	for name, data := range files {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name), data, 0600))
-		manifest = append(manifest, fmt.Sprintf("%x  %s\n", sha256.Sum256(data), name))
-	}
-	sort.Strings(manifest)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "MANIFEST.sha256"), []byte(strings.Join(manifest, "")), 0600))
-	rows, err := service.Read(ctx, dir, "fw:invented:v1", chunks, hash)
+	artifact := build.EmbedArtifact{Index: result.Index, Vectors: result.Vectors}
+	rows, err := service.Read(ctx, artifact, "fw:invented:v1", chunks, hash)
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	for i, row := range rows {
@@ -41,9 +28,9 @@ func TestFrameworkEmbedder_ReadsVerifiedVectorRows(t *testing.T) {
 		require.Len(t, row.Values, embedding.DocumentRecipe1().Dimensions)
 		require.Equal(t, float32(1), row.Values[0])
 	}
-	_, err = service.Read(ctx, dir, "fw:invented:v2", chunks, hash)
+	_, err = service.Read(ctx, artifact, "fw:invented:v2", chunks, hash)
 	require.ErrorContains(t, err, "identity mismatch")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "vectors.f32"), []byte{0}, 0600))
-	_, err = service.Read(ctx, dir, "fw:invented:v1", chunks, hash)
+	artifact.Vectors = []byte{0}
+	_, err = service.Read(ctx, artifact, "fw:invented:v1", chunks, hash)
 	require.Error(t, err)
 }

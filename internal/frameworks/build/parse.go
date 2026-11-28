@@ -3,11 +3,9 @@ package build
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"danny.vn/trachuan/internal/frameworks/parse"
-	"danny.vn/trachuan/internal/frameworks/registry"
 	"danny.vn/trachuan/internal/frameworks/relate"
 )
 
@@ -18,14 +16,28 @@ type catalog struct {
 }
 
 func parseStep(ctx context.Context, base, dir string) error {
-	snapshot := filepath.Join(base, "snapshot")
-	reg, err := readRegistry(filepath.Join(snapshot, "sources/frameworks.yaml"))
+	frozen, err := readSnapshotParseInputs(base, nil)
 	if err != nil {
 		return err
 	}
-	titles, err := readTitles(filepath.Join(snapshot, "trachuan/titles.csv"))
-	if err != nil {
+	if err = frozen.loadParseInputs(); err != nil {
 		return err
+	}
+	return parseStepWith(ctx, base, dir, nil, nil, frozen)
+}
+
+func parseStepWith(ctx context.Context, base, dir string, extractor PDFExtractor, table parse.Table, frozen *snapshotParseInputs) error {
+	if frozen == nil {
+		return fmt.Errorf("snapshot inputs missing")
+	}
+	reg := frozen.registry
+	titles := map[relate.Key]string{}
+	if frozen.titles != nil {
+		var err error
+		titles, err = parseTitles(frozen.titles)
+		if err != nil {
+			return err
+		}
 	}
 	var controls []Control
 	var catalogs []catalog
@@ -36,7 +48,15 @@ func parseStep(ctx context.Context, base, dir string) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
-		result, parseErr := parseVersion(snapshot, v)
+		file, selectErr := v.SelectedSourceWithTable(table)
+		if selectErr != nil {
+			return hide("select source", selectErr)
+		}
+		data, ok := frozen.sources[file.Path]
+		if !ok {
+			return fmt.Errorf("snapshot source missing")
+		}
+		result, parseErr := ParseSourceWithTable(ctx, v, data, extractor, table)
 		if parseErr != nil {
 			return parseErr
 		}
@@ -46,7 +66,7 @@ func parseStep(ctx context.Context, base, dir string) error {
 		catalogs = append(catalogs, catalog{v.Code, v.Version, result.Nodes})
 		titleCatalog.add(v, result.Nodes)
 	}
-	titles, err = titleCatalog.validate(titles, false)
+	titles, err := titleCatalog.validate(titles, false)
 	if err != nil {
 		return err
 	}
@@ -75,29 +95,13 @@ func parseStep(ctx context.Context, base, dir string) error {
 		sort.Slice(rows, func(i, j int) bool { return rows[i].CitationNorm < rows[j].CitationNorm })
 		controls = append(controls, rows...)
 	}
-	if err := writeRows(dir, "controls.jsonl", controls); err != nil {
+	if err := writeRows(dir, "controls.jsonl", controls, frozen.stage); err != nil {
 		return err
 	}
-	if err := writeRows(dir, "catalogs.jsonl", catalogs); err != nil {
+	if err := writeRows(dir, "catalogs.jsonl", catalogs, frozen.stage); err != nil {
 		return err
 	}
-	return writeGaps(dir, gaps)
-}
-
-func parseVersion(snapshot string, v registry.Framework) (*parse.Result, error) {
-	file, err := v.SelectedSource()
-	if err != nil {
-		return nil, err
-	}
-	data, err := readFile(filepath.Join(snapshot, "files", file.Path))
-	if err != nil {
-		return nil, err
-	}
-	result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
-	if err != nil {
-		return nil, hide("parse catalog", err)
-	}
-	return result, nil
+	return writeGaps(dir, gaps, frozen.stage)
 }
 
 func validateLineage(nodes []parse.Node) error {

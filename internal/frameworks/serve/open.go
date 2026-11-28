@@ -72,7 +72,7 @@ func validateIdentity(kind, rel string, schemaVersion int, sealed bool) error {
 
 func SupportsStepVersion(name string, version int) bool {
 	accepted := map[string][]int{
-		"chunk": {1}, "snapshot": {2}, "parse": {1, 2, 3}, "relate": {4}, "embed": {1},
+		"chunk": {1}, "snapshot": {2}, "parse": {1, 2, 3, 4}, "relate": {4}, "embed": {1},
 	}
 	for _, supported := range accepted[name] {
 		if version == supported {

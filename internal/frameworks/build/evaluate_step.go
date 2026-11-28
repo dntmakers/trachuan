@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 type EvaluationReport struct {
@@ -48,19 +47,24 @@ func RecipeSHA256(value any) string {
 	return digest(raw)
 }
 
-func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest, database Database, publish func() error) error {
+func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest, database Database, snapshots ...*snapshotParseInputs) error {
 	evaluator, ok := database.(Evaluator)
 	if !ok {
 		return fmt.Errorf("database evaluator unavailable")
 	}
-	if err := validateBuild(filepath.Join(base, "build")); err != nil {
-		return err
-	}
-	data, err := readDatabaseInputs(base)
+	frozen, err := snapshotForStep(base, snapshots...)
 	if err != nil {
 		return err
 	}
-	raw, err := readFile(filepath.Join(base, "build/build.json"))
+	state := frozen.artifactState()
+	if validateErr := validateBuild(base, state); validateErr != nil {
+		return validateErr
+	}
+	data, err := readDatabaseInputs(base, frozen)
+	if err != nil {
+		return err
+	}
+	raw, err := state.read(base, "build", "build.json")
 	if err != nil {
 		return err
 	}
@@ -68,17 +72,24 @@ func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest
 	if err = json.Unmarshal(raw, &built); err != nil {
 		return hide("decode evaluation build manifest", err)
 	}
-	builtCases, err := loadRows[GoldenCase](filepath.Join(base, "build/cases.jsonl"))
+	builtCases, err := readStepRows[GoldenCase](frozen, base, "build", "cases.jsonl")
 	if err != nil {
 		return err
 	}
 	if RecipeSHA256(builtCases) != RecipeSHA256(data.cases) {
 		return fmt.Errorf("built case mapping mismatch")
 	}
-	request.DumpPath = filepath.Join(base, "build/frameworks.dump")
+	request.DumpPath, err = state.artifactPath(base, "build", "frameworks.dump")
+	if err != nil {
+		return err
+	}
+	request.DumpSHA256, err = state.hash(base, "build", "frameworks.dump")
+	if err != nil {
+		return err
+	}
 	req := EvaluationRequest{DatabaseRequest: request, Cases: data.cases, CaseFileSHA256: data.caseHash, Controls: data.controls, CalibrationSHA256: built.CalibrationSHA256, RecipeHashes: map[string]string{}, InputHashes: map[string]string{}, RetrievalRecipe: built.RetrievalRecipe}
 	if built.CalibrationSHA256 != "" {
-		calibrationRaw, readErr := readFile(filepath.Join(base, "build/calibration.json"))
+		calibrationRaw, readErr := state.read(base, "build", "calibration.json")
 		if readErr != nil {
 			return readErr
 		}
@@ -98,12 +109,12 @@ func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest
 	}
 	recipes["build"] = RecipeSHA256(built.Recipe)
 	recipes["evaluate"] = RecipeSHA256(stepRecipe("evaluate"))
-	review, err := optionalArtifact(filepath.Join(base, "snapshot/trachuan/golden-review.yaml"))
+	review, err := frozen.read("trachuan/golden-review.yaml", true)
 	if err != nil {
 		return err
 	}
 	report := EvaluationReport{Version: 1, Release: request.Rel, DumpSHA256: built.Dump.SHA256, BuildManifestSHA256: digest(raw), RecipeHashes: recipes, CaseFileSHA256: data.caseHash, CaseCounts: CountGoldenCases(data.cases), CalibrationSHA256: built.CalibrationSHA256, Noise: "Small cohorts: one case moves recall by several percentage points. Abstention is biased by calibration on the scored public cohort.", Floors: map[string]FloorResult{}}
-	previous, previousData, previousErr := readPreviousReport(base, request.Rel)
+	previous, previousData, previousErr := readPreviousReportFrozen(frozen, request.Rel)
 	if previousErr != nil {
 		return previousErr
 	}
@@ -118,7 +129,7 @@ func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest
 	baselines := map[string][]floorBaseline{}
 	floorHashes := map[string]string{}
 	for _, cohort := range []string{"public", "licensed"} {
-		file, fileErr := optionalArtifact(filepath.Join(base, "snapshot", baselineFiles[cohort]))
+		file, fileErr := frozen.read(baselineFiles[cohort], true)
 		if fileErr != nil {
 			return fileErr
 		}
@@ -130,20 +141,32 @@ func evaluateStep(ctx context.Context, base, dir string, request DatabaseRequest
 			floorHashes[cohort] = digest(file)
 		}
 	}
-	err = evaluator.Evaluate(ctx, req, func(result EvaluationResult) error {
-		report.EvaluationResult = result
-		for _, cohort := range []string{"public", "licensed"} {
-			report.Floors[cohort] = checkFloors(baselines[cohort], floorHashes[cohort], result.Cohorts[cohort])
-		}
-		report.PreviousDiff = comparePrevious(previous, previousData, result.Cases, report.CaseCounts)
-		report.QualityPass = qualityPass(report)
-		if writeErr := writeJSON(dir, "report.json", report); writeErr != nil {
-			return writeErr
-		}
-		return publish()
-	})
+	result, err := evaluator.Evaluate(ctx, req)
 	if err != nil {
 		return hide("evaluate database", err)
+	}
+	resultData, encodeErr := json.Marshal(result)
+	if encodeErr != nil {
+		return hide("encode evaluation result", encodeErr)
+	}
+	if decodeErr := json.Unmarshal(resultData, &result); decodeErr != nil {
+		return hide("decode evaluation result", decodeErr)
+	}
+
+	if err := state.verifyExternal(base, "build", "frameworks.dump"); err != nil {
+		return err
+	}
+	report.EvaluationResult = result
+	for _, cohort := range []string{"public", "licensed"} {
+		report.Floors[cohort] = checkFloors(baselines[cohort], floorHashes[cohort], result.Cohorts[cohort])
+	}
+	report.PreviousDiff = comparePrevious(previous, previousData, result.Cases, report.CaseCounts)
+	report.QualityPass = qualityPass(report)
+	if err := writeJSON(dir, "report.json", report, frozen.stage); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	return nil
 }

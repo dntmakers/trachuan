@@ -177,6 +177,14 @@ one, or starts a new `<rel>`. A failed step, including disk full, leaves only
 its temporary directory, removed on the next run, so the rerun starts at that
 step.
 
+A run reads each manifest (the snapshot's and each step's) once and keeps it for
+the whole run. Every file a step consumes is checked against that manifest and
+handed over as the checked bytes. A tool that must open a path itself
+(`pg_restore`) gets the checked file, and the run checks its SHA-256 again after
+the tool exits and fails on any difference. This guards against accidental
+change and stale files within a locked run; a hostile process running as the
+same user is out of scope, since it could equally change the binary.
+
 Temporary files of every process go under `FRAMEWORKS_WORK_DIR` (`TMPDIR` is set
 there). The command disables core dumps for itself and its children.
 

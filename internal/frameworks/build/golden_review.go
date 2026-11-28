@@ -2,11 +2,8 @@ package build
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -25,22 +22,12 @@ type goldenReviewEntry struct {
 	Note       *string   `yaml:"note"`
 }
 
-func validateGoldenReview(dir string) error {
-	csv, err := readFile(filepath.Join(dir, "trachuan/golden.csv"))
-	if errors.Is(err, os.ErrNotExist) {
-		csv = nil
-	} else if err != nil {
-		return err
-	}
-	raw, err := readFile(filepath.Join(dir, "trachuan/golden-review.yaml"))
-	if errors.Is(err, os.ErrNotExist) && csv == nil {
+func validateGoldenReviewData(csv, raw []byte) error {
+	if raw == nil && csv == nil {
 		return nil
 	}
-	if errors.Is(err, os.ErrNotExist) {
+	if raw == nil {
 		return fmt.Errorf("golden CSV has no matching review")
-	}
-	if err != nil {
-		return err
 	}
 	var document yaml.Node
 	if yaml.Unmarshal(raw, &document) != nil || !plainReviewYAML(&document) {

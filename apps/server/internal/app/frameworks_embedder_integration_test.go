@@ -10,8 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"danny.vn/trachuan/internal/embedding"
@@ -59,16 +57,13 @@ func (frameworkFixtureEmbedder) Build(_ context.Context, _ string, chunks []buil
 	return build.EmbedResult{Index: raw, Vectors: vectors, Rows: len(rows)}, err
 }
 
-func (s frameworkFixtureEmbedder) Validate(ctx context.Context, dir, key string, chunks []build.Chunk, hash string) error {
-	_, err := s.Read(ctx, dir, key, chunks, hash)
+func (s frameworkFixtureEmbedder) Validate(ctx context.Context, artifact build.EmbedArtifact, key string, chunks []build.Chunk, hash string) error {
+	_, err := s.Read(ctx, artifact, key, chunks, hash)
 	return err
 }
 
-func (frameworkFixtureEmbedder) Read(_ context.Context, dir, _ string, chunks []build.Chunk, _ string) ([]build.Vector, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "index.json"))
-	if err != nil {
-		return nil, fmt.Errorf("read invented index: %w", err)
-	}
+func (frameworkFixtureEmbedder) Read(_ context.Context, artifact build.EmbedArtifact, _ string, chunks []build.Chunk, _ string) ([]build.Vector, error) {
+	raw := artifact.Index
 	var rows []build.Vector
 	if json.Unmarshal(raw, &rows) != nil || len(rows) != len(chunks) {
 		return nil, fmt.Errorf("invalid invented index")

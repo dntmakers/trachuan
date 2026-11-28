@@ -18,10 +18,11 @@ func TestParseRecipe_BindsPDFExtractor(t *testing.T) {
 			base := t.TempDir()
 			tmp, target := filepath.Join(base, "tmp"), filepath.Join(base, "parse")
 			require.NoError(t, os.Mkdir(tmp, 0700))
-			require.NoError(t, writeFile(tmp, "artifact", []byte("invented")))
+			stage := newStagedOutputs(tmp)
+			require.NoError(t, writeFile(tmp, "artifact", []byte("invented"), stage))
 			previous := stepRecipe("parse")
 			previous.Parameters[key] = "previous"
-			require.NoError(t, seal(tmp, target, previous, nil))
+			require.NoError(t, seal(tmp, target, previous, nil, stage))
 			require.ErrorContains(t, validate(target, stepRecipe("parse"), nil), "inputs or recipe changed")
 		})
 	}

@@ -9,23 +9,19 @@ import (
 	"danny.vn/trachuan/internal/frameworks/build"
 )
 
-func (*frameworkEmbedder) Validate(ctx context.Context, dir, key string, chunks []build.Chunk, hash string) error {
+func (*frameworkEmbedder) Validate(ctx context.Context, artifact build.EmbedArtifact, key string, chunks []build.Chunk, hash string) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("validate embedding: %w", err)
 	}
-	idx, err := lawembed.ReadArtifact(dir)
+	idx, err := lawembed.DecodeIndex(artifact.Index)
 	if err != nil {
 		return fmt.Errorf("read embedding: %w", &frameworkEmbedError{cause: err})
 	}
 	if idx.DocumentKey != key || idx.ChunkSHA256 != hash || idx.Recipe != embedding.DocumentRecipe1() {
 		return fmt.Errorf("embedding identity mismatch")
 	}
-	reader, err := lawembed.OpenVectors(dir, idx)
-	if err != nil {
+	if err := lawembed.ValidateVectorBytes(artifact.Vectors, idx); err != nil {
 		return fmt.Errorf("read vectors: %w", &frameworkEmbedError{cause: err})
-	}
-	if err := reader.Close(); err != nil {
-		return fmt.Errorf("close vectors: %w", &frameworkEmbedError{cause: err})
 	}
 	expected := make(map[int]string, len(chunks))
 	for _, c := range chunks {

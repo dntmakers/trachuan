@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -61,13 +60,17 @@ func loadChunks(ctx context.Context, tx pgx.Tx, base string, d databaseInputs, i
 	}
 	sort.Strings(keys)
 	bodyID, publicID := int64(0), int64(0)
-	hash, err := readFile(filepath.Join(base, "chunk/manifest.json"))
+	chunk, err := d.state.capture(base, "chunk")
 	if err != nil {
 		return err
 	}
 	for _, key := range keys {
 		chunks := groups[key]
-		vectors, err := embedder.Read(ctx, filepath.Join(base, "embed/artifacts", digest([]byte(key))), key, chunks, digest(hash))
+		artifact, readErr := d.state.embedding(base, key)
+		if readErr != nil {
+			return hide("read embedded chunks", readErr)
+		}
+		vectors, err := embedder.Read(ctx, artifact, key, chunks, chunk.hash)
 		if err != nil {
 			return hide("read embedded chunks", err)
 		}

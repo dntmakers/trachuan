@@ -26,7 +26,7 @@ type frameworkFixtureDatabase struct {
 	changed bool
 }
 
-func (d frameworkFixtureDatabase) Build(ctx context.Context, r build.DatabaseRequest, load func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (d frameworkFixtureDatabase) Build(ctx context.Context, r build.DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
 	if err := load(ctx, d.conn); err != nil {
 		return err
 	}
@@ -36,11 +36,11 @@ func (d frameworkFixtureDatabase) Build(ctx context.Context, r build.DatabaseReq
 	if err := os.WriteFile(r.DumpPath, []byte("invented fixture dump"), 0600); err != nil {
 		return fmt.Errorf("write invented dump: %w", err)
 	}
-	return publish()
+	return nil
 }
 
-func (d frameworkFixtureDatabase) Evaluate(_ context.Context, _ build.EvaluationRequest, publish func(build.EvaluationResult) error) error {
-	return publish(build.EvaluationResult{RetrievalRecipeStatus: "placeholder"})
+func (d frameworkFixtureDatabase) Evaluate(_ context.Context, _ build.EvaluationRequest) (build.EvaluationResult, error) {
+	return build.EvaluationResult{RetrievalRecipeStatus: "placeholder"}, nil
 }
 
 func frameworkFixtureSources(t *testing.T, changed bool) {
@@ -153,10 +153,20 @@ func extendFrameworkFixture(ctx context.Context, conn *pgx.Conn, changed bool) e
 func TestFrameworkFixture_ParseRecipeCompatibility(t *testing.T) {
 	_, pool, _ := frameworkFixture(t, false, "")
 	ctx := t.Context()
-	for _, tc := range []struct {
+	current := build.PublishedStepVersions()["parse"]
+	require.Positive(t, current)
+	type versionCase struct {
 		version int
 		valid   bool
-	}{{1, true}, {2, true}, {3, true}, {4, false}} {
+	}
+	cases := []versionCase{}
+	for version := 1; version <= current; version++ {
+		if frameworkserve.SupportsStepVersion("parse", version) {
+			cases = append(cases, versionCase{version, true})
+		}
+	}
+	cases = append(cases, versionCase{current + 1, false})
+	for _, tc := range cases {
 		t.Run(fmt.Sprint(tc.version), func(t *testing.T) {
 			_, err := pool.Exec(ctx, `UPDATE release SET parse_recipe = jsonb_set(parse_recipe, '{version}', to_jsonb($1::int)) WHERE singleton`, tc.version)
 			require.NoError(t, err)

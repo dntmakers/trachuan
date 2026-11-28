@@ -21,33 +21,37 @@ type EmbedResult struct {
 	Rejected []EmbedRejection
 }
 
+type EmbedArtifact struct{ Index, Vectors []byte }
+
 type Embedder interface {
 	Recipe() string
-	Validate(context.Context, string, string, []Chunk, string) error
+	Validate(context.Context, EmbedArtifact, string, []Chunk, string) error
 	Check(context.Context) error
 	Build(context.Context, string, []Chunk, string) (EmbedResult, error)
-	Read(context.Context, string, string, []Chunk, string) ([]Vector, error)
+	Read(context.Context, EmbedArtifact, string, []Chunk, string) ([]Vector, error)
 }
 
-func embedStep(ctx context.Context, base, dir string, service Embedder) error {
+func embedStep(ctx context.Context, base, dir string, service Embedder, snapshots ...*snapshotParseInputs) error {
 	if service == nil {
 		return fmt.Errorf("embedder unavailable")
 	}
 	if err := service.Check(ctx); err != nil {
 		return err
 	}
-	data, err := readFile(filepath.Join(base, "chunk/manifest.json"))
+	frozen, err := snapshotForStep(base, snapshots...)
 	if err != nil {
 		return err
 	}
-	chunks, err := loadRows[Chunk](filepath.Join(base, "chunk/chunks.jsonl"))
+	chunk, err := frozen.artifactState().capture(base, "chunk")
 	if err != nil {
 		return err
 	}
-	reg, err := readRegistry(filepath.Join(base, "snapshot/sources/frameworks.yaml"))
+	chunks, err := readStepRows[Chunk](frozen, base, "chunk", "chunks.jsonl")
 	if err != nil {
 		return err
 	}
+	reg := frozen.registry
+	data := chunk.raw
 	type identity struct{ code, version string }
 	identities := map[string]identity{}
 	groups := map[string][]Chunk{}
@@ -99,7 +103,7 @@ func embedStep(ctx context.Context, base, dir string, service Embedder) error {
 		}
 		report := embedReport{1, result.Rows, len(result.Rejected), reportGaps}
 		artifact := filepath.Join("artifacts", digest([]byte(key)))
-		if err := writeEmbedArtifact(dir, artifact, result, report); err != nil {
+		if err := writeEmbedArtifact(dir, artifact, result, report, frozen.stage); err != nil {
 			return err
 		}
 	}
@@ -108,7 +112,7 @@ func embedStep(ctx context.Context, base, dir string, service Embedder) error {
 		citation := key.citation
 		gaps = append(gaps, Gap{Kind: key.kind, Code: key.code, Version: key.version, Citation: &citation, Count: count})
 	}
-	return writeGaps(dir, gaps)
+	return writeGaps(dir, gaps, frozen.stage)
 }
 
 type reportGap struct {
@@ -122,7 +126,7 @@ type embedReport struct {
 	Gaps     []reportGap `json:"gaps"`
 }
 
-func writeEmbedArtifact(dir, artifact string, result EmbedResult, report embedReport) error {
+func writeEmbedArtifact(dir, artifact string, result EmbedResult, report embedReport, stage *stagedOutputs) error {
 	reportData, err := json.Marshal(report)
 	if err != nil {
 		return hide("encode report", err)
@@ -130,7 +134,7 @@ func writeEmbedArtifact(dir, artifact string, result EmbedResult, report embedRe
 	files := map[string][]byte{"index.json": result.Index, "report.json": reportData, "vectors.f32": result.Vectors}
 	lines := make([]string, 0, len(files))
 	for name, data := range files {
-		if err := writeFile(dir, filepath.Join(artifact, name), data); err != nil {
+		if err := writeFile(dir, filepath.Join(artifact, name), data, stage); err != nil {
 			return err
 		}
 		lines = append(lines, fmt.Sprintf("%s  %s\n", digest(data), name))
@@ -140,5 +144,5 @@ func writeEmbedArtifact(dir, artifact string, result EmbedResult, report embedRe
 	for _, line := range lines {
 		manifest = append(manifest, line...)
 	}
-	return writeFile(dir, filepath.Join(artifact, "MANIFEST.sha256"), manifest)
+	return writeFile(dir, filepath.Join(artifact, "MANIFEST.sha256"), manifest, stage)
 }

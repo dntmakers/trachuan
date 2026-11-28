@@ -14,27 +14,42 @@ import (
 
 func (e *Extractor) RuntimeIdentity() string { return e.runtime.identity }
 
-func (e *Extractor) VerifyRuntime() error {
+func (e *Extractor) VerifyRuntime(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if e == nil || e.runtime.snapshot == nil || e.platform == nil || e.runtime.identity == "" {
 		return ErrConfiguration
 	}
-	if err := checkRuntimeSnapshot(e.runtime, e.runtime.snapshot); err != nil {
+	if err := checkRuntimeSnapshotContext(ctx, e.runtime, e.runtime.snapshot); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		return ErrConfiguration
 	}
-	platform, err := e.platform(e.runtime.cacheDirs)
+	platform, err := e.platform(ctx, e.runtime.cacheDirs)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		return ErrConfiguration
 	}
 	current := e.runtime
 	current.platform = platform
-	identity, err := runtimeIdentity(current, "pdftotext version "+Version+"\n")
+	identity, err := runtimeIdentityContext(ctx, current, "pdftotext version "+Version+"\n")
 	if err != nil || identity != e.runtime.identity {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		return ErrConfiguration
 	}
-	if err := checkRuntimeSnapshot(e.runtime, e.runtime.snapshot); err != nil {
+	if err := checkRuntimeSnapshotContext(ctx, e.runtime, e.runtime.snapshot); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
 		return ErrConfiguration
 	}
-	return nil
+	return ctx.Err()
 }
 
 func binaryRpaths(path, executable string) ([]string, error) {

@@ -1,16 +1,30 @@
 package command
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
+	"danny.vn/trachuan/internal/frameworks/build"
 	"danny.vn/trachuan/internal/frameworks/parse"
 	"danny.vn/trachuan/internal/frameworks/registry"
 	"danny.vn/trachuan/internal/frameworks/relate"
 )
 
 func Run(args []string, out io.Writer) error {
+	return RunWithExtractor(context.Background(), args, out, build.NewLazyPDFRuntime(context.Background()))
+}
+
+func RunWithExtractor(ctx context.Context, args []string, out io.Writer, extractor build.PDFExtractor) error {
+	return RunWithOptions(ctx, args, out, extractor, nil)
+}
+
+func RunWithOptions(ctx context.Context, args []string, out io.Writer, extractor build.PDFExtractor, table parse.Table) error {
+	table = table.Clone()
+	if err := table.Validate(); err != nil {
+		return fmt.Errorf("frameworks command failed")
+	}
 	if len(args) != 2 && (len(args) != 1 || args[0] != "edges") {
 		return fmt.Errorf("usage: frameworks <code> <version> | frameworks edges")
 	}
@@ -19,7 +33,7 @@ func Run(args []string, out io.Writer) error {
 		return fmt.Errorf("frameworks command failed")
 	}
 	defer func() { _ = f.Close() }()
-	reg, err := registry.Parse(f)
+	reg, err := registry.ParseWithTable(f, table)
 	if err != nil {
 		return fmt.Errorf("frameworks command failed")
 	}
@@ -40,12 +54,12 @@ func Run(args []string, out io.Writer) error {
 			}
 		}
 		if licensed {
-			if err := edgeStats(reg, io.Discard); err != nil {
+			if err := edgeStatsWith(ctx, reg, io.Discard, extractor, table); err != nil {
 				return fmt.Errorf("frameworks command failed")
 			}
 			return nil
 		}
-		return edgeStats(reg, out)
+		return edgeStatsWith(ctx, reg, out, extractor, table)
 	}
 	targets := map[string]string{}
 	for _, framework := range reg.Frameworks {
@@ -58,7 +72,7 @@ func Run(args []string, out io.Writer) error {
 		if v.Code != args[0] || v.Version != args[1] {
 			continue
 		}
-		file, err := v.SelectedSource()
+		file, err := v.SelectedSourceWithTable(table)
 		if err != nil {
 			if v.Access == "licensed" {
 				return fmt.Errorf("frameworks command failed")
@@ -72,7 +86,7 @@ func Run(args []string, out io.Writer) error {
 			}
 			return fmt.Errorf("read catalog: %w", err)
 		}
-		result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
+		result, err := build.ParseSourceWithTable(ctx, v, data, extractor, table)
 		if v.Access == "licensed" {
 			if err != nil {
 				return fmt.Errorf("frameworks command failed")
@@ -92,13 +106,13 @@ func Run(args []string, out io.Writer) error {
 	return fmt.Errorf("frameworks command failed")
 }
 
-func edgeStats(reg *registry.Registry, out io.Writer) error {
+func edgeStatsWith(ctx context.Context, reg *registry.Registry, out io.Writer, extractor build.PDFExtractor, table parse.Table) error {
 	catalogs := map[string]*parse.Result{}
 	for _, v := range reg.Frameworks {
 		if v.Parser == "" {
 			continue
 		}
-		file, err := v.SelectedSource()
+		file, err := v.SelectedSourceWithTable(table)
 		if err != nil {
 			return err
 		}
@@ -106,7 +120,7 @@ func edgeStats(reg *registry.Registry, out io.Writer) error {
 		if err != nil {
 			return fmt.Errorf("read catalog: %w", err)
 		}
-		result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
+		result, err := build.ParseSourceWithTable(ctx, v, data, extractor, table)
 		if err != nil {
 			return fmt.Errorf("parse catalog: %w", err)
 		}

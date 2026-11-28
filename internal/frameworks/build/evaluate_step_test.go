@@ -66,8 +66,8 @@ func TestRecipeSHA256_JSONBRoundTrip(t *testing.T) {
 
 type failingEvaluator struct{ fakeDatabase }
 
-func (failingEvaluator) Evaluate(context.Context, EvaluationRequest, func(EvaluationResult) error) error {
-	return errors.New("invented question text in engine failure")
+func (failingEvaluator) Evaluate(context.Context, EvaluationRequest) (EvaluationResult, error) {
+	return EvaluationResult{}, errors.New("invented question text in engine failure")
 }
 func TestRun_EvaluationFailureIsPrivateAndRetryable(t *testing.T) {
 	work := fixture(t)
@@ -86,7 +86,69 @@ func TestEvaluationStep_RejectsChangedBuiltCases(t *testing.T) {
 	work := fixture(t)
 	require.NoError(t, testRun(context.Background(), "20990101", &bytes.Buffer{}))
 	base := filepath.Join(work, "20990101")
-	require.NoError(t, os.WriteFile(filepath.Join(base, "build/cases.jsonl"), []byte("{\"id\":\"invented\"}\n"), 0600))
-	err := evaluateStep(context.Background(), base, t.TempDir(), DatabaseRequest{Rel: "20990101"}, fakeDatabase{}, func() error { return nil })
+	cases := []byte("{\"id\":\"invented\"}\n")
+	require.NoError(t, os.WriteFile(filepath.Join(base, "build/cases.jsonl"), cases, 0600))
+	manifestPath := filepath.Join(base, "build/manifest.json")
+	raw, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var m manifest
+	require.NoError(t, json.Unmarshal(raw, &m))
+	m.Outputs["cases.jsonl"] = digest(cases)
+	raw, err = json.Marshal(m)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(manifestPath, raw, 0600))
+	err = evaluateStep(context.Background(), base, t.TempDir(), DatabaseRequest{Rel: "20990101"}, fakeDatabase{})
 	require.ErrorContains(t, err, "built case mapping mismatch")
+}
+
+type changedDumpEvaluator struct{ fakeDatabase }
+
+func (d changedDumpEvaluator) Evaluate(ctx context.Context, req EvaluationRequest) (EvaluationResult, error) {
+	result, err := d.fakeDatabase.Evaluate(ctx, req)
+	if err != nil {
+		return EvaluationResult{}, err
+	}
+	if err := os.WriteFile(req.DumpPath, []byte("changed before return"), 0600); err != nil {
+		return EvaluationResult{}, err
+	}
+	return result, nil
+}
+
+func TestRun_EvaluationFinalDumpFailureDoesNotPublish(t *testing.T) {
+	work := fixture(t)
+	err := Run(context.Background(), "20990101", &bytes.Buffer{}, fakeEmbedder{}, changedDumpEvaluator{})
+	require.Error(t, err)
+	require.NoDirExists(t, filepath.Join(work, "20990101/evaluate"))
+}
+
+type resultThenFailureEvaluator struct{ fakeDatabase }
+
+func (d resultThenFailureEvaluator) Evaluate(ctx context.Context, req EvaluationRequest) (EvaluationResult, error) {
+	result, err := d.fakeDatabase.Evaluate(ctx, req)
+	if err != nil {
+		return EvaluationResult{}, err
+	}
+	return result, errors.New("invented failure after result")
+}
+
+func TestRun_EvaluationFailureAfterResultDoesNotPublish(t *testing.T) {
+	work := fixture(t)
+	err := Run(context.Background(), "20990101", &bytes.Buffer{}, fakeEmbedder{}, resultThenFailureEvaluator{})
+	require.Error(t, err)
+	require.NoDirExists(t, filepath.Join(work, "20990101/evaluate"))
+}
+
+type returnedResultEvaluator struct{ fakeDatabase }
+
+func (returnedResultEvaluator) Evaluate(_ context.Context, _ EvaluationRequest) (EvaluationResult, error) {
+	return EvaluationResult{Restored: true, Cases: []CaseResult{{ID: "original"}}, Cohorts: map[string]CohortMetrics{}, Gaps: []GapTotal{}}, nil
+}
+
+func TestRun_EvaluationStoresReturnedResult(t *testing.T) {
+	work := fixture(t)
+	require.NoError(t, Run(context.Background(), "20990101", &bytes.Buffer{}, fakeEmbedder{}, returnedResultEvaluator{}))
+	rows := readRows[EvaluationReport](t, filepath.Join(work, "20990101/evaluate/report.json"))
+	require.Len(t, rows, 1)
+	require.Len(t, rows[0].Cases, 1)
+	require.Equal(t, "original", rows[0].Cases[0].ID)
 }

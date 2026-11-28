@@ -10,8 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"danny.vn/trachuan/internal/embedding"
@@ -67,24 +65,18 @@ func (syntheticEmbedder) Build(_ context.Context, key string, chunks []build.Chu
 	return build.EmbedResult{Index: raw, Vectors: vectors, Rows: len(chunks)}, err
 }
 
-func (s syntheticEmbedder) Validate(ctx context.Context, dir, key string, chunks []build.Chunk, hash string) error {
-	_, err := s.Read(ctx, dir, key, chunks, hash)
+func (s syntheticEmbedder) Validate(ctx context.Context, artifact build.EmbedArtifact, key string, chunks []build.Chunk, hash string) error {
+	_, err := s.Read(ctx, artifact, key, chunks, hash)
 	return err
 }
 
-func (syntheticEmbedder) Read(_ context.Context, dir, key string, chunks []build.Chunk, hash string) ([]build.Vector, error) {
-	raw, err := os.ReadFile(filepath.Join(dir, "index.json"))
-	if err != nil {
-		return nil, fmt.Errorf("read invented index: %w", err)
-	}
+func (syntheticEmbedder) Read(_ context.Context, artifact build.EmbedArtifact, key string, chunks []build.Chunk, hash string) ([]build.Vector, error) {
+	raw := artifact.Index
 	var index syntheticIndex
 	if json.Unmarshal(raw, &index) != nil || index.Key != key || index.Hash != hash || len(index.Rows) != len(chunks) {
 		return nil, fmt.Errorf("invalid invented index")
 	}
-	vectors, err := os.ReadFile(filepath.Join(dir, "vectors.f32"))
-	if err != nil {
-		return nil, fmt.Errorf("read invented vectors: %w", err)
-	}
+	vectors := artifact.Vectors
 	if len(vectors) != len(chunks)*1024*4 {
 		return nil, fmt.Errorf("invalid invented vectors")
 	}

@@ -21,6 +21,11 @@ func readTitles(path string) (map[relate.Key]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseTitles(data)
+}
+
+func parseTitles(data []byte) (map[relate.Key]string, error) {
+	titles := map[relate.Key]string{}
 	r := csv.NewReader(bytes.NewReader(data))
 	header, err := r.Read()
 	if err != nil {

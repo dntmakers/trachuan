@@ -19,11 +19,13 @@ func relateKeyFixture(t *testing.T, mappings []parse.Mapping) string {
 	source, work, err := prepare()
 	require.NoError(t, err)
 	base := filepath.Join(work, "20990101")
-	for _, step := range []string{"snapshot", "parse"} {
-		require.NoError(t, os.MkdirAll(filepath.Join(base, step), 0700))
-	}
-	_, err = snapshot(context.Background(), filepath.Join(base, "snapshot"), source)
+	require.NoError(t, os.MkdirAll(filepath.Join(base, "parse"), 0700))
+	tmp := filepath.Join(base, "snapshot-tmp")
+	require.NoError(t, os.MkdirAll(tmp, 0700))
+	stage := newStagedOutputs(tmp)
+	inputs, err := snapshotWithStage(context.Background(), tmp, source, nil, stage)
 	require.NoError(t, err)
+	require.NoError(t, seal(tmp, filepath.Join(base, "snapshot"), stepRecipe("snapshot"), inputs, stage))
 	require.NoError(t, parseStep(context.Background(), base, filepath.Join(base, "parse")))
 	setRelateMappings(t, base, mappings)
 	return base
@@ -47,6 +49,19 @@ func setRelateMappings(t *testing.T, base string, mappings []parse.Mapping) {
 		data = append(data, append(encoded, '\n')...)
 	}
 	require.NoError(t, os.WriteFile(path, data, 0600))
+	sealTestParseManifest(t, base)
+}
+
+func sealTestParseManifest(t *testing.T, base string) {
+	t.Helper()
+	dir := filepath.Join(base, "parse")
+	path := filepath.Join(dir, "manifest.json")
+	_ = os.Remove(path)
+	outputs, err := outputHashes(dir)
+	require.NoError(t, err)
+	raw, err := json.Marshal(manifest{Recipe: stepRecipe("parse"), Outputs: outputs})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, raw, 0600))
 }
 
 func TestRelate_DropsInvalidBusinessKeys(t *testing.T) {

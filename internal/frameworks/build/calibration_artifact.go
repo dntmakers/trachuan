@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 
 	schema "danny.vn/trachuan/internal/corpusdb/frameworks"
 	"github.com/jackc/pgx/v5"
 )
 
-func persistCalibration(ctx context.Context, db schema.DB, dir string, record CalibrationRecord) (string, map[string]any, error) {
-	if err := writeJSON(dir, "calibration.json", record); err != nil {
-		return "", nil, err
-	}
-	raw, err := readFile(filepath.Join(dir, "calibration.json"))
+func persistCalibration(ctx context.Context, db schema.DB, dir string, record CalibrationRecord, stages ...*stagedOutputs) (string, map[string]any, error) {
+	raw, err := json.Marshal(record)
 	if err != nil {
+		return "", nil, hide("encode artifact", err)
+	}
+	raw = append(raw, '\n')
+	if err = writeFile(dir, "calibration.json", raw, stages...); err != nil {
 		return "", nil, err
 	}
 	hash := digest(raw)
@@ -26,7 +26,7 @@ func persistCalibration(ctx context.Context, db schema.DB, dir string, record Ca
 	return hash, r, nil
 }
 
-func calibrateBuild(ctx context.Context, conn *pgx.Conn, dir string, d databaseInputs, opener CalibrationOpener) (string, map[string]any, error) {
+func calibrateBuild(ctx context.Context, conn *pgx.Conn, dir string, d databaseInputs, opener CalibrationOpener, stage *stagedOutputs) (string, map[string]any, error) {
 	if d.caseHash == "" {
 		return "", bootstrapRetrievalRecipe(), nil
 	}
@@ -44,16 +44,12 @@ func calibrateBuild(ctx context.Context, conn *pgx.Conn, dir string, d databaseI
 	if err != nil {
 		return "", nil, err
 	}
-	return persistCalibration(ctx, conn, dir, r)
+	return persistCalibration(ctx, conn, dir, r, stage)
 }
 
-func validateCalibration(dir string, m buildManifest) error {
+func validateCalibration(raw []byte, m buildManifest) error {
 	expected := bootstrapRetrievalRecipe()
 	if m.CalibrationSHA256 != "" {
-		raw, err := readFile(filepath.Join(dir, "calibration.json"))
-		if err != nil {
-			return err
-		}
 		var r CalibrationRecord
 		if digest(raw) != m.CalibrationSHA256 || json.Unmarshal(raw, &r) != nil || r.Version != 1 {
 			return fmt.Errorf("calibration record mismatch")

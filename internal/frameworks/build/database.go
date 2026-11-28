@@ -16,11 +16,12 @@ import (
 
 type DatabaseRequest struct {
 	WorkDir, Rel, RunID, DumpPath string
+	DumpSHA256                    string
 	Runtime                       map[string]string
 }
 
 type Database interface {
-	Build(context.Context, DatabaseRequest, func(context.Context, *pgx.Conn) error, func() error) error
+	Build(context.Context, DatabaseRequest, func(context.Context, *pgx.Conn) error) error
 }
 
 type Vector struct {
@@ -59,17 +60,21 @@ func denseRecipe() retrieval.DenseRecipe {
 	return retrieval.DenseRecipe{Version: 1, Model: document.Model, Dimensions: document.Dimensions, Document: document, DocumentHash: document.Hash(), Query: query, QueryHash: query.Hash()}
 }
 
-func buildStep(ctx context.Context, base, dir string, request DatabaseRequest, embedder Embedder, database Database, opener CalibrationOpener, publish func() error) error {
+func buildStep(ctx context.Context, base, dir string, request DatabaseRequest, embedder Embedder, database Database, opener CalibrationOpener, snapshots ...*snapshotParseInputs) error {
 	if database == nil {
 		return fmt.Errorf("database builder unavailable")
 	}
-	data, err := readDatabaseInputs(base)
+	data, err := readDatabaseInputs(base, snapshots...)
 	if err != nil {
 		return err
 	}
+	var stage *stagedOutputs
+	if len(snapshots) > 0 && snapshots[0] != nil {
+		stage = snapshots[0].stage
+	}
 	request.DumpPath = filepath.Join(dir, "frameworks.dump")
 	request.Runtime = lexicalRuntime()
-	if err = writeRows(dir, "cases.jsonl", data.cases); err != nil {
+	if err = writeRows(dir, "cases.jsonl", data.cases, stage); err != nil {
 		return err
 	}
 	calibrationHash, retrievalRecipe := "", bootstrapRetrievalRecipe()
@@ -78,42 +83,48 @@ func buildStep(ctx context.Context, base, dir string, request DatabaseRequest, e
 			return loadErr
 		}
 		var calibrationErr error
-		calibrationHash, retrievalRecipe, calibrationErr = calibrateBuild(ctx, conn, dir, data, opener)
+		calibrationHash, retrievalRecipe, calibrationErr = calibrateBuild(ctx, conn, dir, data, opener, stage)
 		return calibrationErr
-	}, func() error {
-		if contextErr := ctx.Err(); contextErr != nil {
-			return contextErr
-		}
-		info, statErr := os.Lstat(request.DumpPath)
-		if statErr != nil {
-			return hide("inspect database dump", statErr)
-		}
-		if !info.Mode().IsRegular() || info.Size() == 0 {
-			return fmt.Errorf("invalid database dump")
-		}
-		if err = os.Chmod(request.DumpPath, 0600); err != nil {
-			return hide("protect database dump", err)
-		}
-		dump, readErr := readFile(request.DumpPath)
-		if readErr != nil {
-			return readErr
-		}
-		if data.caseHash != "" && calibrationHash == "" {
-			return fmt.Errorf("reviewed cases were not calibrated")
-		}
-		m := buildManifest{Recipe: stepRecipe("build"), RetrievalRecipe: retrievalRecipe, CalibrationSHA256: calibrationHash, CaseCounts: CountGoldenCases(data.cases)}
-		m.Dump.SHA256, m.Dump.Size = digest(dump), int64(len(dump))
-		if syncErr := syncDump(request.DumpPath); syncErr != nil {
-			return syncErr
-		}
-		if err = writeJSON(dir, "build.json", m); err != nil {
-			return err
-		}
-		return publish()
 	})
 	if err != nil {
 		return hide("build database", err)
 	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+
+	info, statErr := os.Lstat(request.DumpPath)
+	if statErr != nil {
+		return hide("inspect database dump", statErr)
+	}
+	if !info.Mode().IsRegular() || info.Size() == 0 {
+		return fmt.Errorf("invalid database dump")
+	}
+	if err = os.Chmod(request.DumpPath, 0600); err != nil {
+		return hide("protect database dump", err)
+	}
+	dumpHash, dumpSize, readErr := hashStagedOutput(request.DumpPath)
+	if readErr != nil {
+		return readErr
+	}
+	if dumpSize == 0 {
+		return fmt.Errorf("invalid database dump")
+	}
+	if err = stage.recordHash(dir, "frameworks.dump", dumpHash); err != nil {
+		return err
+	}
+	if data.caseHash != "" && calibrationHash == "" {
+		return fmt.Errorf("reviewed cases were not calibrated")
+	}
+	m := buildManifest{Recipe: stepRecipe("build"), RetrievalRecipe: retrievalRecipe, CalibrationSHA256: calibrationHash, CaseCounts: CountGoldenCases(data.cases)}
+	m.Dump.SHA256, m.Dump.Size = dumpHash, dumpSize
+	if syncErr := syncDump(request.DumpPath); syncErr != nil {
+		return syncErr
+	}
+	if err = writeJSON(dir, "build.json", m, stage); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -132,8 +143,8 @@ func syncDump(path string) error {
 	return nil
 }
 
-func validateBuild(dir string) error {
-	data, err := readFile(filepath.Join(dir, "build.json"))
+func validateBuild(base string, state *runState) error {
+	data, err := state.read(base, "build", "build.json")
 	if err != nil {
 		return err
 	}
@@ -141,14 +152,25 @@ func validateBuild(dir string) error {
 	if err = json.Unmarshal(data, &m); err != nil {
 		return hide("decode build manifest", err)
 	}
-	dump, err := readFile(filepath.Join(dir, "frameworks.dump"))
+	hash, err := state.hash(base, "build", "frameworks.dump")
+	if err != nil {
+		return err
+	}
+	size, err := state.artifactSize(base, "build", "frameworks.dump")
 	if err != nil {
 		return err
 	}
 	expected, _ := json.Marshal(stepRecipe("build"))
 	actual, _ := json.Marshal(m.Recipe)
-	if !equalJSON(expected, actual) || m.Dump.Size != int64(len(dump)) || len(dump) == 0 || m.Dump.SHA256 != digest(dump) {
+	if !equalJSON(expected, actual) || m.Dump.Size != size || size == 0 || m.Dump.SHA256 != hash {
 		return fmt.Errorf("build manifest mismatch")
 	}
-	return validateCalibration(dir, m)
+	var calibration []byte
+	if m.CalibrationSHA256 != "" {
+		calibration, err = state.read(base, "build", "calibration.json")
+		if err != nil {
+			return err
+		}
+	}
+	return validateCalibration(calibration, m)
 }

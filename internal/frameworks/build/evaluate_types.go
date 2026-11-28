@@ -18,7 +18,7 @@ type EvaluationRequest struct {
 }
 
 type Evaluator interface {
-	Evaluate(context.Context, EvaluationRequest, func(EvaluationResult) error) error
+	Evaluate(context.Context, EvaluationRequest) (EvaluationResult, error)
 }
 
 type EvaluationResult struct {

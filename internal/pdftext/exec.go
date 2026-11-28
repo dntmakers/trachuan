@@ -37,7 +37,7 @@ type Extractor struct {
 	path     string
 	runtime  runtimeSet
 	limiter  *Limiter
-	platform func([]string) (platformIdentity, error)
+	platform func(context.Context, []string) (platformIdentity, error)
 }
 
 func NewExtractor(ctx context.Context, limiter *Limiter) (*Extractor, error) {
@@ -56,7 +56,7 @@ func NewExtractor(ctx context.Context, limiter *Limiter) (*Extractor, error) {
 	if err != nil {
 		return nil, ErrConfiguration
 	}
-	e := &Extractor{path: path, runtime: set, limiter: limiter, platform: readPlatformIdentity}
+	e := &Extractor{path: path, runtime: set, limiter: limiter, platform: readPlatformIdentityContext}
 	if err := e.checkVersion(ctx); err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (p *process) waitWithClock(ctx context.Context, clock watchdogClock) ([]byt
 	fail := func(err error) ([]byte, []byte, error) {
 		_ = p.signal()
 		cancelSample()
-		return p.kill(err)
+		return p.kill(ctx, err)
 	}
 	startSample := func() {
 		result := make(chan memoryResult, 1)
@@ -382,7 +382,7 @@ func (p *process) reap() error {
 	return err
 }
 
-func (p *process) kill(reason error) ([]byte, []byte, error) {
+func (p *process) kill(ctx context.Context, reason error) ([]byte, []byte, error) {
 	_ = p.signal()
 	_ = p.input.Close()
 	if !p.observed {
@@ -393,7 +393,7 @@ func (p *process) kill(reason error) ([]byte, []byte, error) {
 	if p.writerDone != nil {
 		<-p.writerDone
 	}
-	if err := checkRuntimeSnapshot(p.runtime, p.runtime.snapshot); err != nil {
+	if err := checkRuntimeSnapshotContext(ctx, p.runtime, p.runtime.snapshot); err != nil && ctx.Err() == nil {
 		return nil, nil, ErrConfiguration
 	}
 	return nil, nil, reason
