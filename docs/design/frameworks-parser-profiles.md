@@ -5,12 +5,22 @@ acceptance checks are in [licensed parsers](frameworks-parsers.md).
 
 ## CSA CCM v4.1: `csa-ccm-4-1-xlsx`
 
-Select the CCM workbook, not CAIQ. On the exact `CCM` sheet, reuse the bounded
-workbook reader in [`xlsx.go`](../../internal/frameworks/parse/xlsx.go#L11-L26)
-and inspect merge metadata as well as rows. Row 1 is preamble. Row 2 has three
-merged groups, `F2:H2` for service models, `I2:N2` for architecture and `O2:W2`
-for organizational relevance. Require those exact ranges, with a nonblank group
-label in each anchor cell and no group over E. Row 3 gives the columns:
+Select the CCM workbook, not CAIQ. The CSA reader selects the exact `CCM` sheet
+and reads the workbook metadata, relationships, selected sheet and, when needed,
+shared strings directly from the ZIP. Those parts share a 256 MiB uncompressed
+budget; decoded cell values have a separate 256 MiB total budget after shared
+string references are expanded. Reject duplicate ZIP parts, case-insensitive
+sheet-name collisions, invalid XML roots or trailing data, invalid cell types or
+coordinates, out-of-order cells, and overlapping merges. Decode inline and
+shared strings and OOXML escapes before normalization; use raw cell values, not
+formatted values. Cells inside a merge other than its anchor must be blank.
+
+Row 1 is preamble. Row 2 has three merged groups, `F2:H2` for service models,
+`I2:N2` for architecture and `O2:W2` for organizational relevance. Require those
+exact ranges, with a nonblank group label in each anchor cell and all other row
+2 cells blank. Row 1 may hold merges. A domain header row may be merged across
+exactly A to E (`A4:E4`); rows from the pinned trailer row on may be merged. Any
+other merge, including one on a control row, fails. Row 3 gives the columns:
 
 | Columns | Meaning                                         |
 | ------- | ----------------------------------------------- |
@@ -21,16 +31,16 @@ label in each anchor cell and no group over E. Row 3 gives the columns:
 | O–W     | Organizational relevance columns in sheet order |
 
 Require nonblank column labels and reject duplicate labels within a group,
-missing columns, or changed merge ranges before reading data. A domain header in
-A with no ID in C opens a `domain` root keyed by its terminal uppercase acronym,
-including `&`. A row with an ID in C is a `control` (`<acronym>-NN`), parented
-to the active domain with that acronym. Keep the title in B and specification in
-D. Reject malformed IDs, missing title or specification, a mismatched domain or
-an unexpected row inside the table. Skip preamble and blank rows and do not
-parse other sheets. The profile defines no trailer grammar. Skip trailer rows
-only for the pinned workbook, identified by its whole-file SHA-256, from its
-pinned first trailer row to the end. In any other workbook a nonblank row that
-is not a domain or control fails the parse.
+missing columns, or changed merge ranges before emitting nodes. A domain header
+in A with no ID in C opens a `domain` root keyed by its terminal uppercase
+acronym, including `&`. A row with an ID in C is a `control` (`<acronym>-NN`),
+parented to the active domain with that acronym. Keep the title in B and
+specification in D. Reject malformed IDs, missing title or specification, a
+mismatched domain or an unexpected row inside the table. Skip preamble and blank
+rows and do not parse other sheets. The profile defines no trailer grammar. Skip
+trailer rows only for the pinned workbook, identified by its whole-file SHA-256,
+from its pinned first trailer row to the end. In any other workbook a nonblank
+row that is not a domain or control fails the parse.
 
 After the specification and a blank line, emit one line per E–W cell, in column
 order. Use `Group / Column: value`, taking the group from its row 2 merge anchor

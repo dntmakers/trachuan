@@ -15,7 +15,7 @@ func csaField(s string) string {
 }
 
 func parseCSA(data []byte) ([]Node, error) {
-	return parseCSAPinned(data, "5e721628c8ab297bdbd355afa4c01699971fcbb9cb16802ccb9d42c7176ab32b", 229)
+	return parseCSAPinned(data, "5e721628c8ab297bdbd355afa4c01699971fcbb9cb16802ccb9d42c7176ab32b", 228)
 }
 
 func parseCSAPinned(data []byte, footerDigest string, footerRow int) ([]Node, error) {
@@ -34,6 +34,11 @@ func parseCSAPinned(data []byte, footerDigest string, footerRow int) ([]Node, er
 	groups := []string{csaField(cell(r[1], 5)), csaField(cell(r[1], 8)), csaField(cell(r[1], 14))}
 	for _, g := range groups {
 		if g == "" {
+			return nil, fmt.Errorf("invalid workbook header")
+		}
+	}
+	for i := 0; i < 23; i++ {
+		if i != 5 && i != 8 && i != 14 && csaField(cell(r[1], i)) != "" {
 			return nil, fmt.Errorf("invalid workbook header")
 		}
 	}

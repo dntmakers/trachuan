@@ -89,7 +89,7 @@ func stepRecipe(step string) recipe {
 	case "parse":
 		version = 2
 		params["schema"] = "controls/1"
-		params["csa_parser"] = "csa-ccm-4-1-xlsx/1"
+		params["csa_parser"] = "csa-ccm-4-1-xlsx/2"
 		params["csa_normalization"] = "trim-replace-linebreaks/1"
 	case "relate":
 		version = 4
