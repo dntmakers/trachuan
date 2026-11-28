@@ -10,10 +10,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func readPlatformIdentity(cacheDirs []string) (platformIdentity, error) {
-	return readPlatformIdentityContext(context.Background(), cacheDirs)
-}
-
 func readPlatformIdentityContext(ctx context.Context, cacheDirs []string) (platformIdentity, error) {
 	if err := ctx.Err(); err != nil {
 		return platformIdentity{}, err

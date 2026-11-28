@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strconv"
 	"testing"
 
+	"danny.vn/trachuan/internal/frameworks/build"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,13 +95,14 @@ func TestStep_OnlyKnownVersions(t *testing.T) {
 }
 
 func TestStep_ParseRecipeVersions(t *testing.T) {
-	for _, tc := range []struct {
-		version string
-		want    bool
-	}{{"1", true}, {"2", true}, {"3", true}, {"4", false}} {
-		t.Run(tc.version, func(t *testing.T) {
-			raw := []byte(`{"name":"parse","version":` + tc.version + `,"parameters":{}}`)
-			require.Equal(t, tc.want, validStep(raw, "parse"))
+	current := build.PublishedStepVersions()["parse"]
+	require.Positive(t, current)
+	for version := 1; version <= current+1; version++ {
+		name := strconv.Itoa(version)
+		t.Run(name, func(t *testing.T) {
+			raw := []byte(`{"name":"parse","version":` + name + `,"parameters":{}}`)
+			expected := version <= current && SupportsStepVersion("parse", version)
+			require.Equal(t, expected, validStep(raw, "parse"))
 		})
 	}
 }

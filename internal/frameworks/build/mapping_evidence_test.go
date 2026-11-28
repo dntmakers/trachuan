@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,6 +37,7 @@ func TestRelate_StoresOnlyReleaseEvidence(t *testing.T) {
 			}
 			require.NoError(t, os.Remove(filepath.Join(base, "parse/catalogs.jsonl")))
 			require.NoError(t, writeRows(filepath.Join(base, "parse"), "catalogs.jsonl", rows))
+			sealTestParseManifest(t, base)
 			f := excelize.NewFile()
 			t.Cleanup(func() { require.NoError(t, f.Close()) })
 			require.NoError(t, f.SetSheetRow("Sheet1", "A1", &[]string{"Focal Document Element", "Reference Document Element", "Comments (Optional)"}))
@@ -50,6 +52,16 @@ func TestRelate_StoresOnlyReleaseEvidence(t *testing.T) {
 			encoded, err := yaml.Marshal(reg)
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(path, encoded, 0600))
+			manifestPath := filepath.Join(base, "snapshot/manifest.json")
+			raw, err := os.ReadFile(manifestPath)
+			require.NoError(t, err)
+			var m manifest
+			require.NoError(t, json.Unmarshal(raw, &m))
+			m.Outputs, err = outputHashes(filepath.Join(base, "snapshot"))
+			require.NoError(t, err)
+			raw, err = json.Marshal(m)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(manifestPath, raw, 0600))
 			dir := t.TempDir()
 			require.NoError(t, relateStep(context.Background(), base, dir))
 			edges := readRows[relate.Edge](t, filepath.Join(dir, "edges.jsonl"))

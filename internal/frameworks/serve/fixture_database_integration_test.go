@@ -24,7 +24,7 @@ type fixtureDatabase struct {
 	changed, extended bool
 }
 
-func (d fixtureDatabase) Build(ctx context.Context, r build.DatabaseRequest, load func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (d fixtureDatabase) Build(ctx context.Context, r build.DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
 	if err := load(ctx, d.conn); err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func (d fixtureDatabase) Build(ctx context.Context, r build.DatabaseRequest, loa
 	if err := os.WriteFile(r.DumpPath, []byte("invented database dump"), 0600); err != nil {
 		return fmt.Errorf("write invented dump: %w", err)
 	}
-	return publish()
+	return nil
 }
 
 func fixtureSources(t *testing.T, root string, changed bool) {

@@ -15,7 +15,7 @@ type sourceFileDB interface {
 func loadSourceFiles(ctx context.Context, tx sourceFileDB, d databaseInputs, ids databaseIDs) error {
 	id := 0
 	for _, v := range d.versions {
-		selected, err := v.SelectedSource()
+		selected, err := v.SelectedSourceWithTable(d.parserTable)
 		if err != nil {
 			return hide("select source file", err)
 		}

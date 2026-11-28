@@ -10,15 +10,20 @@ import (
 	"path/filepath"
 	"sort"
 
+	"danny.vn/trachuan/internal/frameworks/parse"
 	"danny.vn/trachuan/internal/frameworks/registry"
 )
 
-func readRegistry(path string) (*registry.Registry, error) {
+func readRegistry(path string, tables ...parse.Table) (*registry.Registry, error) {
+	var table parse.Table
+	if len(tables) > 0 {
+		table = tables[0]
+	}
 	data, err := readFile(path)
 	if err != nil {
 		return nil, err
 	}
-	reg, err := registry.Parse(bytes.NewReader(data))
+	reg, err := registry.ParseWithTable(bytes.NewReader(data), table)
 	if err != nil {
 		return nil, hide("validate registry", err)
 	}
@@ -55,22 +60,30 @@ func releaseVersions(reg *registry.Registry) []registry.Framework {
 	return versions
 }
 
-func snapshot(ctx context.Context, dir, sourceDir string) (map[string]*string, error) {
+func snapshot(ctx context.Context, dir, sourceDir string, tables ...parse.Table) (map[string]*string, error) {
+	var table parse.Table
+	if len(tables) > 0 {
+		table = tables[0]
+	}
+	return snapshotWithStage(ctx, dir, sourceDir, table, nil)
+}
+
+func snapshotWithStage(ctx context.Context, dir, sourceDir string, table parse.Table, stage *stagedOutputs) (map[string]*string, error) {
 	data, err := readFile("sources/frameworks.yaml")
 	if err != nil {
 		return nil, err
 	}
-	reg, err := registry.Parse(bytes.NewReader(data))
+	reg, err := registry.ParseWithTable(bytes.NewReader(data), table)
 	if err != nil {
 		return nil, hide("validate registry", err)
 	}
 	if len(releaseVersions(reg)) == 0 {
 		return nil, fmt.Errorf("no release versions")
 	}
-	if err = writeFile(dir, "sources/frameworks.yaml", data); err != nil {
+	if err = writeFile(dir, "sources/frameworks.yaml", data, stage); err != nil {
 		return nil, err
 	}
-	if err = writeJSON(dir, "gap-kinds.json", gapKinds()); err != nil {
+	if err = writeJSON(dir, "gap-kinds.json", gapKinds(), stage); err != nil {
 		return nil, err
 	}
 	for _, v := range releaseVersions(reg) {
@@ -92,12 +105,12 @@ func snapshot(ctx context.Context, dir, sourceDir string) (map[string]*string, e
 			if readErr != nil {
 				return nil, hide("read registered source", readErr)
 			}
-			if err = writeFile(dir, "files/"+original, source); err != nil {
+			if err = writeFile(dir, "files/"+original, source, stage); err != nil {
 				return nil, err
 			}
 		}
 	}
-	if err = snapshotPublicFloors(dir); err != nil {
+	if err = snapshotPublicFloors(dir, stage); err != nil {
 		return nil, err
 	}
 	root, err := os.OpenRoot(sourceDir)
@@ -124,14 +137,14 @@ func snapshot(ctx context.Context, dir, sourceDir string) (map[string]*string, e
 		if err != nil {
 			return nil, hide("read private input", err)
 		}
-		if err := writeFile(dir, name, data); err != nil {
+		if err := writeFile(dir, name, data, stage); err != nil {
 			return nil, err
 		}
 	}
-	if err := writeRows(dir, "gaps.jsonl", []Gap{}); err != nil {
+	if err := writeRows(dir, "gaps.jsonl", []Gap{}, stage); err != nil {
 		return nil, err
 	}
-	return snapshotInputs(dir)
+	return snapshotInputs(dir, table)
 }
 
 func checkedSourceFile(source, name string) (string, error) {
@@ -154,16 +167,50 @@ func checkedSourceFile(source, name string) (string, error) {
 	return filepath.ToSlash(name), nil
 }
 
-func snapshotInputs(dir string) (map[string]*string, error) {
-	if _, err := outputHashes(dir); err != nil {
+func snapshotInputs(dir string, tables ...parse.Table) (map[string]*string, error) {
+	if err := checkSnapshotTree(dir); err != nil {
 		return nil, err
 	}
-	if err := validateGoldenReview(dir); err != nil {
-		return nil, err
+	var table parse.Table
+	if len(tables) > 0 {
+		table = tables[0]
 	}
-	reg, err := readRegistry(filepath.Join(dir, "sources/frameworks.yaml"))
+	cache := map[string][]byte{}
+	loaded := map[string]bool{}
+	read := func(name string, optional bool) ([]byte, error) {
+		if loaded[name] {
+			return cache[name], nil
+		}
+		data, err := readFile(filepath.Join(dir, name))
+		if optional && errors.Is(err, fs.ErrNotExist) {
+			loaded[name] = true
+			return nil, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		loaded[name] = true
+		cache[name] = data
+		return data, nil
+	}
+	csv, err := read("trachuan/golden.csv", true)
 	if err != nil {
 		return nil, err
+	}
+	review, err := read("trachuan/golden-review.yaml", true)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateGoldenReviewData(csv, review); err != nil {
+		return nil, err
+	}
+	data, err := read("sources/frameworks.yaml", false)
+	if err != nil {
+		return nil, err
+	}
+	reg, err := registry.ParseWithTable(bytes.NewReader(data), table)
+	if err != nil {
+		return nil, hide("validate registry", err)
 	}
 	names := append([]string{"sources/frameworks.yaml", "gap-kinds.json"}, optionalSnapshotInputs()...)
 	for _, v := range releaseVersions(reg) {
@@ -171,22 +218,19 @@ func snapshotInputs(dir string) (map[string]*string, error) {
 			names = append(names, "files/"+file.Path)
 		}
 	}
+	optional := map[string]bool{}
+	for _, name := range optionalSnapshotInputs() {
+		optional[name] = true
+	}
 	inputs := map[string]*string{}
 	for _, name := range names {
-		data, err := readFile(filepath.Join(dir, name))
-		if errors.Is(err, fs.ErrNotExist) {
-			optional := false
-			for _, candidate := range optionalSnapshotInputs() {
-				optional = optional || candidate == name
-			}
-			if !optional {
-				return nil, err
-			}
+		data, readErr := read(name, optional[name])
+		if readErr != nil {
+			return nil, readErr
+		}
+		if data == nil && optional[name] {
 			inputs[name] = nil
 			continue
-		}
-		if err != nil {
-			return nil, err
 		}
 		hash := digest(data)
 		inputs[name] = &hash
@@ -202,7 +246,7 @@ func optionalPrivateInputs() []string {
 	return []string{"trachuan/titles.csv", "trachuan/ocr-waivers.yaml", "trachuan/golden.csv", "trachuan/golden-review.yaml", "trachuan/floors.yaml", "trachuan/previous-report.json"}
 }
 
-func snapshotPublicFloors(dir string) error {
+func snapshotPublicFloors(dir string, stage *stagedOutputs) error {
 	raw, err := optionalArtifact("sources/frameworks-floors.yaml")
 	if err != nil {
 		return err
@@ -210,5 +254,5 @@ func snapshotPublicFloors(dir string) error {
 	if raw == nil {
 		return nil
 	}
-	return writeFile(dir, "sources/frameworks-floors.yaml", raw)
+	return writeFile(dir, "sources/frameworks-floors.yaml", raw, stage)
 }

@@ -15,14 +15,14 @@ import (
 
 type fakeDatabase struct{ failure error }
 
-func (d fakeDatabase) Build(_ context.Context, req DatabaseRequest, _ func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (d fakeDatabase) Build(_ context.Context, req DatabaseRequest, _ func(context.Context, *pgx.Conn) error) error {
 	if d.failure != nil {
 		return d.failure
 	}
 	if err := os.WriteFile(req.DumpPath, []byte("synthetic dump"), 0600); err != nil {
 		return err
 	}
-	return publish()
+	return nil
 }
 
 type observingDatabase struct {
@@ -30,9 +30,9 @@ type observingDatabase struct {
 	request DatabaseRequest
 }
 
-func (d *observingDatabase) Build(ctx context.Context, req DatabaseRequest, load func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (d *observingDatabase) Build(ctx context.Context, req DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
 	d.request = req
-	return d.fakeDatabase.Build(ctx, req, load, publish)
+	return d.fakeDatabase.Build(ctx, req, load)
 }
 
 func TestBuild_OwnershipUsesRequestedReleaseAndRealWorkRoot(t *testing.T) {
@@ -60,7 +60,9 @@ func TestBuild_ManifestAndResume(t *testing.T) {
 	require.Equal(t, digest([]byte("synthetic dump")), rows[0].Dump.SHA256)
 	require.Equal(t, "build", rows[0].Recipe.Name)
 	require.FileExists(t, filepath.Join(base, "evaluate/report.json"))
-	inputs, err := stepInputs(base, "build")
+	frozen, err := readSnapshotParseInputs(base, nil)
+	require.NoError(t, err)
+	inputs, err := stepInputs(base, "build", &frozen.manifestHash)
 	require.NoError(t, err)
 	require.Len(t, inputs, 5)
 	require.NoError(t, Run(context.Background(), "20990101", &out, fakeEmbedder{}, fakeDatabase{failure: errors.New("must skip database")}))
@@ -148,6 +150,22 @@ func TestGapPolicy_ClassAndBlocking(t *testing.T) {
 	require.Error(t, err)
 }
 
-func (d fakeDatabase) Evaluate(_ context.Context, _ EvaluationRequest, publish func(EvaluationResult) error) error {
-	return publish(EvaluationResult{Restored: true, RetrievalRecipeStatus: "placeholder", Cohorts: map[string]CohortMetrics{}, Cases: []CaseResult{}, Gaps: []GapTotal{}})
+func (d fakeDatabase) Evaluate(_ context.Context, _ EvaluationRequest) (EvaluationResult, error) {
+	return EvaluationResult{Restored: true, RetrievalRecipeStatus: "placeholder", Cohorts: map[string]CohortMetrics{}, Cases: []CaseResult{}, Gaps: []GapTotal{}}, nil
+}
+
+type finalPingFailureDatabase struct{ fakeDatabase }
+
+func (d finalPingFailureDatabase) Build(ctx context.Context, req DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
+	if err := d.fakeDatabase.Build(ctx, req, load); err != nil {
+		return err
+	}
+	return errors.New("invented final ping failure")
+}
+
+func TestRun_BuildFailureAfterLastWriteDoesNotPublish(t *testing.T) {
+	work := fixture(t)
+	err := Run(context.Background(), "20990101", &bytes.Buffer{}, fakeEmbedder{}, finalPingFailureDatabase{})
+	require.Error(t, err)
+	require.NoDirExists(t, filepath.Join(work, "20990101/build"))
 }

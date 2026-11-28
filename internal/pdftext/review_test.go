@@ -69,7 +69,7 @@ func TestExtractor_VerifiesCurrentRuntime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if verifyErr := e.VerifyRuntime(); verifyErr != nil {
+	if verifyErr := e.VerifyRuntime(context.Background()); verifyErr != nil {
 		t.Fatal(verifyErr)
 	}
 }
@@ -168,8 +168,8 @@ func TestExtractor_VerifyRuntimeDetectsSameStatContentChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &Extractor{runtime: set, platform: func([]string) (platformIdentity, error) { return platform, nil }}
-	if verifyErr := e.VerifyRuntime(); verifyErr != nil {
+	e := &Extractor{runtime: set, platform: func(context.Context, []string) (platformIdentity, error) { return platform, nil }}
+	if verifyErr := e.VerifyRuntime(context.Background()); verifyErr != nil {
 		t.Fatal(verifyErr)
 	}
 	info, err := os.Stat(path)
@@ -189,7 +189,7 @@ func TestExtractor_VerifyRuntimeDetectsSameStatContentChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.VerifyRuntime(); !errors.Is(err, ErrConfiguration) {
+	if err := e.VerifyRuntime(context.Background()); !errors.Is(err, ErrConfiguration) {
 		t.Fatalf("changed content accepted: %v", err)
 	}
 }
@@ -229,11 +229,11 @@ func TestWatchProcess_StaysPending(t *testing.T) {
 	select {
 	case result := <-p.done:
 		p.observed = true
-		_, _, _ = p.kill(ErrFile)
+		_, _, _ = p.kill(context.Background(), ErrFile)
 		t.Fatalf("premature process event: %v", result.err)
 	case <-time.After(30 * time.Millisecond):
 	}
-	_, _, _ = p.kill(ErrFile)
+	_, _, _ = p.kill(context.Background(), ErrFile)
 }
 
 type notifyingContext struct {
@@ -577,7 +577,7 @@ func TestProcess_CancelDuringRuntimeWalk(t *testing.T) {
 	ctx := &cancelAfterCalls{Context: context.Background(), remaining: 3}
 	p, err := e.start(ctx, []string{"-c", `while :; do :; done`}, nil, 100, 100)
 	if p != nil {
-		_, _, _ = p.kill(ErrFile)
+		_, _, _ = p.kill(context.Background(), ErrFile)
 		t.Fatal("process started after runtime walk was cancelled")
 	}
 	if !errors.Is(err, ErrFile) {
@@ -607,7 +607,7 @@ func TestProcess_CancelBeforeStart(t *testing.T) {
 	ctx := &cancelAfterCalls{Context: context.Background(), remaining: 4}
 	p, err := e.start(ctx, []string{"-c", `while :; do :; done`}, nil, 100, 100)
 	if p != nil {
-		_, _, _ = p.kill(ErrFile)
+		_, _, _ = p.kill(context.Background(), ErrFile)
 		t.Fatal("process started after cancellation")
 	}
 	if !errors.Is(err, ErrFile) {

@@ -3,8 +3,12 @@ package build
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -52,6 +56,40 @@ func pgRestore(ctx context.Context, cfg Config, dbName, dumpPath string) error {
 }
 
 func pgRestoreFiltered(ctx context.Context, cfg Config, dbName, dumpPath string, filter func(string) (string, error)) error {
+	return pgRestoreFilteredChecked(ctx, cfg, dbName, dumpPath, filter, nil)
+}
+
+func RestoreFrameworksChecked(ctx context.Context, cfg Config, name, path, expected string) error {
+	if !regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`).MatchString(name) || cfg.PgRestore == "" || path == "" || !regexp.MustCompile(`^[0-9a-f]{64}$`).MatchString(expected) {
+		return fmt.Errorf("invalid restore configuration")
+	}
+	check := func() error {
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			return fmt.Errorf("dump changed")
+		}
+		f, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("inspect dump: %w", err)
+		}
+		defer func() { _ = f.Close() }()
+		info, err = f.Stat()
+		if err != nil || !info.Mode().IsRegular() {
+			return fmt.Errorf("dump changed")
+		}
+		sum := sha256.New()
+		if _, err = io.Copy(sum, f); err != nil {
+			return fmt.Errorf("read dump: %w", err)
+		}
+		if fmt.Sprintf("%x", sum.Sum(nil)) != expected {
+			return fmt.Errorf("dump changed")
+		}
+		return nil
+	}
+	return pgRestoreFilteredChecked(ctx, cfg, name, path, filterFrameworksRestoreList, check)
+}
+
+func pgRestoreFilteredChecked(ctx context.Context, cfg Config, dbName, dumpPath string, filter func(string) (string, error), check func() error) error {
 	env, password, err := toolEnvironment(cfg.BuilderURL)
 	if err != nil {
 		return err
@@ -62,7 +100,18 @@ func pgRestoreFiltered(ctx context.Context, cfg Config, dbName, dumpPath string,
 	listCmd.Env = env
 	var list, stderr bytes.Buffer
 	listCmd.Stdout, listCmd.Stderr = &list, &stderr
-	if err = listCmd.Run(); err != nil {
+	if check != nil {
+		if checkErr := check(); checkErr != nil {
+			return checkErr
+		}
+	}
+	err = listCmd.Run()
+	if check != nil {
+		if checkErr := check(); checkErr != nil {
+			return checkErr
+		}
+	}
+	if err != nil {
 		return toolError("list corpus dump", err, stderr.String(), password, cfg.BuilderURL)
 	}
 	filtered, err := filter(list.String())
@@ -73,7 +122,18 @@ func pgRestoreFiltered(ctx context.Context, cfg Config, dbName, dumpPath string,
 	cmd.Env, cmd.Stdin = env, strings.NewReader(filtered)
 	stderr.Reset()
 	cmd.Stderr = &stderr
-	if err = cmd.Run(); err != nil {
+	if check != nil {
+		if checkErr := check(); checkErr != nil {
+			return checkErr
+		}
+	}
+	err = cmd.Run()
+	if check != nil {
+		if checkErr := check(); checkErr != nil {
+			return checkErr
+		}
+	}
+	if err != nil {
 		return toolError("restore corpus database", err, stderr.String(), password, cfg.BuilderURL)
 	}
 	return nil

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -47,7 +48,67 @@ func readFile(path string) ([]byte, error) {
 	return data, nil
 }
 
-func writeFile(dir, name string, data []byte) error {
+type stagedOutputs struct {
+	dir      string
+	hashes   map[string]string
+	manifest []byte
+}
+
+func newStagedOutputs(dir string) *stagedOutputs {
+	if resolved, err := checkedDir(dir); err == nil {
+		dir = resolved
+	}
+	return &stagedOutputs{dir: dir, hashes: map[string]string{}}
+}
+
+func (s *stagedOutputs) record(dir, name string, data []byte) error {
+	return s.recordHash(dir, name, digest(data))
+}
+
+func (s *stagedOutputs) recordHash(dir, name, hash string) error {
+	if s == nil {
+		return nil
+	}
+	if filepath.Clean(dir) != filepath.Clean(s.dir) || !filepath.IsLocal(name) {
+		return fmt.Errorf("invalid staged output")
+	}
+	name = filepath.ToSlash(name)
+	if _, exists := s.hashes[name]; exists {
+		return fmt.Errorf("duplicate staged output")
+	}
+	s.hashes[name] = hash
+	return nil
+}
+
+func hashStagedOutput(path string) (string, int64, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", 0, hide("inspect staged output", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", 0, fmt.Errorf("invalid staged output")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", 0, hide("open staged output", err)
+	}
+	defer func() { _ = file.Close() }()
+	info, err = file.Stat()
+	if err != nil {
+		return "", 0, hide("stat staged output", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", 0, fmt.Errorf("invalid staged output")
+	}
+	sum := sha256.New()
+	size, err := io.Copy(sum, file)
+	if err != nil {
+		return "", 0, hide("read staged output", err)
+	}
+	return fmt.Sprintf("%x", sum.Sum(nil)), size, nil
+}
+
+func writeFile(dir, name string, data []byte, stages ...*stagedOutputs) error {
 	dir, err := checkedDir(dir)
 	if err != nil {
 		return err
@@ -78,18 +139,21 @@ func writeFile(dir, name string, data []byte) error {
 	if err := f.Close(); err != nil {
 		return hide("close output", err)
 	}
+	if len(stages) > 0 {
+		return stages[0].record(dir, name, data)
+	}
 	return nil
 }
 
-func writeJSON(dir, name string, value any) error {
+func writeJSON(dir, name string, value any, stages ...*stagedOutputs) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return hide("encode artifact", err)
 	}
-	return writeFile(dir, name, append(data, '\n'))
+	return writeFile(dir, name, append(data, '\n'), stages...)
 }
 
-func writeRows[T any](dir, name string, rows []T) error {
+func writeRows[T any](dir, name string, rows []T, stages ...*stagedOutputs) error {
 	var data []byte
 	for _, row := range rows {
 		encoded, err := json.Marshal(row)
@@ -99,14 +163,10 @@ func writeRows[T any](dir, name string, rows []T) error {
 		data = append(data, encoded...)
 		data = append(data, '\n')
 	}
-	return writeFile(dir, name, data)
+	return writeFile(dir, name, data, stages...)
 }
 
-func loadRows[T any](path string) ([]T, error) {
-	data, err := readFile(path)
-	if err != nil {
-		return nil, err
-	}
+func decodeRows[T any](data []byte) ([]T, error) {
 	var rows []T
 	dec := json.NewDecoder(bytes.NewReader(data))
 	for {
@@ -207,16 +267,50 @@ func syncDirectory(path string) error {
 	return nil
 }
 
-func seal(dir, target string, r recipe, inputs map[string]*string) error {
-	outputs, err := outputHashes(dir)
+func seal(dir, target string, r recipe, inputs map[string]*string, stage *stagedOutputs) error {
+	resolved, err := checkedDir(dir)
 	if err != nil {
 		return err
 	}
-	if err := writeJSON(dir, "manifest.json", manifest{r, inputs, outputs}); err != nil {
+	if stage == nil || resolved != stage.dir {
+		return fmt.Errorf("staged output ledger missing")
+	}
+	outputs := maps.Clone(stage.hashes)
+	actual, err := outputHashes(dir)
+	if err != nil {
 		return err
 	}
+	if !reflect.DeepEqual(outputs, actual) {
+		if r.Name == "snapshot" {
+			return fmt.Errorf("snapshot input changed")
+		}
+		return fmt.Errorf("staged output changed")
+	}
+	if r.Name == "snapshot" {
+		for name, expected := range inputs {
+			actual, exists := outputs[name]
+			if expected == nil {
+				if exists {
+					return fmt.Errorf("snapshot input changed")
+				}
+				continue
+			}
+			if !exists || actual != *expected {
+				return fmt.Errorf("snapshot input changed")
+			}
+		}
+	}
+	manifestData, err := json.Marshal(manifest{r, inputs, outputs})
+	if err != nil {
+		return hide("encode artifact", err)
+	}
+	manifestData = append(manifestData, '\n')
+	if writeErr := writeFile(dir, "manifest.json", manifestData); writeErr != nil {
+		return writeErr
+	}
+	stage.manifest = bytes.Clone(manifestData)
 	var dirs []string
-	if err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+	if walkErr := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return hide("inspect output directory", err)
 		}
@@ -228,14 +322,31 @@ func seal(dir, target string, r recipe, inputs map[string]*string) error {
 			dirs = append(dirs, checked)
 		}
 		return nil
-	}); err != nil {
-		return err
+	}); walkErr != nil {
+		return walkErr
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
 	for _, path := range dirs {
-		if err := syncDirectory(path); err != nil {
-			return err
+		if syncErr := syncDirectory(path); syncErr != nil {
+			return syncErr
 		}
+	}
+	actual, err = outputHashes(dir)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(outputs, actual) {
+		if r.Name == "snapshot" {
+			return fmt.Errorf("snapshot input changed")
+		}
+		return fmt.Errorf("staged output changed")
+	}
+	manifestHash, manifestSize, err := hashStagedOutput(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return err
+	}
+	if manifestSize != int64(len(stage.manifest)) || manifestHash != digest(stage.manifest) {
+		return fmt.Errorf("staged manifest changed")
 	}
 	if err := os.Rename(dir, target); err != nil {
 		return hide("publish step", err)

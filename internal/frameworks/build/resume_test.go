@@ -72,6 +72,9 @@ func TestRun_FailedStepLeavesTemporaryDirectory(t *testing.T) {
 	matches, err := filepath.Glob(filepath.Join(base, ".tmp-parse-*"))
 	require.NoError(t, err)
 	require.Len(t, matches, 1)
+	entries, err := os.ReadDir(matches[0])
+	require.NoError(t, err)
+	require.Empty(t, entries)
 	require.DirExists(t, filepath.Join(base, "snapshot"))
 }
 

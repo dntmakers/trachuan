@@ -45,9 +45,10 @@ func TestMain(m *testing.M) {
 }
 
 type bridgeRequest struct {
-	Op, Dir, Key, Hash string
-	Chunks             []Chunk
-	Reject             map[int]string
+	Op, Key, Hash string
+	Artifact      EmbedArtifact
+	Chunks        []Chunk
+	Reject        map[int]string
 }
 
 func bridge(ctx context.Context, req bridgeRequest) (EmbedResult, error) {
@@ -81,13 +82,13 @@ func (fakeEmbedder) Check(context.Context) error { return nil }
 func (fakeEmbedder) Build(ctx context.Context, key string, chunks []Chunk, hash string) (EmbedResult, error) {
 	return bridge(ctx, bridgeRequest{Op: "build", Key: key, Chunks: chunks, Hash: hash})
 }
-func (fakeEmbedder) Validate(ctx context.Context, dir, key string, chunks []Chunk, hash string) error {
-	_, err := bridge(ctx, bridgeRequest{Op: "validate", Dir: dir, Key: key, Chunks: chunks, Hash: hash})
+func (fakeEmbedder) Validate(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) error {
+	_, err := bridge(ctx, bridgeRequest{Op: "validate", Artifact: artifact, Key: key, Chunks: chunks, Hash: hash})
 	return err
 }
-func (fakeEmbedder) Read(ctx context.Context, dir, key string, chunks []Chunk, hash string) ([]Vector, error) {
+func (fakeEmbedder) Read(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) ([]Vector, error) {
 	var rows []Vector
-	err := bridgeCall(ctx, bridgeRequest{Op: "read", Dir: dir, Key: key, Chunks: chunks, Hash: hash}, &rows)
+	err := bridgeCall(ctx, bridgeRequest{Op: "read", Artifact: artifact, Key: key, Chunks: chunks, Hash: hash}, &rows)
 	return rows, err
 }
 func testRun(ctx context.Context, rel string, out io.Writer) error {
@@ -113,8 +114,8 @@ func (e *rejectingEmbedder) Build(ctx context.Context, key string, rows []Chunk,
 	e.calls++
 	return bridge(ctx, bridgeRequest{Op: "build", Key: key, Chunks: rows, Hash: hash, Reject: reject})
 }
-func (*rejectingEmbedder) Validate(ctx context.Context, dir, key string, chunks []Chunk, hash string) error {
-	return (fakeEmbedder{}).Validate(ctx, dir, key, chunks, hash)
+func (*rejectingEmbedder) Validate(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) error {
+	return (fakeEmbedder{}).Validate(ctx, artifact, key, chunks, hash)
 }
 
 func TestEmbed_GapsAndResume(t *testing.T) {
@@ -152,9 +153,11 @@ type failedEmbedder struct {
 	builds int
 }
 
-func (*failedEmbedder) Validate(context.Context, string, string, []Chunk, string) error { return nil }
-func (*failedEmbedder) Recipe() string                                                  { return "test-stage-recipe" }
-func (*failedEmbedder) Check(context.Context) error                                     { return fmt.Errorf("recipe mismatch") }
+func (*failedEmbedder) Validate(context.Context, EmbedArtifact, string, []Chunk, string) error {
+	return nil
+}
+func (*failedEmbedder) Recipe() string              { return "test-stage-recipe" }
+func (*failedEmbedder) Check(context.Context) error { return fmt.Errorf("recipe mismatch") }
 func (e *failedEmbedder) Build(context.Context, string, []Chunk, string) (EmbedResult, error) {
 	e.builds++
 	return EmbedResult{}, nil
@@ -223,11 +226,11 @@ func (sameControlEmbedder) Build(ctx context.Context, key string, rows []Chunk, 
 	}
 	return bridge(ctx, bridgeRequest{Op: "build", Key: key, Chunks: rows, Hash: hash, Reject: reject})
 }
-func (sameControlEmbedder) Validate(ctx context.Context, dir, key string, chunks []Chunk, hash string) error {
-	return (fakeEmbedder{}).Validate(ctx, dir, key, chunks, hash)
+func (sameControlEmbedder) Validate(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) error {
+	return (fakeEmbedder{}).Validate(ctx, artifact, key, chunks, hash)
 }
-func (sameControlEmbedder) Read(ctx context.Context, dir, key string, chunks []Chunk, hash string) ([]Vector, error) {
-	return (fakeEmbedder{}).Read(ctx, dir, key, chunks, hash)
+func (sameControlEmbedder) Read(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) ([]Vector, error) {
+	return (fakeEmbedder{}).Read(ctx, artifact, key, chunks, hash)
 }
 
 func TestEmbed_CountsRejectedChunksAcrossIndexes(t *testing.T) {
@@ -318,4 +321,56 @@ func TestEmbed_RejectsHashConsistentInvalidArtifact(t *testing.T) {
 			require.NotContains(t, err.Error(), "private body")
 		})
 	}
+}
+
+type changingStagedEmbedder struct {
+	fakeEmbedder
+	work    string
+	changed bool
+}
+
+func (e *changingStagedEmbedder) Validate(ctx context.Context, artifact EmbedArtifact, key string, chunks []Chunk, hash string) error {
+	if err := e.fakeEmbedder.Validate(ctx, artifact, key, chunks, hash); err != nil {
+		return err
+	}
+	if e.changed {
+		return nil
+	}
+	paths, err := filepath.Glob(filepath.Join(e.work, "20990101", ".tmp-embed-*", "artifacts", digest([]byte(key))))
+	if err != nil || len(paths) != 1 {
+		return fmt.Errorf("staged embedding unavailable")
+	}
+	dir := paths[0]
+	vectors, err := os.ReadFile(filepath.Join(dir, "vectors.f32"))
+	if err != nil || len(vectors) < 8 {
+		return fmt.Errorf("staged vectors unavailable")
+	}
+	copy(vectors[:4], []byte{0, 0, 0, 0})
+	copy(vectors[4:8], []byte{0, 0, 128, 63})
+	if err = os.WriteFile(filepath.Join(dir, "vectors.f32"), vectors, 0600); err != nil {
+		return err
+	}
+	var lines []string
+	for _, name := range []string{"index.json", "report.json", "vectors.f32"} {
+		raw, readErr := os.ReadFile(filepath.Join(dir, name))
+		if readErr != nil {
+			return readErr
+		}
+		lines = append(lines, fmt.Sprintf("%s  %s\n", digest(raw), name))
+	}
+	sort.Strings(lines)
+	if err = os.WriteFile(filepath.Join(dir, "MANIFEST.sha256"), []byte(strings.Join(lines, "")), 0600); err != nil {
+		return err
+	}
+	e.changed = true
+	return nil
+}
+
+func TestEmbed_RejectsStagedArtifactChangedAfterValidation(t *testing.T) {
+	work := fixture(t)
+	embedder := &changingStagedEmbedder{work: work}
+	err := Run(context.Background(), "20990101", &bytes.Buffer{}, embedder, fakeDatabase{})
+	require.True(t, embedder.changed)
+	require.Error(t, err)
+	require.NoDirExists(t, filepath.Join(work, "20990101/embed"))
 }

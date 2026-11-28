@@ -16,19 +16,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func (d *frameworkDatabase) Evaluate(ctx context.Context, req build.EvaluationRequest, publish func(build.EvaluationResult) error) error {
+func (d *frameworkDatabase) Evaluate(ctx context.Context, req build.EvaluationRequest) (build.EvaluationResult, error) {
 	query, err := newFrameworkQueryEmbedder()
 	if err != nil {
-		return err
+		return build.EvaluationResult{}, err
 	}
 	cache := evaluate.NewQueryCache(query)
 	if err = cache.Prepare(ctx, req.Cases); err != nil {
-		return err
+		return build.EvaluationResult{}, err
 	}
 	open := func(ctx context.Context, conn *pgx.Conn, key []byte) (evaluate.Engine, func(), error) {
 		return openFrameworkEvaluation(ctx, conn, key, cache)
 	}
-	return evaluate.Restored(ctx, req, d.restore, open, publish)
+	return evaluate.Restored(ctx, req, d.restore, open)
 }
 
 func (d *frameworkDatabase) restore(ctx context.Context, req build.DatabaseRequest, suffix string, temporary bool, use func(context.Context, *pgx.Conn) error) error {
@@ -54,7 +54,7 @@ func (d *frameworkDatabase) restore(ctx context.Context, req build.DatabaseReque
 		withDatabase = lawbuild.WithTemporaryDatabase
 	}
 	err = withDatabase(ctx, cfg, name, string(raw), marker.owns, func(ctx context.Context, conn *pgx.Conn) error {
-		if restoreErr := lawbuild.RestoreDatabase(ctx, cfg, name, req.DumpPath); restoreErr != nil {
+		if restoreErr := lawbuild.RestoreFrameworksChecked(ctx, cfg, name, req.DumpPath, req.DumpSHA256); restoreErr != nil {
 			return fmt.Errorf("restore evaluation copy: %w", &frameworkEmbedError{cause: restoreErr})
 		}
 		return use(ctx, conn)

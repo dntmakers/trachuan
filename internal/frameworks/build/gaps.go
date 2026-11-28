@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-func writeGaps(dir string, gaps []Gap) error {
+func writeGaps(dir string, gaps []Gap, stages ...*stagedOutputs) error {
 	for _, gap := range gaps {
 		if _, ok := gapKinds()[gap.Kind]; !ok {
 			return fmt.Errorf("unknown gap kind")
@@ -30,5 +30,5 @@ func writeGaps(dir string, gaps []Gap) error {
 		}
 		return a.Count < b.Count
 	})
-	return writeRows(dir, "gaps.jsonl", gaps)
+	return writeRows(dir, "gaps.jsonl", gaps, stages...)
 }

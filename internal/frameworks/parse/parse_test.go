@@ -146,3 +146,30 @@ func TestCSF_ReferenceAndMissingParent(t *testing.T) {
 		t.Error("missing active parent accepted")
 	}
 }
+
+func TestTable_RejectsInvalidParserEntries(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		mutate func(*PDFParser)
+	}{
+		{"missing callback", func(p *PDFParser) { p.Parse = nil }},
+		{"both callbacks", func(p *PDFParser) { p.Catalog = Default()["nist-oscal-800-53"].Catalog }},
+		{"missing modes", func(p *PDFParser) { p.Layout = false; p.BBox = false }},
+		{"wrong role", func(p *PDFParser) { p.Role = "catalog" }},
+		{"wrong format", func(p *PDFParser) { p.Format = "xlsx" }},
+		{"missing revision", func(p *PDFParser) { p.Revision = "" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			table := Default()
+			entry := table["iso27002-2022-pdf"]
+			tc.mutate(&entry)
+			table["iso27002-2022-pdf"] = entry
+			if err := table.Validate(); err == nil {
+				t.Fatal("invalid parser accepted")
+			}
+			if _, err := table.ParsePDF("iso27002-2022-pdf", PDFInputs{}, "", nil); err == nil {
+				t.Fatal("invalid parser dispatched")
+			}
+		})
+	}
+}

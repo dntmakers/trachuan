@@ -2,7 +2,9 @@ package command
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
+	"danny.vn/trachuan/internal/frameworks/parse"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,5 +115,55 @@ func TestRun_UsageNamesBothForms(t *testing.T) {
 	err := Run(nil, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "frameworks <code> <version>") || !strings.Contains(err.Error(), "frameworks edges") {
 		t.Fatal("usage omits command forms")
+	}
+}
+
+type inventedExtractor struct{ calls int }
+
+func (e *inventedExtractor) Extract(_ context.Context, _ []byte, layout, bbox bool) (parse.PDFInputs, error) {
+	e.calls++
+	if !layout || bbox {
+		return parse.PDFInputs{}, fmt.Errorf("wrong inputs")
+	}
+	return parse.PDFInputs{Layout: []string{"invented"}}, nil
+}
+
+func TestRun_InventedPDF(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	t.Setenv("FRAMEWORKS_SOURCE_DIR", dir)
+	if err := os.Mkdir("sources", 0700); err != nil {
+		t.Fatal(err)
+	}
+	data := []byte("invented")
+	sum := sha256.Sum256(data)
+	if err := os.WriteFile("fixture.pdf", data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := fmt.Sprintf("frameworks:\n  - code: alpha\n    version: '1.0'\n    name: Invented\n    publisher: Invented\n    language: en\n    access: licensed\n    ordinal: 1\n    citation_scheme: invented\n    parser: invented-pdf\n    parse_source: fixture.pdf\n    expected_controls: 1\n    files:\n      - path: fixture.pdf\n        sha256: %x\n        size: %d\n        role: text\n        format: pdf\n", sum, len(data))
+	if err := os.WriteFile("sources/frameworks.yaml", []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	table := parse.Default()
+	table["invented-pdf"] = parse.PDFParser{Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in parse.PDFInputs, _ string, _ *int) (*parse.Result, error) {
+		if len(in.Layout) != 1 {
+			return nil, fmt.Errorf("missing layout")
+		}
+		return &parse.Result{Nodes: []parse.Node{{Citation: "A", CitationNorm: "A", Parent: -1}}}, nil
+	}}
+	extractor := &inventedExtractor{}
+	var out bytes.Buffer
+	if err := RunWithOptions(context.Background(), []string{"alpha", "1.0"}, &out, extractor, table); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "controls: 1\n" {
+		t.Fatalf("unexpected output %q", out.String())
+	}
+	out.Reset()
+	if err := RunWithOptions(context.Background(), []string{"edges"}, &out, extractor, table); err != nil {
+		t.Fatal(err)
+	}
+	if out.Len() != 0 || extractor.calls != 2 {
+		t.Fatalf("output %q, extraction calls %d", out.String(), extractor.calls)
 	}
 }

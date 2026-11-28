@@ -2,19 +2,18 @@ package build
 
 import (
 	"context"
-	"path/filepath"
 
 	"danny.vn/trachuan/internal/frameworks/parse"
 	"danny.vn/trachuan/internal/frameworks/relate"
 )
 
-func relateStep(ctx context.Context, base, dir string) error {
-	snapshot := filepath.Join(base, "snapshot")
-	reg, err := readRegistry(filepath.Join(snapshot, "sources/frameworks.yaml"))
+func relateStep(ctx context.Context, base, dir string, snapshots ...*snapshotParseInputs) error {
+	frozen, err := snapshotForStep(base, snapshots...)
 	if err != nil {
 		return err
 	}
-	rows, err := loadRows[catalog](filepath.Join(base, "parse/catalogs.jsonl"))
+	reg := frozen.registry
+	rows, err := readStepRows[catalog](frozen, base, "parse", "catalogs.jsonl")
 	if err != nil {
 		return err
 	}
@@ -34,7 +33,7 @@ func relateStep(ctx context.Context, base, dir string) error {
 			if file.Role != "mapping workbook" {
 				continue
 			}
-			data, readErr := readFile(filepath.Join(snapshot, "files", file.Path))
+			data, readErr := frozen.read("files/"+file.Path, false)
 			if readErr != nil {
 				return readErr
 			}
@@ -57,8 +56,8 @@ func relateStep(ctx context.Context, base, dir string) error {
 		gaps = append(gaps, Gap{Kind: "mapping_dropped", Code: key.Code, Version: key.Version, Count: count})
 	}
 	edges, gaps = releaseMappings(edges, gaps)
-	if err := writeRows(dir, "edges.jsonl", edges); err != nil {
+	if err := writeRows(dir, "edges.jsonl", edges, frozen.stage); err != nil {
 		return err
 	}
-	return writeGaps(dir, gaps)
+	return writeGaps(dir, gaps, frozen.stage)
 }

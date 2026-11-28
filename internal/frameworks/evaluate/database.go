@@ -11,14 +11,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func Restored(ctx context.Context, req EvaluationRequest, restore Restore, open Opener, publish func(EvaluationResult) error) error {
+func Restored(ctx context.Context, req EvaluationRequest, restore Restore, open Opener) (EvaluationResult, error) {
 	var result EvaluationResult
 	if restore == nil || open == nil {
-		return fmt.Errorf("evaluation dependencies unavailable")
+		return result, fmt.Errorf("evaluation dependencies unavailable")
 	}
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
-		return hide("create evaluation cursor key", err)
+		return result, hide("create evaluation cursor key", err)
 	}
 	err := restore(ctx, req.DatabaseRequest, "_eval", false, func(ctx context.Context, conn *pgx.Conn) error {
 		if err := verifyRestored(ctx, conn, req); err != nil {
@@ -57,12 +57,12 @@ func Restored(ctx context.Context, req EvaluationRequest, restore Restore, open 
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return publish(result)
+		return nil
 	})
 	if err != nil {
-		return hide("evaluate restored database", err)
+		return EvaluationResult{}, hide("evaluate restored database", err)
 	}
-	return nil
+	return result, nil
 }
 
 func verifyRestored(ctx context.Context, conn *pgx.Conn, req EvaluationRequest) error {

@@ -1,6 +1,7 @@
 package build
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,9 +36,13 @@ func TestParseVersionUsesSelectedSource(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "files", "chosen.xlsx"), buf.Bytes(), 0600))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "files", "other.xlsx"), []byte("not selected"), 0600))
 	count := 2
-	v := registry.Framework{Parser: "csa-ccm-4-1-xlsx", ParseSource: "chosen.xlsx", ExpectedControls: &count, Files: []registry.File{{Path: "other.xlsx", Role: "catalog", Format: "xlsx"}, {Path: "chosen.xlsx", Role: "catalog", Format: "xlsx"}}}
-	result, err := parseVersion(dir, v)
-	require.NoError(t, err)
-	require.Len(t, result.Nodes, 2)
-	require.Equal(t, "CH-01", result.Nodes[1].Citation)
+	v := registry.Framework{Parser: "csa-ccm-4-1-xlsx", ParseSource: "chosen.xlsx", ExpectedControls: &count, Files: []registry.File{{Path: "other.xlsx", Role: "catalog", Format: "xlsx"}, {Path: "chosen.xlsx", Role: "catalog", Format: "xlsx", Size: int64(buf.Len()), SHA256: digest(buf.Bytes())}}}
+	output := filepath.Join(dir, "parse")
+	require.NoError(t, os.Mkdir(output, 0700))
+	frozen := &snapshotParseInputs{registry: &registry.Registry{Frameworks: []registry.Framework{v}}, sources: map[string][]byte{"chosen.xlsx": buf.Bytes(), "other.xlsx": []byte("not selected")}}
+	require.NoError(t, parseStepWith(context.Background(), dir, output, nil, nil, frozen))
+	catalogs := readRows[catalog](t, filepath.Join(output, "catalogs.jsonl"))
+	require.Len(t, catalogs, 1)
+	require.Len(t, catalogs[0].Nodes, 2)
+	require.Equal(t, "CH-01", catalogs[0].Nodes[1].Citation)
 }

@@ -17,7 +17,7 @@ import (
 	"danny.vn/trachuan/internal/frameworks/relate"
 )
 
-func titleSources(ctx context.Context) (*titleCatalog, string, error) {
+func titleSources(ctx context.Context, extractor PDFExtractor, table parse.Table) (*titleCatalog, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
@@ -36,7 +36,7 @@ func titleSources(ctx context.Context) (*titleCatalog, string, error) {
 	if err != nil || !contained(dir, source) {
 		return nil, "", fmt.Errorf("invalid title directory")
 	}
-	reg, err := readRegistry("sources/frameworks.yaml")
+	reg, err := readRegistry("sources/frameworks.yaml", table)
 	if err != nil {
 		return nil, "", err
 	}
@@ -49,7 +49,7 @@ func titleSources(ctx context.Context) (*titleCatalog, string, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, "", err
 		}
-		file, err := v.SelectedSource()
+		file, err := v.SelectedSourceWithTable(table)
 		if err != nil {
 			return nil, "", err
 		}
@@ -63,7 +63,7 @@ func titleSources(ctx context.Context) (*titleCatalog, string, error) {
 		if err != nil {
 			return nil, "", hide("read source", err)
 		}
-		result, err := parse.Parse(v.Parser, data, v.Code, v.Version, v.ExpectedControls)
+		result, err := ParseSourceWithTable(ctx, v, data, extractor, table)
 		if err != nil {
 			return nil, "", hide("parse source", err)
 		}
@@ -76,7 +76,19 @@ func titleSources(ctx context.Context) (*titleCatalog, string, error) {
 }
 
 func ImportTitles(ctx context.Context, input string) error {
-	catalog, dir, err := titleSources(ctx)
+	return ImportTitlesWithExtractor(ctx, input, nil)
+}
+
+func ImportTitlesWithExtractor(ctx context.Context, input string, extractor PDFExtractor) error {
+	return ImportTitlesWithOptions(ctx, input, extractor, nil)
+}
+
+func ImportTitlesWithOptions(ctx context.Context, input string, extractor PDFExtractor, table parse.Table) error {
+	table = table.Clone()
+	if err := table.Validate(); err != nil {
+		return err
+	}
+	catalog, dir, err := titleSources(ctx, extractor, table)
 	if err != nil {
 		return err
 	}
@@ -183,7 +195,19 @@ func ImportTitles(ctx context.Context, input string) error {
 }
 
 func CheckTitles(ctx context.Context) error {
-	catalog, dir, err := titleSources(ctx)
+	return CheckTitlesWithExtractor(ctx, nil)
+}
+
+func CheckTitlesWithExtractor(ctx context.Context, extractor PDFExtractor) error {
+	return CheckTitlesWithOptions(ctx, extractor, nil)
+}
+
+func CheckTitlesWithOptions(ctx context.Context, extractor PDFExtractor, table parse.Table) error {
+	table = table.Clone()
+	if err := table.Validate(); err != nil {
+		return err
+	}
+	catalog, dir, err := titleSources(ctx, extractor, table)
 	if err != nil {
 		return err
 	}

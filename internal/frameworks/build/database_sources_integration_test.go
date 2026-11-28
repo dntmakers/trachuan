@@ -16,14 +16,14 @@ import (
 
 type sourceTestDatabase struct{ conn *pgx.Conn }
 
-func (db sourceTestDatabase) Build(ctx context.Context, req DatabaseRequest, load func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (db sourceTestDatabase) Build(ctx context.Context, req DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
 	if err := load(ctx, db.conn); err != nil {
 		return err
 	}
 	if err := writeFile(filepath.Dir(req.DumpPath), filepath.Base(req.DumpPath), []byte("synthetic dump")); err != nil {
 		return err
 	}
-	return publish()
+	return nil
 }
 
 func TestRun_SupplementaryFilesStayInSnapshot(t *testing.T) {
@@ -58,6 +58,6 @@ func TestRun_SupplementaryFilesStayInSnapshot(t *testing.T) {
 	require.True(t, complete)
 }
 
-func (db sourceTestDatabase) Evaluate(ctx context.Context, req EvaluationRequest, publish func(EvaluationResult) error) error {
-	return fakeDatabase{}.Evaluate(ctx, req, publish)
+func (db sourceTestDatabase) Evaluate(ctx context.Context, req EvaluationRequest) (EvaluationResult, error) {
+	return fakeDatabase{}.Evaluate(ctx, req)
 }

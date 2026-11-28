@@ -1,10 +1,21 @@
 package registry
 
-import "fmt"
+import (
+	"fmt"
 
-func (f Framework) SelectedSource() (File, error) {
+	"danny.vn/trachuan/internal/frameworks/parse"
+)
+
+func (f Framework) SelectedSource() (File, error) { return f.SelectedSourceWithTable(nil) }
+
+func (f Framework) SelectedSourceWithTable(table parse.Table) (File, error) {
+	entry, required := table.Requirements(f.Parser)
+	role, format := entry.Role, entry.Format
+	if !required {
+		return File{}, fmt.Errorf("unknown parser")
+	}
 	if f.ParseSource == "" {
-		if f.Parser == "csa-ccm-4-1-xlsx" {
+		if !entry.Legacy {
 			return File{}, fmt.Errorf("parse source required")
 		}
 		var found File
@@ -20,17 +31,19 @@ func (f Framework) SelectedSource() (File, error) {
 		}
 		return found, nil
 	}
+	var found File
+	count := 0
 	for _, file := range f.Files {
-		if file.Path != f.ParseSource {
-			continue
+		if file.Path == f.ParseSource {
+			found = file
+			count++
 		}
-		switch f.Parser {
-		case "csa-ccm-4-1-xlsx":
-			if file.Role == "catalog" && file.Format == "xlsx" {
-				return file, nil
-			}
-		}
+	}
+	if count != 1 {
+		return File{}, fmt.Errorf("parse source not registered uniquely")
+	}
+	if entry.Legacy || found.Role != role || found.Format != format {
 		return File{}, fmt.Errorf("invalid parse source type")
 	}
-	return File{}, fmt.Errorf("parse source not registered")
+	return found, nil
 }

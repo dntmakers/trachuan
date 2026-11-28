@@ -13,12 +13,20 @@ import (
 
 	"danny.vn/trachuan/internal/embedding"
 	"danny.vn/trachuan/internal/frameworks/businesskey"
+	"danny.vn/trachuan/internal/frameworks/parse"
 	"danny.vn/trachuan/internal/pdftext"
 	"golang.org/x/sys/unix"
 )
 
+type runState struct {
+	snapshotManifest []byte
+	steps            map[string]*frozenStep
+}
+
 type RunOptions struct {
-	PDFRuntime PDFRuntime
+	state       *runState
+	PDFRuntime  PDFRuntime
+	ParserTable parse.Table
 }
 
 func Run(ctx context.Context, rel string, out io.Writer, embedder Embedder, database Database, calibration ...CalibrationOpener) error {
@@ -26,6 +34,10 @@ func Run(ctx context.Context, rel string, out io.Writer, embedder Embedder, data
 }
 
 func RunWithOptions(ctx context.Context, rel string, out io.Writer, embedder Embedder, database Database, options RunOptions, calibration ...CalibrationOpener) error {
+	options.ParserTable = options.ParserTable.Clone()
+	if err := options.ParserTable.Validate(); err != nil {
+		return err
+	}
 	if len(calibration) > 1 {
 		return fmt.Errorf("multiple calibration engine openers")
 	}
@@ -69,6 +81,7 @@ func RunWithOptions(ctx context.Context, rel string, out io.Writer, embedder Emb
 	if _, err = rand.Read(id); err != nil {
 		return hide("create run id", err)
 	}
+	options.state = &runState{}
 	request := DatabaseRequest{WorkDir: work, Rel: rel, RunID: fmt.Sprintf("%x", id)}
 	for _, step := range []string{"snapshot", "parse", "relate", "chunk", "embed", "build", "evaluate"} {
 		if err := ctx.Err(); err != nil {
@@ -104,12 +117,11 @@ func stepRecipe(step string) recipe {
 		version = 2
 		params = databaseRecipe()
 	case "parse":
-		version = 3
+		version = 4
 		params["pdf_extractor_version"] = pdftext.Version
 		params["pdf_layout_flags"] = pdftext.LayoutFlags()
 		params["pdf_bbox_flags"] = pdftext.BBoxFlags()
 		params["schema"] = "controls/1"
-		params["csa_parser"] = "csa-ccm-4-1-xlsx/2"
 		params["csa_normalization"] = "trim-replace-linebreaks/1"
 	case "relate":
 		version = 4
@@ -127,34 +139,14 @@ func stepRecipe(step string) recipe {
 	return recipe{Name: step, Version: version, Parameters: params}
 }
 
-func stepInputs(base, step string) (map[string]*string, error) {
-	inputs := map[string]*string{}
-	deps := []string{"snapshot"}
-	if step == "relate" || step == "chunk" {
-		deps = append(deps, "parse")
-	}
-	if step == "embed" {
-		deps = append(deps, "chunk")
-	}
-	if step == "build" || step == "evaluate" {
-		deps = append(deps, "parse", "relate", "chunk", "embed")
-	}
-	if step == "evaluate" {
-		deps = append(deps, "build")
-	}
-	for _, dep := range deps {
-		name := dep + "/manifest.json"
-		data, err := readFile(filepath.Join(base, name))
-		if err != nil {
-			return nil, err
-		}
-		hash := digest(data)
-		inputs[name] = &hash
-	}
-	return inputs, nil
-}
-
 func runStep(ctx context.Context, base, step string, request DatabaseRequest, source string, out io.Writer, embedder Embedder, database Database, options RunOptions, calibration ...CalibrationOpener) error {
+	options.ParserTable = options.ParserTable.Clone()
+	if err := options.ParserTable.Validate(); err != nil {
+		return err
+	}
+	if options.state == nil {
+		options.state = &runState{}
+	}
 	target, err := checkedDir(filepath.Join(base, step))
 	if err != nil {
 		return err
@@ -172,32 +164,60 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 	}
 	err = nil
 	var inputs map[string]*string
+	var parseInputs *snapshotParseInputs
 	if step == "snapshot" && exists {
-		inputs, err = snapshotInputs(target)
+		parseInputs, err = readSnapshotParseInputs(base, options.ParserTable)
+		if err == nil {
+			inputs, err = snapshotInputsFrozen(parseInputs)
+		}
 	} else if step != "snapshot" {
-		inputs, err = stepInputs(base, step)
+		if options.state != nil && options.state.snapshotManifest != nil {
+			parseInputs, err = readSnapshotWithManifest(base, options.ParserTable, options.state.snapshotManifest)
+		} else {
+			parseInputs, err = readSnapshotParseInputs(base, options.ParserTable)
+		}
+		if err == nil && step == "parse" {
+			err = parseInputs.loadParseInputs()
+		}
+		if err == nil {
+			inputs, err = stepInputs(base, step, &parseInputs.manifestHash, options.state)
+		}
 	}
 	if err != nil {
 		return err
+	}
+	if parseInputs != nil {
+		parseInputs.state = options.state
 	}
 	r := stepRecipe(step)
 	pdfIdentity := ""
 	pdfRequired := false
 	if step == "parse" {
-		reg, readErr := readRegistry(filepath.Join(base, "snapshot", "sources/frameworks.yaml"))
-		if readErr != nil {
-			return readErr
+		reg := parseInputs.registry
+		needsPDF := false
+		for _, v := range releaseVersions(reg) {
+			pdf := options.ParserTable.NeedsPDF(v.Parser)
+			needsPDF = needsPDF || pdf
 		}
-		if availablePDFRuntime(options.PDFRuntime) {
+		if needsPDF && availablePDFRuntime(options.PDFRuntime) {
 			pdfIdentity = options.PDFRuntime.RuntimeIdentity()
+			if pdfIdentity == "" {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
+				return fmt.Errorf("PDF runtime configuration error")
+			}
 		}
-		r, err = pdfParseRecipe(reg, pdfIdentity)
+		r, err = pdfParseRecipe(reg, pdfIdentity, options.ParserTable)
 		if err != nil {
 			return err
 		}
 		_, pdfRequired = r.Parameters["pdf_runtime_sha256"]
 		if pdfRequired {
-			if verifyErr := options.PDFRuntime.VerifyRuntime(); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+			if verifyErr := options.PDFRuntime.VerifyRuntime(ctx); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
 				return fmt.Errorf("PDF runtime verification failed")
 			}
 			if ctxErr := ctx.Err(); ctxErr != nil {
@@ -212,16 +232,27 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 		r.Parameters["law_stage_recipe_hash"] = embedder.Recipe()
 	}
 	if exists {
-		if err = validate(target, r, inputs); err != nil {
+		if step == "snapshot" {
+			err = validateFrozenSnapshot(parseInputs, r, inputs)
+		} else {
+			err = options.state.validateStep(base, step, r, inputs)
+		}
+		if err != nil {
 			return err
 		}
+		if step == "snapshot" && options.state != nil {
+			options.state.snapshotManifest = append([]byte(nil), parseInputs.manifestData...)
+			if _, captureErr := options.state.captureBytes(base, step, parseInputs.manifestData); captureErr != nil {
+				return captureErr
+			}
+		}
 		if step == "embed" {
-			if err = validateEmbeddings(ctx, base, target, embedder, *inputs["chunk/manifest.json"]); err != nil {
+			if err = validateEmbeddings(ctx, base, target, embedder, *inputs["chunk/manifest.json"], false, parseInputs); err != nil {
 				return err
 			}
 		}
 		if step == "build" {
-			if err = validateBuild(target); err != nil {
+			if err = validateBuild(base, options.state); err != nil {
 				return err
 			}
 		}
@@ -240,44 +271,30 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 	if err = os.Mkdir(tmp, 0700); err != nil {
 		return hide("create step directory", err)
 	}
-	if step == "build" {
-		var opener CalibrationOpener
-		if len(calibration) > 0 {
-			opener = calibration[0]
-		}
-		return buildStep(ctx, base, tmp, request, embedder, database, opener, func() error {
-			if sealErr := seal(tmp, target, r, inputs); sealErr != nil {
-				return sealErr
-			}
-			if _, writeErr := fmt.Fprintf(out, "%s complete\n", step); writeErr != nil {
-				return hide("write progress", writeErr)
-			}
-			return nil
-		})
+	stage := newStagedOutputs(tmp)
+	if parseInputs != nil {
+		parseInputs.stage = stage
 	}
-	if step == "evaluate" {
-		return evaluateStep(ctx, base, tmp, request, database, func() error {
-			if sealErr := seal(tmp, target, r, inputs); sealErr != nil {
-				return sealErr
-			}
-			_, writeErr := fmt.Fprintf(out, "%s complete\n", step)
-			if writeErr != nil {
-				return hide("write progress", writeErr)
-			}
-			return nil
-		})
+	var opener CalibrationOpener
+	if len(calibration) > 0 {
+		opener = calibration[0]
 	}
+
 	switch step {
 	case "snapshot":
-		inputs, err = snapshot(ctx, tmp, source)
+		inputs, err = snapshotWithStage(ctx, tmp, source, options.ParserTable, stage)
 	case "parse":
-		err = parseStep(ctx, base, tmp)
+		err = parseStepWith(ctx, base, tmp, options.PDFRuntime, options.ParserTable, parseInputs)
 	case "relate":
-		err = relateStep(ctx, base, tmp)
+		err = relateStep(ctx, base, tmp, parseInputs)
 	case "chunk":
-		err = chunkStep(ctx, base, tmp)
+		err = chunkStep(ctx, base, tmp, parseInputs)
 	case "embed":
-		err = embedStep(ctx, base, tmp, embedder)
+		err = embedStep(ctx, base, tmp, embedder, parseInputs)
+	case "build":
+		err = buildStep(ctx, base, tmp, request, embedder, database, opener, parseInputs)
+	case "evaluate":
+		err = evaluateStep(ctx, base, tmp, request, database, parseInputs)
 	}
 	if err != nil {
 		return err
@@ -286,7 +303,10 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 		return err
 	}
 	if pdfRequired {
-		if verifyErr := options.PDFRuntime.VerifyRuntime(); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+		if verifyErr := options.PDFRuntime.VerifyRuntime(ctx); verifyErr != nil || options.PDFRuntime.RuntimeIdentity() != pdfIdentity {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
 			return fmt.Errorf("PDF runtime verification failed")
 		}
 		if err := ctx.Err(); err != nil {
@@ -294,12 +314,32 @@ func runStep(ctx context.Context, base, step string, request DatabaseRequest, so
 		}
 	}
 	if step == "embed" {
-		if err := validateEmbeddings(ctx, base, tmp, embedder, *inputs["chunk/manifest.json"]); err != nil {
+		if err := validateEmbeddings(ctx, base, tmp, embedder, *inputs["chunk/manifest.json"], true, parseInputs); err != nil {
 			return err
 		}
 	}
-	if err := seal(tmp, target, r, inputs); err != nil {
+	if err := seal(tmp, target, r, inputs, stage); err != nil {
 		return err
+	}
+	if step == "snapshot" {
+		frozen, readErr := readSnapshotWithManifest(base, options.ParserTable, stage.manifest)
+		if readErr != nil {
+			return readErr
+		}
+		options.state.snapshotManifest = append([]byte(nil), frozen.manifestData...)
+		if _, captureErr := options.state.captureBytes(base, step, frozen.manifestData); captureErr != nil {
+			return captureErr
+		}
+		if captureErr := options.state.capturePublished(base, step, r, inputs); captureErr != nil {
+			return captureErr
+		}
+	} else {
+		if _, captureErr := options.state.captureBytes(base, step, stage.manifest); captureErr != nil {
+			return captureErr
+		}
+		if captureErr := options.state.capturePublished(base, step, r, inputs); captureErr != nil {
+			return captureErr
+		}
 	}
 	if _, err := fmt.Fprintf(out, "%s complete\n", step); err != nil {
 		return hide("write progress", err)

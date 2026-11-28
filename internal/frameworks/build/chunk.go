@@ -3,19 +3,19 @@ package build
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"danny.vn/trachuan/internal/textsplit"
 )
 
-func chunkStep(ctx context.Context, base, dir string) error {
-	reg, err := readRegistry(filepath.Join(base, "snapshot/sources/frameworks.yaml"))
+func chunkStep(ctx context.Context, base, dir string, snapshots ...*snapshotParseInputs) error {
+	frozen, err := snapshotForStep(base, snapshots...)
 	if err != nil {
 		return err
 	}
-	controls, err := loadRows[Control](filepath.Join(base, "parse/controls.jsonl"))
+	reg := frozen.registry
+	controls, err := readStepRows[Control](frozen, base, "parse", "controls.jsonl")
 	if err != nil {
 		return err
 	}
@@ -64,10 +64,10 @@ func chunkStep(ctx context.Context, base, dir string) error {
 		}
 		return chunks[i].Ordinal < chunks[j].Ordinal
 	})
-	if err := writeRows(dir, "chunks.jsonl", chunks); err != nil {
+	if err := writeRows(dir, "chunks.jsonl", chunks, frozen.stage); err != nil {
 		return err
 	}
-	return writeGaps(dir, nil)
+	return writeGaps(dir, nil, frozen.stage)
 }
 
 func citationPath(c Control, nodes map[string]Control) (string, error) {

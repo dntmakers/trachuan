@@ -3,11 +3,10 @@ package build
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
+
+	"danny.vn/trachuan/internal/frameworks/parse"
 
 	"danny.vn/trachuan/internal/frameworks/registry"
 	"danny.vn/trachuan/internal/frameworks/relate"
@@ -19,23 +18,28 @@ type stepProvenance struct {
 }
 
 type databaseInputs struct {
-	versions []registry.Framework
-	controls []Control
-	chunks   []Chunk
-	edges    []relate.Edge
-	gaps     []Gap
-	steps    map[string]stepProvenance
-	cases    []GoldenCase
-	caseHash string
+	parserTable parse.Table
+	versions    []registry.Framework
+	controls    []Control
+	chunks      []Chunk
+	edges       []relate.Edge
+	gaps        []Gap
+	steps       map[string]stepProvenance
+	cases       []GoldenCase
+	caseHash    string
+	state       *runState
 }
 
-func readDatabaseInputs(base string) (databaseInputs, error) {
+func readDatabaseInputs(base string, snapshots ...*snapshotParseInputs) (databaseInputs, error) {
 	var d databaseInputs
-	reg, err := readRegistry(filepath.Join(base, "snapshot/sources/frameworks.yaml"))
+	frozen, err := snapshotForStep(base, snapshots...)
 	if err != nil {
 		return d, err
 	}
-	policy, err := readFile(filepath.Join(base, "snapshot/gap-kinds.json"))
+	d.parserTable = frozen.table
+	d.state = frozen.artifactState()
+	reg := frozen.registry
+	policy, err := frozen.read("gap-kinds.json", false)
 	if err != nil {
 		return d, err
 	}
@@ -47,26 +51,32 @@ func readDatabaseInputs(base string) (databaseInputs, error) {
 		return d, fmt.Errorf("gap kind table changed")
 	}
 	d.versions = releaseVersions(reg)
-	if d.controls, err = loadRows[Control](filepath.Join(base, "parse/controls.jsonl")); err != nil {
+	if d.controls, err = readStepRows[Control](frozen, base, "parse", "controls.jsonl"); err != nil {
 		return d, err
 	}
-	caseData, err := readFile(filepath.Join(base, "snapshot/trachuan/golden.csv"))
-	if err == nil {
-		if err = validateGoldenReview(filepath.Join(base, "snapshot")); err != nil {
-			return d, err
-		}
+	caseData, err := frozen.read("trachuan/golden.csv", true)
+	if err != nil {
+		return d, err
+	}
+	review, err := frozen.read("trachuan/golden-review.yaml", true)
+	if err != nil {
+		return d, err
+	}
+	if err = validateGoldenReviewData(caseData, review); err != nil {
+		return d, err
+	}
+	if caseData != nil {
 		d.cases, err = MapGoldenCases(bytes.NewReader(caseData), reg, d.controls)
 		if err != nil {
 			return d, err
 		}
 		d.caseHash = digest(caseData)
-	} else if !errors.Is(err, os.ErrNotExist) {
+	}
+
+	if d.chunks, err = readStepRows[Chunk](frozen, base, "chunk", "chunks.jsonl"); err != nil {
 		return d, err
 	}
-	if d.chunks, err = loadRows[Chunk](filepath.Join(base, "chunk/chunks.jsonl")); err != nil {
-		return d, err
-	}
-	if d.edges, err = loadRows[relate.Edge](filepath.Join(base, "relate/edges.jsonl")); err != nil {
+	if d.edges, err = readStepRows[relate.Edge](frozen, base, "relate", "edges.jsonl"); err != nil {
 		return d, err
 	}
 	d.steps = map[string]stepProvenance{}
@@ -76,7 +86,16 @@ func readDatabaseInputs(base string) (databaseInputs, error) {
 	}
 	seen := map[string]bool{}
 	for _, step := range []string{"snapshot", "parse", "relate", "chunk", "embed"} {
-		raw, err := readFile(filepath.Join(base, step, "manifest.json"))
+		var raw []byte
+		if step == "snapshot" {
+			raw = frozen.manifestData
+		} else {
+			var stepArtifact *frozenStep
+			stepArtifact, err = d.state.capture(base, step)
+			if err == nil {
+				raw = stepArtifact.raw
+			}
+		}
 		if err != nil {
 			return d, err
 		}
@@ -85,7 +104,15 @@ func readDatabaseInputs(base string) (databaseInputs, error) {
 			return d, hide("decode step provenance", err)
 		}
 		d.steps[step] = stepProvenance{m.Recipe, stepInputHash(m.Inputs)}
-		gaps, err := loadRows[Gap](filepath.Join(base, step, "gaps.jsonl"))
+		var gaps []Gap
+		if step == "snapshot" {
+			raw, err = frozen.read("gaps.jsonl", false)
+			if err == nil {
+				gaps, err = decodeRows[Gap](raw)
+			}
+		} else {
+			gaps, err = readStepRows[Gap](frozen, base, step, "gaps.jsonl")
+		}
 		if err != nil {
 			return d, err
 		}

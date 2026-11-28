@@ -3,7 +3,6 @@ package build
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -55,11 +54,19 @@ type previousReport struct {
 	CaseCounts  []GoldenCaseCount `json:"case_counts"`
 }
 
-func readPreviousReport(base, rel string) (*previousReference, previousReport, error) {
-	raw, err := optionalArtifact(filepath.Join(base, "snapshot/trachuan/previous-report.json"))
-	if err != nil || raw == nil {
+func readPreviousReportFrozen(frozen *snapshotParseInputs, rel string) (*previousReference, previousReport, error) {
+	raw, err := frozen.read("trachuan/previous-report.json", true)
+	if err != nil {
 		return nil, previousReport{}, err
 	}
+	return parsePreviousReport(raw, rel)
+}
+
+func parsePreviousReport(raw []byte, rel string) (*previousReference, previousReport, error) {
+	if raw == nil {
+		return nil, previousReport{}, nil
+	}
+	var err error
 	var previous previousReport
 	if err = json.Unmarshal(raw, &previous); err != nil {
 		return nil, previousReport{}, hide("decode previous report", err)

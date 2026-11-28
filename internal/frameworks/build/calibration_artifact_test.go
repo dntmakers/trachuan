@@ -45,5 +45,5 @@ func TestBuild_PlaceholderHasNoCalibration(t *testing.T) {
 	require.Empty(t, m.CalibrationSHA256)
 	require.Equal(t, "placeholder", m.RetrievalRecipe["status"])
 	require.NoFileExists(t, filepath.Join(dir, "calibration.json"))
-	require.NoError(t, validateBuild(dir))
+	require.NoError(t, validateBuild(filepath.Dir(dir), &runState{}))
 }

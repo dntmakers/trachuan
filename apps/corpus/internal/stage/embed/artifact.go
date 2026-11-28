@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -16,7 +17,6 @@ import (
 	"danny.vn/trachuan/internal/embedding"
 )
 
-// Index describes the vectors and rejected chunk ordinals.
 type Index struct {
 	Version     int              `json:"version"`
 	DocumentKey string           `json:"document_key"`
@@ -28,7 +28,6 @@ type Index struct {
 	Rejected    []Rejected       `json:"rejected"`
 }
 
-// Row maps a vector to its chunk and input.
 type Row struct {
 	Row          int    `json:"row"`
 	ChunkOrdinal int    `json:"chunk_ordinal"`
@@ -36,7 +35,6 @@ type Row struct {
 	InputSHA256  string `json:"input_sha256"`
 }
 
-// Rejected records an input omitted from the vectors.
 type Rejected struct {
 	ChunkOrdinal int    `json:"chunk_ordinal"`
 	TokenCount   *int   `json:"token_count"`
@@ -98,7 +96,6 @@ func validHash(s string) bool {
 	return err == nil && len(b) == 32 && s == fmt.Sprintf("%x", b)
 }
 
-// ReadArtifact verifies and reads the embedding index.
 func ReadArtifact(dir string) (Index, error) {
 	var idx Index
 	if _, err := artifact.Verify(dir); err != nil {
@@ -108,8 +105,21 @@ func ReadArtifact(dir string) (Index, error) {
 }
 
 func readVerifiedIndex(dir string) (Index, error) {
+	file, err := os.Open(filepath.Join(dir, "index.json"))
+	if err != nil {
+		return Index{}, fmt.Errorf("open index.json: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return Index{}, fmt.Errorf("decode index.json: %w", err)
+	}
+	return DecodeIndex(data)
+}
+
+func DecodeIndex(data []byte) (Index, error) {
 	var idx Index
-	if err := decodeFile(dir, "index.json", &idx); err != nil {
+	if err := decodeArtifact("index.json", bytes.NewReader(data), &idx); err != nil {
 		return idx, err
 	}
 	if idx.Version != 1 || idx.DocumentKey == "" || !validHash(idx.ChunkSHA256) || idx.RecipeHash != idx.Recipe.Hash() || idx.Dimensions <= 0 || idx.Dimensions != idx.Recipe.Dimensions || idx.Rows == nil || idx.Rejected == nil {
@@ -165,13 +175,34 @@ func validateVectors(data []byte, rows, dimensions int) error {
 	return nil
 }
 
-// VectorReader reads vector rows from an artifact.
+func ValidateVectorBytes(data []byte, index Index) error {
+	return validateVectors(data, len(index.Rows), index.Dimensions)
+}
+
+func ReadVectorBytes(data []byte, index Index, row int) ([]float32, error) {
+	if row < 0 || row >= len(index.Rows) {
+		return nil, fmt.Errorf("vector row out of bounds")
+	}
+	if index.Dimensions <= 0 || int64(len(data)) != int64(len(index.Rows))*int64(index.Dimensions)*4 {
+		return nil, fmt.Errorf("invalid vector size")
+	}
+	width := index.Dimensions * 4
+	raw := data[row*width : (row+1)*width]
+	if err := validateVectors(raw, 1, index.Dimensions); err != nil {
+		return nil, err
+	}
+	values := make([]float32, index.Dimensions)
+	for i := range values {
+		values[i] = math.Float32frombits(binary.LittleEndian.Uint32(raw[i*4:]))
+	}
+	return values, nil
+}
+
 type VectorReader struct {
 	file             *os.File
 	dimensions, rows int
 }
 
-// OpenVectors verifies the manifest, file size and every vector before opening rows.
 func OpenVectors(dir string, index Index) (*VectorReader, error) {
 	actual, err := ReadArtifact(dir)
 	if err != nil {
@@ -206,7 +237,6 @@ func OpenVectors(dir string, index Index) (*VectorReader, error) {
 	return &VectorReader{f, index.Dimensions, len(index.Rows)}, nil
 }
 
-// Row returns a vector by its row number.
 func (r *VectorReader) Row(i int) ([]float32, error) {
 	if i < 0 || i >= r.rows {
 		return nil, fmt.Errorf("vector row out of bounds")
@@ -225,5 +255,4 @@ func (r *VectorReader) Row(i int) ([]float32, error) {
 	return values, nil
 }
 
-// Close closes the vector file.
 func (r *VectorReader) Close() error { return r.file.Close() }

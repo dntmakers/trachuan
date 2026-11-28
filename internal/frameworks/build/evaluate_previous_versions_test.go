@@ -2,8 +2,6 @@ package build
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -38,14 +36,10 @@ func TestPreviousComparison_VersionMembership(t *testing.T) {
 }
 
 func TestPreviousReport_PreservesVersionCounts(t *testing.T) {
-	base := t.TempDir()
-	dir := filepath.Join(base, "snapshot/trachuan")
-	require.NoError(t, os.MkdirAll(dir, 0700))
 	report := EvaluationReport{Version: 1, Release: "20990101", QualityPass: true, CaseCounts: []GoldenCaseCount{{Code: "fw-alpha", Version: "1", Accepted: 1}, {Code: "fw-alpha", Version: "2", OutOfRelease: 1}}, EvaluationResult: EvaluationResult{Cases: []CaseResult{pairedCaseFixture("old", 1, 1), versionCaseFixture("outside", "out_of_release")}}}
 	raw, err := json.Marshal(report)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "previous-report.json"), raw, 0600))
-	reference, previous, err := readPreviousReport(base, "20990102")
+	reference, previous, err := parsePreviousReport(raw, "20990102")
 	require.NoError(t, err)
 	require.Equal(t, report.CaseCounts, previous.CaseCounts)
 	result := comparePrevious(reference, previous, []CaseResult{versionCaseFixture("all-new-id", "rejected")}, []GoldenCaseCount{{Code: "fw-alpha", Version: "2", Rejected: 1}})

@@ -270,3 +270,28 @@ func TestEmbed_Rejects422AfterTokenize(t *testing.T) {
 		t.Fatalf("calls=%v error=%v", f.calls, err)
 	}
 }
+
+func TestArtifact_ByteDecoderMatchesPublishedVectors(t *testing.T) {
+	idx, vectors, err := run(t, &fake{}, chunk.Chunk{Ordinal: 0, Content: "invented"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := DecodeIndex(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validateErr := ValidateVectorBytes(vectors, decoded); validateErr != nil {
+		t.Fatal(validateErr)
+	}
+	values, err := ReadVectorBytes(vectors, decoded, 0)
+	if err != nil || len(values) != 2 || values[0] != 1 {
+		t.Fatalf("values=%v err=%v", values, err)
+	}
+	if validateErr := ValidateVectorBytes([]byte{0}, decoded); validateErr == nil {
+		t.Fatal("invalid vector size accepted")
+	}
+}

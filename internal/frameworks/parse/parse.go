@@ -3,6 +3,8 @@ package parse
 import (
 	"fmt"
 	"strings"
+
+	"danny.vn/trachuan/internal/pdftext"
 )
 
 type Mapping struct {
@@ -38,47 +40,150 @@ type Result struct {
 }
 
 func Parse(name string, data []byte, code, version string, expected *int) (*Result, error) {
-	var nodes []Node
-	var err error
-	switch name {
-	case "nist-oscal-800-53":
-		nodes, err = parseOSCAL(data, code, version)
-	case "nist-csf-2-xlsx":
-		nodes, err = parseCSF(data, code, version)
-	case "cis-controls-8-xlsx":
-		nodes, err = parseCIS(data)
-	case "csa-ccm-4-1-xlsx":
-		nodes, err = parseCSA(data)
-	default:
+	return Table(nil).ParseCatalog(name, data, code, version, expected)
+}
+
+type PDFInputs struct {
+	Layout []string
+	BBox   []pdftext.Page
+}
+
+type PDFParser struct {
+	Revision string
+	Legacy   bool
+	Catalog  func([]byte, string, string, *int) (*Result, error)
+	Role     string
+	Format   string
+	Layout   bool
+	BBox     bool
+	Parse    func(PDFInputs, string, *int) (*Result, error)
+}
+
+type Table map[string]PDFParser
+
+func Default() Table {
+	return Table{
+		"nist-oscal-800-53": {Revision: "1", Legacy: true, Role: "catalog", Catalog: func(data []byte, code, version string, expected *int) (*Result, error) {
+			nodes, err := parseOSCAL(data, code, version)
+			return finish(nodes, err, expected)
+		}},
+		"nist-csf-2-xlsx": {Revision: "1", Legacy: true, Role: "catalog", Catalog: func(data []byte, code, version string, expected *int) (*Result, error) {
+			nodes, err := parseCSF(data, code, version)
+			return finish(nodes, err, expected)
+		}},
+		"cis-controls-8-xlsx": {Revision: "1", Legacy: true, Role: "catalog", Catalog: func(data []byte, code, version string, expected *int) (*Result, error) {
+			nodes, err := parseCIS(data)
+			return finish(nodes, err, expected)
+		}},
+		"iso27018-2019-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseISO27018Pages(in.Layout, sha, expected)
+		}},
+		"iso27017-2015-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseISO27017Pages(in.Layout, sha, expected)
+		}},
+		"aicpa-tsc-2017-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseAICPAPages(in.Layout, sha, expected)
+		}},
+		"iso27001-2022-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseISO27001Pages(in.Layout, sha, expected)
+		}},
+		"tcvn11930-2017-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseTCVN11930Pages(in.Layout, sha, expected)
+		}},
+		"iso27002-2022-pdf": {Revision: "1", Role: "text", Format: "pdf", Layout: true, Parse: func(in PDFInputs, sha string, expected *int) (*Result, error) {
+			return parseISO27002Pages(in.Layout, sha, expected, iso27002Layout{sourceSHA: "1da41b305cce13c7d9150e8ceb520eb13d082d8a80080f9768a5dc9f2900b7e2", annexColumn: 49, tables: []isoTableRange{{page: 21, first: 31, last: 35}}})
+		}},
+		"csa-ccm-4-1-xlsx": {Revision: "2", Role: "catalog", Format: "xlsx", Catalog: func(data []byte, _, _ string, expected *int) (*Result, error) {
+			nodes, err := parseCSA(data)
+			return finish(nodes, err, expected)
+		}},
+	}
+}
+
+func (t Table) Clone() Table {
+	if t == nil {
+		return Default()
+	}
+	copy := make(Table, len(t))
+	for name, entry := range t {
+		copy[name] = entry
+	}
+	return copy
+}
+
+func (p PDFParser) Validate() error {
+	if p.Revision == "" || (p.Parse == nil) == (p.Catalog == nil) {
+		return fmt.Errorf("invalid parser configuration")
+	}
+	if p.Parse != nil {
+		if p.Legacy || p.Role != "text" || p.Format != "pdf" || (!p.Layout && !p.BBox) {
+			return fmt.Errorf("invalid parser configuration")
+		}
+	} else if p.Layout || p.BBox || p.Role != "catalog" || (p.Legacy && p.Format != "") || (!p.Legacy && p.Format == "") {
+		return fmt.Errorf("invalid parser configuration")
+	}
+	return nil
+}
+
+func (t Table) Validate() error {
+	if t == nil {
+		t = Default()
+	}
+	for name, entry := range t {
+		if name == "" {
+			return fmt.Errorf("invalid parser configuration")
+		}
+		if err := entry.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t Table) Requirements(name string) (PDFParser, bool) {
+	if t == nil {
+		t = Default()
+	}
+	p, ok := t[name]
+	if ok && p.Validate() != nil {
+		return PDFParser{}, false
+	}
+	return p, ok
+}
+
+func (t Table) NeedsPDF(name string) bool {
+	p, ok := t.Requirements(name)
+	return ok && p.Parse != nil
+}
+
+func (t Table) ParseCatalog(name string, data []byte, code, version string, expected *int) (*Result, error) {
+	p, ok := t.Requirements(name)
+	if !ok || p.Catalog == nil {
 		return nil, fmt.Errorf("unknown parser")
 	}
-	return finish(nodes, err, expected)
+	return p.Catalog(data, code, version, expected)
+}
+
+func ValidateCount(result *Result, expected *int) error {
+	if expected == nil {
+		return fmt.Errorf("expected control count unset")
+	}
+	if *expected <= 0 || result == nil || len(result.Nodes) != *expected {
+		return fmt.Errorf("control count mismatch")
+	}
+	return nil
+}
+
+func (t Table) ParsePDF(name string, inputs PDFInputs, sourceSHA string, expected *int) (*Result, error) {
+	p, ok := t.Requirements(name)
+	if !ok || p.Parse == nil {
+		return nil, fmt.Errorf("unknown parser")
+	}
+	return p.Parse(inputs, sourceSHA, expected)
 }
 
 func ParsePages(name string, pages []string, code, version, sourceSHA string, expected *int) (*Result, error) {
-	if name == "iso27018-2019-pdf" {
-		return parseISO27018Pages(pages, sourceSHA, expected)
-	}
-	if name == "iso27017-2015-pdf" {
-		return parseISO27017Pages(pages, sourceSHA, expected)
-	}
-	if name == "aicpa-tsc-2017-pdf" {
-		return parseAICPAPages(pages, sourceSHA, expected)
-	}
-	if name == "iso27001-2022-pdf" {
-		return parseISO27001Pages(pages, sourceSHA, expected)
-	}
-	if name == "tcvn11930-2017-pdf" {
-		return parseTCVN11930Pages(pages, sourceSHA, expected)
-	}
-	if name != "iso27002-2022-pdf" {
-		return nil, fmt.Errorf("unknown parser")
-	}
-	return parseISO27002Pages(pages, sourceSHA, expected, iso27002Layout{
-		sourceSHA:   "1da41b305cce13c7d9150e8ceb520eb13d082d8a80080f9768a5dc9f2900b7e2",
-		annexColumn: 49,
-		tables:      []isoTableRange{{page: 21, first: 31, last: 35}},
-	})
+	return Table(nil).ParsePDF(name, PDFInputs{Layout: pages}, sourceSHA, expected)
 }
 
 func parseISO27002Pages(pages []string, sourceSHA string, expected *int, layout iso27002Layout) (*Result, error) {

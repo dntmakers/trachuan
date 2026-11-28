@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"danny.vn/trachuan/internal/frameworks/parse"
+
 	"golang.org/x/text/cases"
 	"gopkg.in/yaml.v3"
 )
@@ -49,7 +51,9 @@ type File struct {
 	Parser string `yaml:"parser"`
 }
 
-func Parse(r io.Reader) (*Registry, error) {
+func Parse(r io.Reader) (*Registry, error) { return ParseWithTable(r, nil) }
+
+func ParseWithTable(r io.Reader, table parse.Table) (*Registry, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("read registry: %w", err)
@@ -74,7 +78,7 @@ func Parse(r io.Reader) (*Registry, error) {
 		}
 		return nil, fmt.Errorf("decode registry: %w", err)
 	}
-	if err := reg.Validate(); err != nil {
+	if err := reg.ValidateWithTable(table); err != nil {
 		return nil, fmt.Errorf("validate registry: %w", err)
 	}
 	return &reg, nil
@@ -82,7 +86,9 @@ func Parse(r io.Reader) (*Registry, error) {
 
 func normalized(s string) string { return cases.Fold().String(strings.Join(strings.Fields(s), " ")) }
 
-func (r *Registry) Validate() error {
+func (r *Registry) Validate() error { return r.ValidateWithTable(nil) }
+
+func (r *Registry) ValidateWithTable(table parse.Table) error {
 	versions := map[string]bool{}
 	paths := map[string]bool{}
 	hashes := map[string]bool{}
@@ -164,8 +170,8 @@ func (r *Registry) Validate() error {
 			paths[file.Path] = true
 			hashes[file.SHA256] = true
 		}
-		if f.ParseSource != "" || f.Parser == "csa-ccm-4-1-xlsx" {
-			if _, err := f.SelectedSource(); err != nil {
+		if entry, required := table.Requirements(f.Parser); f.ParseSource != "" || (required && !entry.Legacy) {
+			if _, err := f.SelectedSourceWithTable(table); err != nil {
 				return fmt.Errorf("invalid parse source for %s", f.Code)
 			}
 		}

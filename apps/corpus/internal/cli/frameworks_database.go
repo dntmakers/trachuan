@@ -47,7 +47,7 @@ func (m frameworkDatabaseMarker) owns(raw string) bool {
 	return dec.Decode(&extra) == io.EOF && actual.WorkDir == m.WorkDir && actual.Rel == m.Rel && actual.RunID != ""
 }
 
-func (d *frameworkDatabase) Build(ctx context.Context, req build.DatabaseRequest, load func(context.Context, *pgx.Conn) error, publish func() error) error {
+func (d *frameworkDatabase) Build(ctx context.Context, req build.DatabaseRequest, load func(context.Context, *pgx.Conn) error) error {
 	if !regexp.MustCompile(`^[0-9]{8}(_[0-9]{1,2})?$`).MatchString(req.Rel) || req.WorkDir == "" || req.RunID == "" {
 		return fmt.Errorf("invalid frameworks database identity")
 	}
@@ -76,7 +76,7 @@ func (d *frameworkDatabase) Build(ctx context.Context, req build.DatabaseRequest
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return publish()
+		return nil
 	})
 }
 
